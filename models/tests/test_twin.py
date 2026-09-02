@@ -35,13 +35,16 @@ def sick(index, *, infected_on_day=0, recovers_on_day=None, **kwargs):
     return agent(index, "infected", **clocks, **kwargs)
 
 
-def document(agents, contacts=(), *, day=1, seed=42, beta=0.9, total_cases_before=0):
+def document(agents, contacts=(), *, day=1, seed=42, beta=0.9, total_cases_before=0, mixing=None):
+    pars = {"diseases": {"type": "sir", "beta": beta, "init_prev": 0}}
+    if mixing is not None:
+        pars["virtual"] = mixing
     return {
         "study_id": "c0badf00-1111-4222-8333-444455556666",
         "day": day,
         "seed": seed,
         "population": len(agents),
-        "pars": {"diseases": {"type": "sir", "beta": beta, "init_prev": 0}},
+        "pars": pars,
         "protection": {"efficacy": 1.0, "blocks_transmission": True},
         "agents": list(agents),
         "contacts": list(contacts),
@@ -253,6 +256,104 @@ class TestUnits:
         )
 
         assert result["newly_infected"] > 5
+
+
+class TestVirtualMixing:
+    """The simulated remainder of the population has to actually mix.
+
+    A study of twenty players on a seven-day protocol will not produce an epidemic by itself. The
+    virtual population is what makes the game playable, so its contacts are part of the model and
+    not a detail -- and they are also the only route by which the wider outbreak reaches anyone.
+    """
+
+    def test_virtual_agents_are_inert_without_mixing(self):
+        result = tick(
+            document([sick(0, virtual=True)] + [agent(i) for i in range(1, 30)], [])
+        )
+
+        assert result["newly_infected"] == 0
+
+    def test_mixing_lets_the_virtual_population_seed_the_real_one(self):
+        result = tick(
+            document(
+                [sick(0, virtual=True)] + [agent(i) for i in range(1, 30)],
+                [],
+                mixing={"contacts_per_day": 10, "band_seconds": {"immediate": 3600}},
+            )
+        )
+
+        assert result["newly_infected"] > 0
+
+    def test_mixing_is_reproducible(self):
+        doc = document(
+            [sick(0, virtual=True)] + [agent(i) for i in range(1, 30)],
+            [],
+            mixing={"contacts_per_day": 8, "band_seconds": {"immediate": 3600}},
+        )
+
+        assert tick(copy.deepcopy(doc)) == tick(copy.deepcopy(doc))
+
+    def test_an_agent_is_never_its_own_contact(self):
+        # A self-edge would let an agent reinfect itself and inflate the epidemic from nowhere.
+        result = tick(
+            document(
+                [sick(0, virtual=True)] + [agent(i, virtual=True) for i in range(1, 20)],
+                [],
+                mixing={"contacts_per_day": 19, "band_seconds": {"immediate": 3600}},
+            )
+        )
+
+        for record in result["agents"]:
+            sources = [s["index"] for s in record.get("infection", {}).get("sources", [])]
+            assert record["index"] not in sources
+
+
+class TestInfectionCause:
+    """Every infection records how it happened.
+
+    A participant told they were infected is owed an account of why, and a study that cannot
+    separate infections caught from real measured contact from those injected by the simulated
+    population cannot report its own results honestly.
+    """
+
+    def test_a_measured_contact_is_recorded_as_such(self):
+        result = tick(
+            document([sick(0), agent(1)], [contact(0, 1)], beta=0.99)
+        )
+
+        infection = result["agents"][1]["infection"]
+        assert infection["cause"] == "measured_contact"
+        assert [s["subject"] for s in infection["sources"]] == ["subject-0000"]
+
+    def test_a_virtual_source_is_distinguished_from_a_real_one(self):
+        result = tick(
+            document([sick(0, virtual=True), agent(1)], [contact(0, 1)], beta=0.99)
+        )
+
+        infection = result["agents"][1]["infection"]
+        assert infection["cause"] == "virtual_population"
+        assert infection["sources"][0]["virtual"] is True
+
+    def test_several_possible_sources_are_reported_as_ambiguous(self):
+        # Starsim exposes no transmission tree, so with a real and a virtual source both present
+        # the honest answer is that we do not know which -- not a plausible-looking guess.
+        result = tick(
+            document(
+                [sick(0), sick(1, virtual=True), agent(2)],
+                [contact(0, 2), contact(1, 2)],
+                beta=0.99,
+            )
+        )
+
+        infection = result["agents"][2]["infection"]
+        assert infection["cause"] == "ambiguous"
+        assert len(infection["sources"]) == 2
+
+    def test_agents_that_were_not_infected_carry_no_cause(self):
+        result = tick(document([sick(0), agent(1)], []))
+
+        assert "infection" not in result["agents"][1]
+        assert "infection" not in result["agents"][0]
 
 
 class TestChainedDays:

@@ -79,7 +79,10 @@ defmodule EpidemicaServer.IngestTest do
       {:ok, result} = Ingest.submit(auth(), [envelope])
 
       assert result.quarantined == 1
-      assert [%{"reason" => "unknown_payload_schema", "status" => "quarantined"}] = stringify(result.exceptions)
+
+      assert [%{"reason" => "unknown_payload_schema", "status" => "quarantined"}] =
+               stringify(result.exceptions)
+
       assert [%{validated: false, payload: %{"grains_per_m3" => 42}}] = all_observations()
     end
   end
@@ -112,7 +115,9 @@ defmodule EpidemicaServer.IngestTest do
     end
 
     test "a future envelope version is quarantined as a version lag, not a defect" do
-      envelope = fixtures("valid") |> hd() |> Map.merge(%{"envelope_version" => "1.1", "seq" => 0})
+      envelope =
+        fixtures("valid") |> hd() |> Map.merge(%{"envelope_version" => "1.1", "seq" => 0})
+
       {:ok, result} = Ingest.submit(auth(), [envelope])
 
       assert [%{"reason" => "unknown_envelope_version"}] = stringify(result.exceptions)

@@ -67,7 +67,8 @@ def tick(doc: Mapping[str, Any]) -> dict[str, Any]:
     efficacy = float(protection.get("efficacy", 1.0))
     blocks_transmission = bool(protection.get("blocks_transmission", True))
 
-    sim = _build_sim(doc, population, pars)
+    edges = _edges(doc, agents, population, pars)
+    sim = _build_sim(doc, population, pars, edges)
     disease = sim.diseases[0]
     day = int(doc["day"])
 
@@ -77,10 +78,56 @@ def tick(doc: Mapping[str, Any]) -> dict[str, Any]:
     infected_before = np.array(disease.infected.raw, dtype=bool).copy()
     sim.run_one_step()
 
-    return _read_states(doc, disease, agents, infected_before, sim, day)
+    return _read_states(doc, disease, agents, infected_before, sim, day, edges)
 
 
-def _build_sim(doc: Mapping[str, Any], population: int, pars: Mapping[str, Any]) -> ss.Sim:
+def _edges(doc, agents, population: int, pars: Mapping[str, Any]) -> dict[str, np.ndarray]:
+    """The day's edge list: measured contacts, plus the virtual population's mixing."""
+    contacts = list(doc.get("contacts") or [])
+    p1 = [int(c["a"]) for c in contacts]
+    p2 = [int(c["b"]) for c in contacts]
+    beta = [edge_weight(c.get("band_seconds") or {}) for c in contacts]
+
+    vp1, vp2, vbeta = _virtual_edges(doc, agents, population, pars)
+    return {
+        "p1": np.array(p1 + vp1, dtype=np.int64),
+        "p2": np.array(p2 + vp2, dtype=np.int64),
+        "beta": np.array(beta + vbeta, dtype=np.float64),
+        "measured": len(p1),
+    }
+
+
+def _virtual_edges(doc, agents, population: int, pars: Mapping[str, Any]):
+    """Daily mixing for the simulated remainder of the population.
+
+    Virtual participants have no measured contacts, so without this they are epidemiologically
+    inert and completing the population achieves nothing: a seven-day study of twenty players
+    would simply never see an outbreak. Their partners are drawn from everyone, which is also the
+    only route by which the wider epidemic reaches a participant.
+    """
+    mixing = dict(pars.get("virtual") or {})
+    per_day = int(mixing.get("contacts_per_day", 0))
+    virtual = [int(a["index"]) for a in agents if a.get("virtual")]
+    if per_day <= 0 or not virtual or population < 2:
+        return [], [], []
+
+    weight = edge_weight(mixing.get("band_seconds") or {"close": REFERENCE_EXPOSURE_S})
+
+    # Its own stream, seeded from the tick, so the mixing is reproducible without perturbing the
+    # draws Starsim makes for transmission.
+    rng = np.random.default_rng([int(doc["seed"]), 0x7717])
+    p1: list[int] = []
+    p2: list[int] = []
+    for v in virtual:
+        partners = rng.choice(population - 1, size=min(per_day, population - 1), replace=False)
+        for partner in partners:
+            other = int(partner) + (1 if int(partner) >= v else 0)
+            p1.append(v)
+            p2.append(other)
+    return p1, p2, [weight] * len(p1)
+
+
+def _build_sim(doc: Mapping[str, Any], population: int, pars: Mapping[str, Any], edges) -> ss.Sim:
     disease_pars = dict(pars.get("diseases") or {})
     disease_pars.pop("type", None)
 
@@ -101,9 +148,6 @@ def _build_sim(doc: Mapping[str, Any], population: int, pars: Mapping[str, Any])
     disease_pars.setdefault("p_death", 0.0)
 
     contacts = list(doc.get("contacts") or [])
-    p1 = np.array([int(c["a"]) for c in contacts], dtype=np.int64)
-    p2 = np.array([int(c["b"]) for c in contacts], dtype=np.int64)
-    beta = np.array([edge_weight(c.get("band_seconds") or {}) for c in contacts], dtype=np.float64)
 
     sim = ss.Sim(
         n_agents=population,
@@ -121,9 +165,9 @@ def _build_sim(doc: Mapping[str, Any], population: int, pars: Mapping[str, Any])
 
     # Replace whatever the static network generated with the day's measured edges.
     net = sim.networks[0]
-    net.edges.p1 = p1
-    net.edges.p2 = p2
-    net.edges.beta = beta
+    net.edges.p1 = edges["p1"]
+    net.edges.p2 = edges["p2"]
+    net.edges.beta = edges["beta"]
     return sim
 
 
@@ -194,8 +238,10 @@ def _read_states(
     infected_before: np.ndarray,
     sim: ss.Sim,
     day: int,
+    edges,
 ) -> dict[str, Any]:
     uids = sim.people.auids
+    exposures = _exposures(agents, edges, infected_before, uids)
 
     out_agents = []
     newly_infected = 0
@@ -221,6 +267,8 @@ def _read_states(
             "state": state,
             "newly_infected": became,
         }
+        if became:
+            record["infection"] = exposures.get(i, {"cause": "unknown", "sources": []})
         for field, attr in CLOCKS.items():
             record[field] = _absolute_day(getattr(disease, attr), uid, day)
         out_agents.append(record)
@@ -239,6 +287,54 @@ def _read_states(
     }
 
 
+def _exposures(agents, edges, infected_before: np.ndarray, uids) -> dict[int, dict[str, Any]]:
+    """Who each agent could have caught it from, and through which pathway.
+
+    Starsim does not expose a transmission tree, so the specific transmitting edge is not
+    recoverable. What is recoverable is the exposure set -- the infectious neighbours the agent
+    actually had that day -- and reporting that rather than picking one of them keeps the record
+    honest about what is known. A single source is an attribution; several is an ambiguity, and
+    saying so is better than inventing certainty.
+    """
+    by_index = {int(a["index"]): a for a in agents}
+    neighbours: dict[int, list[int]] = {}
+    for a, b in zip(edges["p1"], edges["p2"]):
+        neighbours.setdefault(int(a), []).append(int(b))
+        neighbours.setdefault(int(b), []).append(int(a))
+
+    out = {}
+    for index in by_index:
+        sources = [
+            n
+            for n in dict.fromkeys(neighbours.get(index, []))
+            if n in by_index and bool(infected_before[uids[n]])
+        ]
+        if not sources:
+            continue
+
+        any_real = any(not by_index[n].get("virtual") for n in sources)
+        any_virtual = any(by_index[n].get("virtual") for n in sources)
+        if any_real and any_virtual:
+            cause = "ambiguous"
+        elif any_real:
+            cause = "measured_contact"
+        else:
+            cause = "virtual_population"
+
+        out[index] = {
+            "cause": cause,
+            "sources": [
+                {
+                    "index": n,
+                    "subject": by_index[n].get("subject"),
+                    "virtual": bool(by_index[n].get("virtual", False)),
+                }
+                for n in sorted(sources)
+            ],
+        }
+    return out
+
+
 def _absolute_day(state, uid, day: int):
     """Convert one of Starsim's timeline offsets back to an absolute study day."""
     value = state[uid]
@@ -251,9 +347,14 @@ def _absolute_day(state, uid, day: int):
     return day + int(value)
 
 
-def main() -> None:
-    """Read a tick document on stdin, write the result on stdout."""
-    doc = json.load(sys.stdin)
+def main(argv: list[str] | None = None) -> None:
+    """Run one tick: read a document from a file argument or stdin, write the result to stdout."""
+    argv = sys.argv[1:] if argv is None else argv
+    if argv:
+        with open(argv[0], encoding="utf-8") as handle:
+            doc = json.load(handle)
+    else:
+        doc = json.load(sys.stdin)
     json.dump(tick(doc), sys.stdout)
 
 

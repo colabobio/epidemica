@@ -37,7 +37,8 @@ defmodule EpidemicaServer.ReconciliationTest do
         "peer" => peer,
         "started_at" => DateTime.to_iso8601(at(from_min)),
         "ended_at" => DateTime.to_iso8601(at(to_min)),
-        "band_seconds" => Map.merge(%{"immediate" => 0, "close" => 0, "medium" => 0, "far" => 0}, bands),
+        "band_seconds" =>
+          Map.merge(%{"immediate" => 0, "close" => 0, "medium" => 0, "far" => 0}, bands),
         "band_edges_m" => [1.0, 2.0, 5.0],
         "sample_count" => 10,
         "estimator" => "coarse_distance",

@@ -52,6 +52,17 @@ config :logger, :console,
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
 
+# The twin queue runs one job at a time: a tick reads the state its predecessor wrote, so two of
+# them for the same study must never overlap.
+config :epidemica_server, Oban,
+  repo: EpidemicaServer.Repo,
+  queues: [twin: 1],
+  plugins: [{Oban.Plugins.Pruner, max_age: 60 * 60 * 24 * 7}]
+
+# Where the Starsim bridge lives. Set explicitly so a release fails loudly rather than guessing a
+# path and silently running nothing.
+config :epidemica_server, :twin, models_dir: Path.expand("../../models", __DIR__)
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"

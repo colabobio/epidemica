@@ -55,6 +55,7 @@ defmodule EpidemicaServer.MixProject do
       {:jason, "~> 1.2"},
       {:exonerate, "~> 1.2", runtime: false},
       {:decimal, "~> 3.0", override: true},
+      {:oban, "~> 2.18"},
       {:dns_cluster, "~> 0.1.1"},
       {:bandit, "~> 1.5"}
     ]

@@ -70,7 +70,7 @@ defmodule EpidemicaServer.Contracts do
   @state_base "https://schemas.epidemica.info/state/"
 
   @state_validators %{
-    @state_base <> "epigame/1.0.0.json" => :validate_epigame_state
+    (@state_base <> "epigame/1.0.0.json") => :validate_epigame_state
   }
 
   @doc "State URIs this build can validate."
@@ -93,10 +93,10 @@ defmodule EpidemicaServer.Contracts do
   @base "https://schemas.epidemica.info/observations/"
 
   @payload_validators %{
-    @base <> "proximity/contact_episode/1.0.0.json" => :validate_contact_episode,
-    @base <> "location/location_fix/1.0.0.json" => :validate_location_fix,
-    @base <> "instruments/survey_response/1.0.0.json" => :validate_survey_response,
-    @base <> "health/module_status/1.0.0.json" => :validate_module_status
+    (@base <> "proximity/contact_episode/1.0.0.json") => :validate_contact_episode,
+    (@base <> "location/location_fix/1.0.0.json") => :validate_location_fix,
+    (@base <> "instruments/survey_response/1.0.0.json") => :validate_survey_response,
+    (@base <> "health/module_status/1.0.0.json") => :validate_module_status
   }
 
   @doc "Schema URIs this build can validate."

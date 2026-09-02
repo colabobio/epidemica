@@ -150,10 +150,22 @@ defmodule EpidemicaServer.Enrollment do
 
       {token, device, participant} ->
         cond do
-          token.revoked_at != nil -> {:error, :revoked}
-          DateTime.compare(token.expires_at, DateTime.utc_now()) != :gt -> {:error, :expired}
-          participant.withdrawn_at != nil -> {:error, :withdrawn}
-          true -> {:ok, %Auth{study_id: device.study_id, device_id: device.device_id, subject: participant.subject}}
+          token.revoked_at != nil ->
+            {:error, :revoked}
+
+          DateTime.compare(token.expires_at, DateTime.utc_now()) != :gt ->
+            {:error, :expired}
+
+          participant.withdrawn_at != nil ->
+            {:error, :withdrawn}
+
+          true ->
+            {:ok,
+             %Auth{
+               study_id: device.study_id,
+               device_id: device.device_id,
+               subject: participant.subject
+             }}
         end
     end
   end
@@ -207,7 +219,9 @@ defmodule EpidemicaServer.Enrollment do
   def refresh(_), do: {:error, :invalid_token}
 
   defp revoke_all(device, kind, now) do
-    from(t in Token, where: t.device_row_id == ^device.id and t.kind == ^kind and is_nil(t.revoked_at))
+    from(t in Token,
+      where: t.device_row_id == ^device.id and t.kind == ^kind and is_nil(t.revoked_at)
+    )
     |> Repo.update_all(set: [revoked_at: now])
   end
 

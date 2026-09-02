@@ -38,7 +38,8 @@ defmodule EpidemicaServer.ContractsTest do
 
     test "rejects every invalid fixture" do
       for %{"case" => name, "instance" => instance} <- envelope_fixtures("invalid") do
-        assert {:error, _} = Contracts.validate_envelope(instance), "should have rejected: #{name}"
+        assert {:error, _} = Contracts.validate_envelope(instance),
+               "should have rejected: #{name}"
       end
     end
 

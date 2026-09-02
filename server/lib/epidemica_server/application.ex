@@ -12,6 +12,7 @@ defmodule EpidemicaServer.Application do
       EpidemicaServer.Repo,
       {DNSCluster, query: Application.get_env(:epidemica_server, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: EpidemicaServer.PubSub},
+      {Oban, Application.fetch_env!(:epidemica_server, Oban)},
       # Start a worker by calling: EpidemicaServer.Worker.start_link(arg)
       # {EpidemicaServer.Worker, arg},
       # Start to serve requests, typically the last entry

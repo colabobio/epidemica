@@ -38,7 +38,10 @@ defmodule Mix.Tasks.Epidemica.SeedStudy do
     decoded = Jason.decode!(source)
 
     name = opts[:name] || decoded["title"] || Path.basename(path)
-    code = opts[:code] || decoded["join_code"] || Mix.raise("no --code and no join_code in bundle")
+
+    code =
+      opts[:code] || decoded["join_code"] || Mix.raise("no --code and no join_code in bundle")
+
     hash = Study.hash_of(source)
 
     study =

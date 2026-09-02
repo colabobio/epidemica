@@ -67,10 +67,17 @@ defmodule EpidemicaServer.Ingest do
       length(devices) > 1 or length(studies) > 1 or length(subjects) > 1 ->
         {:error, :heterogeneous_batch}
 
-      devices != [auth.device_id] -> {:error, :forbidden}
-      studies != [auth.study_id] -> {:error, :forbidden}
-      subjects != [auth.subject] -> {:error, :forbidden}
-      true -> :ok
+      devices != [auth.device_id] ->
+        {:error, :forbidden}
+
+      studies != [auth.study_id] ->
+        {:error, :forbidden}
+
+      subjects != [auth.subject] ->
+        {:error, :forbidden}
+
+      true ->
+        :ok
     end
   end
 
@@ -99,7 +106,14 @@ defmodule EpidemicaServer.Ingest do
       }
     else
       {:error, detail} ->
-        %{index: index, seq: nil, status: :rejected, reason: :unparseable, detail: detail, row: nil}
+        %{
+          index: index,
+          seq: nil,
+          status: :rejected,
+          reason: :unparseable,
+          detail: detail,
+          row: nil
+        }
     end
   end
 

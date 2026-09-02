@@ -23,6 +23,9 @@ config :epidemica_server, EpidemicaServerWeb.Endpoint,
 # Print only warnings and errors during test
 config :logger, level: :warning
 
+# Tests drive ticks directly rather than waiting on a queue.
+config :epidemica_server, Oban, testing: :manual
+
 # Initialize plugs at runtime for faster test compilation
 config :phoenix, :plug_init_mode, :runtime
 

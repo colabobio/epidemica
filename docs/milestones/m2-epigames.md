@@ -191,13 +191,21 @@ result in one transaction.
 A subprocess rather than a service because a daily tick is a batch job: nothing to supervise, no RPC
 failure modes, and re-running the exact command with the same inputs is the reproducibility story.
 
-- [ ] Each tick stores its inputs, its seed and its outputs; re-running reproduces them exactly
-- [ ] Ticks are immutable — a tick is never recomputed, and no participant's history changes
-- [ ] A tick that fails leaves no partial state and can be retried
-- [ ] Virtual participants complete the population to the bundle's size, following ADR-0012's
+Three things the plan did not anticipate. Virtual participants need a **mixing model** of their own
+(`twin.pars.virtual`), because without contacts they are inert and completing the population
+achieves nothing. Starsim exposes **no transmission tree**, so an infection records the *exposure
+set* — the infectious neighbours it actually had — and marks itself `ambiguous` when more than one
+could explain it, rather than naming a source it cannot know. And **slots are permanent**: a
+participant joining mid-study takes a slot no one has held and a virtual agent is retired, so that a
+joiner never inherits a simulated person's infection history.
+
+- [x] Each tick stores its inputs, its seed and its outputs; re-running reproduces them exactly
+- [x] Ticks are immutable — a tick is never recomputed, and no participant's history changes
+- [x] A tick that fails leaves no partial state and can be retried
+- [x] Virtual participants complete the population to the bundle's size, following ADR-0012's
       pre-allocated pool with an `active` state
-- [ ] Every infection records its cause: a reconciled contact, or a virtual-population event
-- [ ] The Starsim version is recorded on every tick
+- [x] Every infection records its cause: a reconciled contact, or a virtual-population event
+- [x] The Starsim version is recorded on every tick
 
 ### W5 — Game rules
 
