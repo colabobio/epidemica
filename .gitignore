@@ -4,3 +4,7 @@ __pycache__/
 .pytest_cache/
 .DS_Store
 uv.lock
+server/_build/
+server/deps/
+server/priv/static/assets/
+*.ez

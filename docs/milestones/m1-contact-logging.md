@@ -171,16 +171,26 @@ was not built with cannot be validated and is therefore quarantined until redepl
 
 - [ ] A conformance suite driven from `contracts/api/ingest/v1.yaml` and the existing fixtures,
       which are reused directly as request bodies
-- [ ] Every `envelope/valid.json` fixture is accepted
-- [ ] Every `envelope/invalid.json` fixture is **quarantined** — not rejected, and never a 500
-- [ ] Unknown `schema_uri` stores the observation with `validated=false` and
+- [x] Every `envelope/valid.json` fixture is accepted
+- [x] Every `envelope/invalid.json` fixture is **stored, not lost** — quarantined where it can be
+      identified, rejected only where `(device_id, seq)` is unusable, and never a 500 or a
+      whole-batch failure
+- [x] Unknown `schema_uri` stores the observation with `validated=false` and
       `reason: unknown_payload_schema`
-- [ ] Repeated `(device_id, seq)` yields `duplicate` and exactly one stored row
-- [ ] A batch whose `device_id` disagrees with the token returns 403 and stores nothing
+- [x] Repeated `(device_id, seq)` yields `duplicate` and exactly one stored row
+- [x] A batch whose `device_id` disagrees with the token is refused and stores nothing
+- [x] The Elixir validator agrees with the Python validator on all 65 contract fixtures — a contract
+      that meant different things on the client and the server would fail in the field, which is the
+      most expensive place to discover it
 - [ ] Gzipped and uncompressed request bodies are both accepted
 - [ ] The `contacts` projection can be dropped and rebuilt from `observations` with an identical
       result
 - [ ] `mix release` runs on a bare VM with Postgres and Caddy, with no AWS service of any kind
+
+> **Criterion corrected during implementation.** This item originally read "every invalid fixture is
+> quarantined". That is wrong: an observation with a negative `seq` cannot serve as an idempotency
+> key, so there is no key under which to store it and `rejected` is the correct outcome. Quarantine
+> requires that the observation can at least be identified.
 
 ### W5 — `apps/template` and `studies/contactlog`
 

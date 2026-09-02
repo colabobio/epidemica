@@ -1,0 +1,304 @@
+defmodule EpidemicaServer.Ingest do
+  @moduledoc """
+  Batch ingest of observations.
+
+  Implements `contracts/api/ingest/v1.yaml`. Two rules from ADR-0002 drive the whole design:
+
+  * **Schema problems never lose data.** An observation this build cannot validate is stored with
+    `validated: false` and reported as quarantined. A newer client can outrun a server upgrade, and
+    field deployments are usually the last thing updated, so rejecting would destroy data that
+    cannot be recollected.
+  * **Delivery is idempotent.** `(device_id, seq)` is a unique key, so a retry after an ambiguous
+    failure is always safe and is reported as a duplicate.
+
+  Only an observation whose identifying fields cannot be read is *rejected*, because there is no key
+  under which to store it. Even then the client is told to keep it rather than discard it.
+  """
+
+  import Ecto.Query
+
+  alias EpidemicaServer.{Contracts, Repo}
+  alias EpidemicaServer.Ingest.Observation
+
+  @max_batch 1000
+
+  defmodule Auth do
+    @moduledoc "The device and study a token authorises."
+    defstruct [:study_id, :subject, :device_id]
+  end
+
+  @doc """
+  Ingest a batch of envelopes on behalf of an authenticated device.
+
+  Returns `{:ok, result}` or `{:error, reason}` where reason is `:too_large`, `:empty`,
+  `:heterogeneous_batch` (a 400) or `:forbidden` (a 403).
+  """
+  def submit(%Auth{} = auth, envelopes) when is_list(envelopes) do
+    with :ok <- check_size(envelopes),
+         :ok <- check_batch_binding(auth, envelopes) do
+      received_at = DateTime.utc_now()
+
+      classified = Enum.with_index(envelopes) |> Enum.map(&classify(&1, auth, received_at))
+
+      {storable, rejected} = Enum.split_with(classified, &(&1.status != :rejected))
+      inserted = insert(storable)
+
+      {:ok, build_result(classified, storable, rejected, inserted, received_at)}
+    end
+  end
+
+  defp check_size([]), do: {:error, :empty}
+  defp check_size(list) when length(list) > @max_batch, do: {:error, :too_large}
+  defp check_size(_), do: :ok
+
+  # A batch is homogeneous and must match the token. Accepting a batch that disagrees with its
+  # token would let one device write observations attributed to another participant, so this is a
+  # 403 rather than a per-item outcome.
+  defp check_batch_binding(auth, envelopes) do
+    devices = envelopes |> Enum.map(&Map.get(&1, "device_id")) |> Enum.uniq()
+    studies = envelopes |> Enum.map(&Map.get(&1, "study_id")) |> Enum.uniq()
+
+    cond do
+      length(devices) > 1 or length(studies) > 1 -> {:error, :heterogeneous_batch}
+      devices != [auth.device_id] -> {:error, :forbidden}
+      studies != [auth.study_id] -> {:error, :forbidden}
+      true -> :ok
+    end
+  end
+
+  # -- classification ---------------------------------------------------------------------------
+
+  defp classify({envelope, index}, auth, received_at) do
+    with {:ok, device_id, seq} <- identifying_fields(envelope) do
+      {status, reason, detail} = validate(envelope)
+
+      %{
+        index: index,
+        seq: seq,
+        status: status,
+        reason: reason,
+        detail: detail,
+        row: row(envelope, auth, device_id, seq, received_at, status, reason, detail)
+      }
+    else
+      {:error, detail} ->
+        %{index: index, seq: nil, status: :rejected, reason: :unparseable, detail: detail, row: nil}
+    end
+  end
+
+  # Without a usable (device_id, seq) there is no idempotency key, so there is nowhere to put the
+  # observation and no way to recognise a retry of it.
+  defp identifying_fields(envelope) when is_map(envelope) do
+    with {:ok, device_id} <- uuid(Map.get(envelope, "device_id")),
+         {:ok, seq} <- seq(Map.get(envelope, "seq")) do
+      {:ok, device_id, seq}
+    end
+  end
+
+  defp identifying_fields(_), do: {:error, "envelope is not an object"}
+
+  defp uuid(value) when is_binary(value) do
+    case Ecto.UUID.cast(value) do
+      {:ok, uuid} -> {:ok, uuid}
+      :error -> {:error, "device_id is not a UUID"}
+    end
+  end
+
+  defp uuid(_), do: {:error, "device_id is missing"}
+
+  defp seq(value) when is_integer(value) and value >= 0, do: {:ok, value}
+  defp seq(value) when is_integer(value), do: {:error, "seq must not be negative"}
+  defp seq(_), do: {:error, "seq is missing or not an integer"}
+
+  defp validate(envelope) do
+    version = Map.get(envelope, "envelope_version")
+
+    cond do
+      version not in Contracts.envelope_versions() ->
+        {:quarantined, :unknown_envelope_version, "envelope_version #{inspect(version)}"}
+
+      match?({:error, _}, Contracts.validate_envelope(envelope)) ->
+        {:error, error} = Contracts.validate_envelope(envelope)
+        {:quarantined, :envelope_invalid, describe(error)}
+
+      true ->
+        validate_payload(envelope)
+    end
+  end
+
+  defp validate_payload(envelope) do
+    schema_uri = Map.get(envelope, "schema_uri")
+    payload = Map.get(envelope, "payload")
+
+    case Contracts.validate_payload(schema_uri, payload) do
+      :ok ->
+        {:accepted, nil, nil}
+
+      {:error, :unknown_payload_schema} ->
+        {:quarantined, :unknown_payload_schema, "no local contract for #{schema_uri}"}
+
+      {:error, error} ->
+        {:quarantined, :payload_invalid, describe(error)}
+    end
+  end
+
+  defp describe(error) when is_list(error) do
+    error
+    |> Keyword.take([:instance_location, :absolute_keyword_location, :expected])
+    |> Enum.map_join(", ", fn {k, v} -> "#{k}=#{inspect(v)}" end)
+    |> String.slice(0, 1024)
+  end
+
+  defp describe(other), do: other |> inspect() |> String.slice(0, 1024)
+
+  # -- persistence ------------------------------------------------------------------------------
+
+  defp row(envelope, auth, device_id, seq, received_at, status, reason, detail) do
+    %{
+      study_id: auth.study_id,
+      subject: Map.get(envelope, "subject") || auth.subject,
+      device_id: device_id,
+      seq: seq,
+      module: string(Map.get(envelope, "module")),
+      schema_uri: string(Map.get(envelope, "schema_uri")),
+      envelope_version: string(Map.get(envelope, "envelope_version")),
+      protocol_hash: string(Map.get(envelope, "protocol_hash")),
+      observed_at: timestamp(Map.get(envelope, "observed_at")),
+      clock_offset_ms: integer(Map.get(envelope, "clock_offset_ms")),
+      received_at: received_at,
+      envelope: envelope,
+      payload: map_or_nil(Map.get(envelope, "payload")),
+      validated: status == :accepted,
+      validation_reason: reason && Atom.to_string(reason),
+      validation_detail: detail
+    }
+  end
+
+  defp string(v) when is_binary(v), do: v
+  defp string(_), do: nil
+  defp integer(v) when is_integer(v), do: v
+  defp integer(_), do: nil
+  defp map_or_nil(v) when is_map(v), do: v
+  defp map_or_nil(_), do: nil
+
+  # The contract allows fractional seconds of any length, so "…:22.481Z" arrives with millisecond
+  # precision while the column demands microsecond. The value is already correct; only the declared
+  # precision needs normalising.
+  defp timestamp(v) when is_binary(v) do
+    case DateTime.from_iso8601(v) do
+      {:ok, dt, _} -> %{dt | microsecond: {elem(dt.microsecond, 0), 6}}
+      _ -> nil
+    end
+  end
+
+  defp timestamp(_), do: nil
+
+  # `on_conflict: :nothing` makes a retry a no-op; the returned keys tell us which rows were new,
+  # and everything else in the batch was therefore already held.
+  defp insert([]), do: MapSet.new()
+
+  defp insert(storable) do
+    rows = Enum.map(storable, & &1.row)
+
+    {_count, returned} =
+      Repo.insert_all(Observation, rows,
+        on_conflict: :nothing,
+        conflict_target: [:device_id, :seq],
+        returning: [:seq]
+      )
+
+    MapSet.new(returned, & &1.seq)
+  end
+
+  defp build_result(classified, storable, rejected, inserted, received_at) do
+    outcomes =
+      Enum.map(storable, fn item ->
+        if MapSet.member?(inserted, item.seq) do
+          %{item | status: item.status}
+        else
+          %{item | status: :duplicate, reason: nil, detail: nil}
+        end
+      end) ++ rejected
+
+    counts = Enum.frequencies_by(outcomes, & &1.status)
+
+    accepted_seqs =
+      outcomes |> Enum.filter(&(&1.status == :accepted)) |> Enum.map(& &1.seq)
+
+    %{
+      received: length(classified),
+      accepted: Map.get(counts, :accepted, 0),
+      duplicate: Map.get(counts, :duplicate, 0),
+      quarantined: Map.get(counts, :quarantined, 0),
+      rejected: Map.get(counts, :rejected, 0),
+      highest_seq_accepted: if(accepted_seqs == [], do: nil, else: Enum.max(accepted_seqs)),
+      exceptions:
+        outcomes
+        |> Enum.reject(&(&1.status == :accepted))
+        |> Enum.sort_by(& &1.index)
+        |> Enum.map(&exception/1),
+      server_time: received_at
+    }
+  end
+
+  defp exception(item) do
+    %{index: item.index, seq: item.seq, status: Atom.to_string(item.status)}
+    |> maybe_put(:reason, item.reason && Atom.to_string(item.reason))
+    |> maybe_put(:detail, item.detail)
+  end
+
+  defp maybe_put(map, _key, nil), do: map
+  defp maybe_put(map, key, value), do: Map.put(map, key, value)
+
+  # -- watermark --------------------------------------------------------------------------------
+
+  @doc """
+  What the server holds for a device.
+
+  `highest_contiguous_seq` is the value a client may safely prune below. Pruning below
+  `highest_seq` instead would discard observations sitting behind a gap.
+  """
+  def watermark(%Auth{} = auth) do
+    seqs =
+      from(o in Observation,
+        where: o.device_id == ^auth.device_id and o.study_id == ^auth.study_id,
+        select: o.seq,
+        order_by: o.seq
+      )
+      |> Repo.all()
+
+    %{
+      device_id: auth.device_id,
+      study_id: auth.study_id,
+      highest_seq: List.last(seqs),
+      highest_contiguous_seq: highest_contiguous(seqs),
+      accepted_count: count_where(auth, true),
+      quarantined_count: count_where(auth, false),
+      server_time: DateTime.utc_now()
+    }
+  end
+
+  defp highest_contiguous([]), do: nil
+  defp highest_contiguous([first | _]) when first != 0, do: nil
+
+  defp highest_contiguous(seqs) do
+    Enum.reduce_while(seqs, nil, fn seq, acc ->
+      cond do
+        acc == nil and seq == 0 -> {:cont, 0}
+        acc != nil and seq == acc + 1 -> {:cont, seq}
+        acc != nil and seq == acc -> {:cont, acc}
+        true -> {:halt, acc}
+      end
+    end)
+  end
+
+  defp count_where(auth, validated) do
+    from(o in Observation,
+      where:
+        o.device_id == ^auth.device_id and o.study_id == ^auth.study_id and
+          o.validated == ^validated,
+      select: count()
+    )
+    |> Repo.one()
+  end
+end
