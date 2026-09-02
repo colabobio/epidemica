@@ -285,7 +285,7 @@ Four suites, none of which need a radio.
 cd packages/epidemica_proximity && flutter test
 
 # Swift: the wire codec, no Xcode project needed            (6 tests)
-cd packages/epidemica_proximity_ios/wire && swift test
+cd packages/epidemica_proximity_ios/ios/epidemica_proximity_ios/wire && swift test
 
 # Kotlin: the wire codec and the detection buffer          (10 tests)
 cd packages/epidemica_proximity/example/android \

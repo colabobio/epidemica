@@ -10,7 +10,11 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/theheraldproject/herald-for-ios.git", exact: "2.2.0"),
-        .package(path: "../../wire"),
+        // Nested inside this package rather than beside it. Flutter symlinks this directory into
+        // the app's ephemeral Packages, and SPM resolves a relative path against the symlink's
+        // location -- so a sibling dependency escapes the staged tree and Xcode reports it as a
+        // folder that does not exist.
+        .package(path: "wire"),
     ],
     targets: [
         .target(
