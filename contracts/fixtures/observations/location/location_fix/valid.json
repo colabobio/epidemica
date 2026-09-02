@@ -1,0 +1,87 @@
+[
+  {
+    "case": "full precision GPS fix while moving",
+    "instance": {
+      "latitude": 42.2626,
+      "longitude": -71.8023,
+      "accuracy_m": 8.5,
+      "altitude_m": 141.2,
+      "altitude_accuracy_m": 3.0,
+      "speed_mps": 1.4,
+      "speed_accuracy_mps": 0.5,
+      "heading_deg": 271.5,
+      "provider": "fused",
+      "sample_source": "background",
+      "generalization": { "method": "none" },
+      "activity": { "type": "walking", "confidence": 88 },
+      "is_moving": true,
+      "battery_level": 0.62,
+      "is_charging": false,
+      "mock_location": false
+    }
+  },
+  {
+    "case": "grid-generalised to 500 m for a minimal-disclosure study",
+    "instance": {
+      "latitude": 42.2625,
+      "longitude": -71.8025,
+      "accuracy_m": 12.0,
+      "provider": "gps",
+      "sample_source": "schedule",
+      "generalization": { "method": "grid", "cell_size_m": 500 }
+    }
+  },
+  {
+    "case": "truncated to three decimals",
+    "instance": {
+      "latitude": 42.262,
+      "longitude": -71.802,
+      "accuracy_m": 20.0,
+      "provider": "network",
+      "generalization": { "method": "truncated", "decimals": 3 }
+    }
+  },
+  {
+    "case": "geohash prefix only",
+    "instance": {
+      "latitude": 42.26,
+      "longitude": -71.8,
+      "accuracy_m": 65.0,
+      "provider": "network",
+      "generalization": { "method": "geohash", "geohash": "drt3n" }
+    }
+  },
+  {
+    "case": "region only, no coordinates at all",
+    "instance": {
+      "provider": "geocoded",
+      "sample_source": "background",
+      "generalization": { "method": "region_only" },
+      "region": { "country": "TZ", "admin1": "Kilimanjaro", "timezone": "Africa/Dar_es_Salaam", "geocoder": "platform" }
+    }
+  },
+  {
+    "case": "geofence transition feeding a JITAI decision point",
+    "instance": {
+      "latitude": 42.2626,
+      "longitude": -71.8023,
+      "accuracy_m": 15.0,
+      "provider": "fused",
+      "sample_source": "geofence",
+      "geofence_id": "clinic_entrance",
+      "generalization": { "method": "none" },
+      "is_moving": false
+    }
+  },
+  {
+    "case": "flagged mock location, retained rather than dropped",
+    "instance": {
+      "latitude": 0.0,
+      "longitude": 0.0,
+      "accuracy_m": 5.0,
+      "provider": "gps",
+      "generalization": { "method": "none" },
+      "mock_location": true
+    }
+  }
+]

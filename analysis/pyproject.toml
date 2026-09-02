@@ -1,0 +1,30 @@
+[project]
+name = "epidemica-analysis"
+version = "0.0.1"
+description = "Contract validation, data-quality checks and FAIR tooling for Epidemica datasets."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [{ name = "The Epidemica Project Contributors" }]
+
+dependencies = [
+    "jsonschema>=4.21",
+    "referencing>=0.35",
+    # JSON Schema format checkers. Both MIT. Deliberately NOT rfc3987, the usual choice for the
+    # `uri` format, which is GPLv3+ and excluded by the ADR-0009 dependency allow-list.
+    "rfc3339-validator>=0.1.4",
+    "rfc3986-validator>=0.1.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/epidemica_analysis"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

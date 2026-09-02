@@ -1,0 +1,128 @@
+[
+  {
+    "case": "region_only but coordinates present",
+    "why": "The whole point of region_only is that no coordinates leave the device. Allowing both would let a study claim minimisation while still uploading precise positions.",
+    "expect_paths": ["$.latitude", "$.longitude"],
+    "instance": {
+      "latitude": 42.2626,
+      "longitude": -71.8023,
+      "provider": "gps",
+      "generalization": { "method": "region_only" },
+      "region": { "country": "US" }
+    }
+  },
+  {
+    "case": "region_only without a region",
+    "why": "If coordinates are withheld, the coarse geography is the only signal left; omitting it makes the observation carry no location information at all.",
+    "instance": {
+      "provider": "geocoded",
+      "generalization": { "method": "region_only" }
+    }
+  },
+  {
+    "case": "coordinates without accuracy_m",
+    "why": "A fix that cannot be quality-filtered silently corrupts mobility measures, so accuracy is required whenever coordinates are present.",
+    "instance": {
+      "latitude": 42.2626,
+      "longitude": -71.8023,
+      "provider": "gps",
+      "generalization": { "method": "none" }
+    }
+  },
+  {
+    "case": "generalization omitted entirely",
+    "why": "Minimisation state is always recorded, including when nothing was minimised, so a dataset is self-describing without consulting its protocol.",
+    "instance": {
+      "latitude": 42.2626,
+      "longitude": -71.8023,
+      "accuracy_m": 8.0,
+      "provider": "gps"
+    }
+  },
+  {
+    "case": "generalization without a method",
+    "why": "method is what makes the minimisation machine-readable.",
+    "instance": {
+      "latitude": 42.2626,
+      "longitude": -71.8023,
+      "accuracy_m": 8.0,
+      "provider": "gps",
+      "generalization": { "cell_size_m": 500 }
+    }
+  },
+  {
+    "case": "latitude out of range",
+    "why": "Out-of-range coordinates are a classic sign of swapped lat/long or a unit error.",
+    "instance": {
+      "latitude": 142.2626,
+      "longitude": -71.8023,
+      "accuracy_m": 8.0,
+      "provider": "gps",
+      "generalization": { "method": "none" }
+    }
+  },
+  {
+    "case": "country as a three-letter code",
+    "why": "ISO 3166-1 alpha-2 is fixed by the contract so that cross-site joins do not depend on which standard each site happened to use.",
+    "instance": {
+      "provider": "geocoded",
+      "generalization": { "method": "region_only" },
+      "region": { "country": "TZA" }
+    }
+  },
+  {
+    "case": "country as a display name",
+    "why": "Reverse geocoders return names in the device locale, which is exactly the failure Travel Healthy had to work around by pinning the geocoding locale to English.",
+    "instance": {
+      "provider": "geocoded",
+      "generalization": { "method": "region_only" },
+      "region": { "country": "Tanzania" }
+    }
+  },
+  {
+    "case": "negative accuracy",
+    "why": "Accuracy is a radius.",
+    "instance": {
+      "latitude": 42.2626,
+      "longitude": -71.8023,
+      "accuracy_m": -1,
+      "provider": "gps",
+      "generalization": { "method": "none" }
+    }
+  },
+  {
+    "case": "unknown provider",
+    "why": "Providers are enumerated because their accuracy characteristics differ sharply; an open string would let unanalysable values in.",
+    "instance": {
+      "latitude": 42.2626,
+      "longitude": -71.8023,
+      "accuracy_m": 8.0,
+      "provider": "starlink",
+      "generalization": { "method": "none" }
+    }
+  },
+  {
+    "case": "battery level as a percentage",
+    "why": "battery_level is a fraction in [0,1]; accepting both scales would make the field meaningless.",
+    "instance": {
+      "latitude": 42.2626,
+      "longitude": -71.8023,
+      "accuracy_m": 8.0,
+      "provider": "gps",
+      "generalization": { "method": "none" },
+      "battery_level": 62
+    }
+  },
+  {
+    "case": "undeclared extra field",
+    "why": "Contracts are closed so that a module cannot quietly start shipping a field nobody has agreed to store.",
+    "instance": {
+      "latitude": 42.2626,
+      "longitude": -71.8023,
+      "accuracy_m": 8.0,
+      "provider": "gps",
+      "generalization": { "method": "none" },
+      "wifi_ssid": "CampusNet"
+    }
+  }
+]

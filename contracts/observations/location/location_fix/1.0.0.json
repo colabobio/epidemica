@@ -1,0 +1,146 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.epidemica.info/observations/location/location_fix/1.0.0.json",
+  "title": "Location fix",
+  "description": "A single geographic position reported by the location module. Carried as the `payload` of an observation envelope; the envelope's `observed_at` is the time of the fix, so this payload carries no timestamp of its own.\n\nRaw location traces are among the most re-identifying data a study can hold -- a handful of points is often enough to identify a person -- so this contract is built around making data minimisation explicit rather than optional. `generalization` records what precision reduction was deliberately applied, and `region_only` studies can report coarse geography with no coordinates at all.",
+  "type": "object",
+  "$comment": "The critical distinction here is between `accuracy_m` (how well the device could locate itself -- a sensor limitation) and `generalization` (how much precision the study chose to discard -- a policy decision). Conflating them makes both uninterpretable: you can no longer tell a poor urban-canyon GPS fix from a deliberately coarsened one, and you cannot reason about either measurement error or disclosure risk.",
+  "required": ["provider", "generalization"],
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": { "generalization": { "properties": { "method": { "const": "region_only" } }, "required": ["method"] } },
+        "required": ["generalization"]
+      },
+      "then": {
+        "required": ["region"],
+        "properties": {
+          "latitude": { "type": "null" },
+          "longitude": { "type": "null" }
+        }
+      },
+      "else": {
+        "required": ["latitude", "longitude", "accuracy_m"]
+      }
+    }
+  ],
+  "properties": {
+    "latitude": {
+      "type": ["number", "null"],
+      "minimum": -90,
+      "maximum": 90,
+      "description": "Decimal degrees, WGS84. Null or absent only when generalization.method is 'region_only'."
+    },
+    "longitude": {
+      "type": ["number", "null"],
+      "minimum": -180,
+      "maximum": 180,
+      "description": "Decimal degrees, WGS84."
+    },
+    "accuracy_m": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Horizontal accuracy radius in metres as reported by the platform (68% confidence). A sensor property, not a privacy control. Required whenever coordinates are present: a fix without an accuracy estimate cannot be quality-filtered, and unfiltered fixes silently corrupt mobility measures."
+    },
+    "generalization": {
+      "type": "object",
+      "description": "What deliberate precision reduction was applied on-device before upload. Always present, including when nothing was reduced, so that a dataset is self-describing and two studies with different minimisation policies can be told apart without consulting their protocols.",
+      "required": ["method"],
+      "additionalProperties": false,
+      "properties": {
+        "method": {
+          "enum": ["none", "truncated", "grid", "geohash", "region_only"],
+          "description": "none = full precision as measured; truncated = decimal places dropped; grid = snapped to a grid cell centre; geohash = reduced to a geohash prefix; region_only = no coordinates, coarse geography only."
+        },
+        "decimals": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 12,
+          "description": "Decimal places retained when method is 'truncated'."
+        },
+        "cell_size_m": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Grid cell edge length in metres when method is 'grid'."
+        },
+        "geohash": {
+          "type": "string",
+          "pattern": "^[0-9bcdefghjkmnpqrstuvwxyz]{1,12}$",
+          "description": "The geohash itself when method is 'geohash'. Base32, standard geohash alphabet."
+        }
+      }
+    },
+    "region": {
+      "type": "object",
+      "description": "Coarse geography, typically derived on-device by reverse geocoding. Reporting region without coordinates is the minimal-disclosure mode used by studies that only need country-level context, as Travel Healthy does for travel notices.",
+      "additionalProperties": false,
+      "properties": {
+        "country": {
+          "type": "string",
+          "pattern": "^[A-Z]{2}$",
+          "description": "ISO 3166-1 alpha-2. A code rather than a name: reverse geocoders return names in the device locale, which silently breaks cross-site joins."
+        },
+        "admin1": {
+          "type": "string",
+          "maxLength": 128,
+          "description": "First-level administrative subdivision (state, province, region)."
+        },
+        "timezone": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "IANA timezone identifier, e.g. 'Europe/Berlin'."
+        },
+        "geocoder": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Which geocoder produced this, since different geocoders disagree at borders."
+        }
+      }
+    },
+    "altitude_m": { "type": ["number", "null"], "description": "Metres above the WGS84 ellipsoid." },
+    "altitude_accuracy_m": { "type": "number", "minimum": 0 },
+    "speed_mps": { "type": ["number", "null"], "minimum": 0, "description": "Ground speed in metres per second." },
+    "speed_accuracy_mps": { "type": "number", "minimum": 0 },
+    "heading_deg": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "exclusiveMaximum": 360,
+      "description": "Direction of travel in degrees clockwise from true north."
+    },
+    "provider": {
+      "enum": ["gps", "network", "fused", "cell", "wifi", "manual", "geocoded", "unknown"],
+      "description": "How the position was obtained. Accuracy characteristics differ sharply between providers, so mixing them without recording which was used makes a mobility dataset hard to interpret."
+    },
+    "sample_source": {
+      "enum": ["foreground", "background", "headless", "boot", "motion_change", "geofence", "schedule", "manual"],
+      "description": "What caused this fix to be recorded. Essential for completeness analysis: a gap during 'background' sampling means something different from a gap when the app was never opened."
+    },
+    "geofence_id": {
+      "type": "string",
+      "maxLength": 64,
+      "description": "The geofence that triggered this fix, when sample_source is 'geofence'. Links a location observation to a JITAI decision point."
+    },
+    "activity": {
+      "type": "object",
+      "description": "Platform-reported motion activity, where available.",
+      "additionalProperties": false,
+      "properties": {
+        "type": { "enum": ["still", "walking", "running", "on_bicycle", "in_vehicle", "on_foot", "tilting", "unknown"] },
+        "confidence": { "type": "integer", "minimum": 0, "maximum": 100 }
+      }
+    },
+    "is_moving": { "type": "boolean", "description": "Platform's moving/stationary determination at the time of the fix." },
+    "battery_level": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Battery fraction at the time of the fix. Recorded because battery state explains most long gaps in background location data, and a completeness metric that cannot distinguish 'participant disengaged' from 'phone was dead' is not measuring engagement."
+    },
+    "is_charging": { "type": "boolean" },
+    "mock_location": {
+      "type": "boolean",
+      "description": "Platform flag indicating the fix came from a mock location provider. Retained as an integrity signal: in incentivised or compensated studies, spoofed location is a real and otherwise invisible failure mode."
+    }
+  }
+}

@@ -17,6 +17,10 @@ dependencies = [
 dev = [
     "pytest>=8",
     "matplotlib>=3.8",
+    # JSON Schema format checkers. Both MIT. Deliberately NOT rfc3987, which is the usual
+    # choice for the `uri` format but is GPLv3+ and excluded by the ADR-0009 allow-list.
+    "rfc3339-validator>=0.1.4",
+    "rfc3986-validator>=0.1.1",
 ]
 
 [build-system]

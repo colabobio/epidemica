@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.epidemica.info/observations/batch/1.0.0.json",
+  "title": "Observation batch",
+  "description": "Request body for POST /observations. Per ADR-0002 there is no batch header: every observation carries a full envelope and the repetition is absorbed by request-level gzip, so a batch is simply a list. Wrapped in an object rather than sent as a bare array so the request can gain optional fields additively without a breaking change.",
+  "type": "object",
+  "required": ["observations"],
+  "additionalProperties": false,
+  "properties": {
+    "observations": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1000,
+      "description": "Clients chunk their outbox to this bound. The server processes each item independently: one invalid observation is quarantined (validated=false) and never fails the batch, because a single bad record must not block delivery of good ones from a field site.",
+      "items": { "$ref": "https://schemas.epidemica.info/observations/envelope/1.0.0.json" }
+    }
+  }
+}

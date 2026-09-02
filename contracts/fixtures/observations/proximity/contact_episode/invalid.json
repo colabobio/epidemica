@@ -1,0 +1,116 @@
+[
+  {
+    "case": "a distance band is missing",
+    "why": "All four bands are always present, including zeros. An absent band is ambiguous between 'no time there' and 'not measured', and the whole exposure calculation depends on the distinction.",
+    "instance": {
+      "peer": "c9e2f1a0-6b3d-4c88-9a71-2f3e4d5c6b7a",
+      "started_at": "2026-08-11T14:03:22Z",
+      "ended_at": "2026-08-11T14:05:22Z",
+      "band_seconds": { "immediate": 0, "close": 120, "medium": 0 },
+      "band_edges_m": [1.0, 2.0, 5.0],
+      "sample_count": 4,
+      "estimator": "coarse_distance",
+      "estimator_version": "2.0.0"
+    }
+  },
+  {
+    "case": "negative band seconds",
+    "why": "Durations cannot be negative; this catches sign errors in on-device aggregation.",
+    "instance": {
+      "peer": "c9e2f1a0-6b3d-4c88-9a71-2f3e4d5c6b7a",
+      "started_at": "2026-08-11T14:03:22Z",
+      "ended_at": "2026-08-11T14:05:22Z",
+      "band_seconds": { "immediate": -5, "close": 120, "medium": 0, "far": 0 },
+      "band_edges_m": [1.0, 2.0, 5.0],
+      "sample_count": 4,
+      "estimator": "coarse_distance",
+      "estimator_version": "2.0.0"
+    }
+  },
+  {
+    "case": "band_edges_m omitted",
+    "why": "Recording the banding inline is what keeps the observation self-describing when the estimator changes, and is what makes datasets poolable across app versions.",
+    "instance": {
+      "peer": "c9e2f1a0-6b3d-4c88-9a71-2f3e4d5c6b7a",
+      "started_at": "2026-08-11T14:03:22Z",
+      "ended_at": "2026-08-11T14:05:22Z",
+      "band_seconds": { "immediate": 0, "close": 120, "medium": 0, "far": 0 },
+      "sample_count": 4,
+      "estimator": "coarse_distance",
+      "estimator_version": "2.0.0"
+    }
+  },
+  {
+    "case": "wrong number of band edges",
+    "why": "Four bands require exactly three interior edges; any other count means the payload and the band names disagree.",
+    "instance": {
+      "peer": "c9e2f1a0-6b3d-4c88-9a71-2f3e4d5c6b7a",
+      "started_at": "2026-08-11T14:03:22Z",
+      "ended_at": "2026-08-11T14:05:22Z",
+      "band_seconds": { "immediate": 0, "close": 120, "medium": 0, "far": 0 },
+      "band_edges_m": [1.0, 2.0],
+      "sample_count": 4,
+      "estimator": "coarse_distance",
+      "estimator_version": "2.0.0"
+    }
+  },
+  {
+    "case": "zero samples",
+    "why": "An episode with no underlying samples is not an observation of anything.",
+    "instance": {
+      "peer": "c9e2f1a0-6b3d-4c88-9a71-2f3e4d5c6b7a",
+      "started_at": "2026-08-11T14:03:22Z",
+      "ended_at": "2026-08-11T14:05:22Z",
+      "band_seconds": { "immediate": 0, "close": 120, "medium": 0, "far": 0 },
+      "band_edges_m": [1.0, 2.0, 5.0],
+      "sample_count": 0,
+      "estimator": "coarse_distance",
+      "estimator_version": "2.0.0"
+    }
+  },
+  {
+    "case": "unknown device class",
+    "why": "RSSI-to-distance mapping is device-dependent and only calibrated for the enumerated classes.",
+    "instance": {
+      "peer": "c9e2f1a0-6b3d-4c88-9a71-2f3e4d5c6b7a",
+      "started_at": "2026-08-11T14:03:22Z",
+      "ended_at": "2026-08-11T14:05:22Z",
+      "band_seconds": { "immediate": 0, "close": 120, "medium": 0, "far": 0 },
+      "band_edges_m": [1.0, 2.0, 5.0],
+      "sample_count": 4,
+      "peer_device_class": "wearos",
+      "estimator": "coarse_distance",
+      "estimator_version": "2.0.0"
+    }
+  },
+  {
+    "case": "malformed pair_key",
+    "why": "pair_key is a SHA-256 hex digest; anything else breaks server-side reconciliation of the two sides of an encounter.",
+    "instance": {
+      "peer": "c9e2f1a0-6b3d-4c88-9a71-2f3e4d5c6b7a",
+      "pair_key": "not-a-hash",
+      "started_at": "2026-08-11T14:03:22Z",
+      "ended_at": "2026-08-11T14:05:22Z",
+      "band_seconds": { "immediate": 0, "close": 120, "medium": 0, "far": 0 },
+      "band_edges_m": [1.0, 2.0, 5.0],
+      "sample_count": 4,
+      "estimator": "coarse_distance",
+      "estimator_version": "2.0.0"
+    }
+  },
+  {
+    "case": "raw RSSI sample array smuggled in",
+    "why": "The contract is closed precisely to keep raw sample streams out: uploading them defeats the on-device minimisation the proximity module exists to perform.",
+    "instance": {
+      "peer": "c9e2f1a0-6b3d-4c88-9a71-2f3e4d5c6b7a",
+      "started_at": "2026-08-11T14:03:22Z",
+      "ended_at": "2026-08-11T14:05:22Z",
+      "band_seconds": { "immediate": 0, "close": 120, "medium": 0, "far": 0 },
+      "band_edges_m": [1.0, 2.0, 5.0],
+      "sample_count": 4,
+      "estimator": "coarse_distance",
+      "estimator_version": "2.0.0",
+      "rssi_samples": [-61, -64, -59, -70]
+    }
+  }
+]

@@ -1,8 +1,9 @@
 # ADR-0002: Observation Envelope as the universal ingest contract
 
-- **Status:** Proposed
+- **Status:** **Accepted**
 - **Date:** 2026-09-02
 - **Deciders:** Colubri (PI), mobile eng, backend eng
+- **Usage guide:** [`docs/concepts/observation-envelope.md`](../concepts/observation-envelope.md)
 
 ## Context
 
@@ -56,6 +57,39 @@ Consequent rules:
    context, which is what makes FAIR/DCAT export a build step rather than a research project.
 5. Server-controlled fields (`received_at`, `study_id` binding) are never trusted from the client.
 
+### Wire shape: uniform per observation, gzipped
+
+Every observation carries a full envelope; there is no batch header or per-item delta encoding.
+Request-level gzip already collapses the repetition of `study_id`/`device_id`/`protocol_hash`, and
+server-side those fields are normalised into columns rather than stored per row. A uniform shape is
+simpler to generate, validate, replay individually, and reimplement by a third party. A batch header
+remains available later as a compatible optimisation, but only on the strength of measurement from a
+real deployment.
+
+### Unknown or invalid schema: accept, store, flag
+
+Ingest never rejects an observation for schema reasons. It stores it with `validated = false` plus a
+reason, and alerts. A newer app can outrun a server upgrade, and field deployments are often updated
+last; rejecting would silently destroy data that cannot be recollected, whereas a quarantine is
+recoverable. Two cases share the flag but not the response: an **unknown `schema_uri`** is a
+recoverable version lag, while a **known `schema_uri` with a failing payload** is a defect and must
+alert loudly.
+
+This obliges three things: projections skip unvalidated rows (a projection assumes a known shape); a
+re-validate-and-backfill job is mandatory rather than optional, or "accept and flag" is just a
+slower way of losing data; and exports must surface the flag so completeness metrics stay honest.
+
+### `seq` does not reset per study
+
+`seq` is monotonic per **device install** across every study that device joins, allocated inside the
+same transaction as the outbox insert. One outbox, one counter, so ordering and exactly-once hold
+regardless of how many studies a participant enrols in; a per-study counter would require one outbox
+partition per study and break as soon as someone joins a second.
+
+Consequence to document for analysts: the stream interleaves across studies, so `max(seq)` is **not**
+a per-study observation count and within-study gaps are expected. Count rows; never infer counts from
+`seq`.
+
 ## Consequences
 
 **Positive.** One sync engine, one offline queue, one retry policy for the entire platform. Retries
@@ -86,9 +120,14 @@ non-trivial for high-frequency proximity data — which is a further argument fo
 ## Open questions
 
 - Payload size cap and behaviour on oversize observations (reject vs. spill to object storage).
+  Interacts with the rule that binary attachments are uploaded separately and referenced, never
+  inlined as base64.
 - Whether `subject` rotates per study or is stable across studies at one institution — this
   interacts with ADR-0011.
 - Retention default: the roadmap proposes `raw_ttl_days: 730`, which needs an IRB sanity check.
+- Tamper-evidence: signed envelopes are deferred. The additive-within-a-major policy means an
+  optional `signature` field can be added in any 1.x release, so this is cheap to defer; what cannot
+  be retrofitted is a canonical serialisation rule, which must be specified at the same time.
 
 ## Validation
 

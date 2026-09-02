@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.epidemica.info/observations/envelope/1.0.0.json",
+  "title": "Observation envelope",
+  "description": "The universal wrapper every Epidemica observation travels in, from any module and any channel. This schema describes what a **client sends**: server-assigned fields (received_at, validated, validation_error) are deliberately absent, so `additionalProperties: false` mechanically rejects a client that tries to supply them. The `payload` is NOT validated here; the server dereferences `schema_uri` and validates it separately, which is what lets payload contracts version independently of the envelope. See docs/concepts/observation-envelope.md and ADR-0002.",
+  "type": "object",
+  "$comment": "Where a `format` keyword and a `pattern` overlap, the pattern is normative. JSON Schema's format vocabulary is optional and its support varies between implementations and languages -- the Elixir server, the Dart client and the Python tooling do not agree on which formats they check -- so anything that must actually be enforced is expressed as a pattern. The formats are retained as documentation and as extra strictness where a validator does support them.",
+  "required": [
+    "envelope_version",
+    "study_id",
+    "protocol_hash",
+    "subject",
+    "device_id",
+    "module",
+    "schema_uri",
+    "observed_at",
+    "clock_offset_ms",
+    "seq",
+    "payload"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "envelope_version": {
+      "const": "1.0",
+      "description": "Selects the envelope schema the server validates against. Additive changes publish a new minor (1.1) with its own schema file; servers accept every 1.x they know. See ADR-0007."
+    },
+    "study_id": {
+      "$ref": "#/$defs/uuid",
+      "description": "The study this observation belongs to. Epidemica observations are always study-scoped; there is no such thing as a study-less observation."
+    },
+    "protocol_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "Hash of the exact Study Protocol Bundle version in force on the device when this was recorded. This is what makes a dataset reproducible: you can always answer which version of the study produced any given row."
+    },
+    "subject": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "description": "Client-generated pseudonym. Never PII. The character class is a deliberate guard rather than a formatting preference: it makes an email address or any string containing '@', '.' or whitespace fail validation outright. A UUIDv4 with hyphens is the recommended value.",
+      "$comment": "A bare phone number would still pass this pattern; the guard reduces accidental PII, it does not eliminate it. Enforcement also lives in code review and the privacy tests."
+    },
+    "device_id": {
+      "$ref": "#/$defs/uuid",
+      "description": "Identifies one app installation, not one physical device or one person. Reinstalling produces a new device_id, which is the correct interpretation: the outbox and its seq counter are gone."
+    },
+    "module": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{1,31}$",
+      "description": "The module that produced this observation, e.g. 'proximity', 'instruments', 'reach'. Open-ended so third-party modules need no change to this contract."
+    },
+    "schema_uri": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https?://",
+      "description": "Absolute, immutable, resolvable URI of the payload contract. Dereferences to a JSON Schema plus a JSON-LD context, which is how FAIR/DCAT export becomes a build step instead of a research project. https is required in production; http is tolerated for local development."
+    },
+    "observed_at": {
+      "$ref": "#/$defs/utcTimestamp",
+      "description": "When the observation happened, by the device clock. Must be UTC with a 'Z' suffix -- mixed UTC offsets across a multi-site study are a recurring data-quality failure, so they are rejected at the contract rather than cleaned up in analysis."
+    },
+    "clock_offset_ms": {
+      "type": ["integer", "null"],
+      "description": "Device clock minus reference clock, in milliseconds, as measured against NTP or the server. Required but nullable: null means 'not measured', which analysis must distinguish from a verified zero. Never substitute 0 for unknown."
+    },
+    "seq": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Monotonic counter per device install, allocated in the same transaction as the outbox insert. With device_id it forms the idempotency key. It does NOT reset per study, so a device in two studies produces one interleaved stream: max(seq) is not a per-study observation count, and within-study gaps are expected. Count rows; never infer counts from seq."
+    },
+    "payload": {
+      "type": "object",
+      "description": "Module-specific content, validated separately against schema_uri. Binary attachments (photos, audio) are uploaded out of band and referenced here; they are never inlined as base64."
+    }
+  },
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    },
+    "utcTimestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$"
+    }
+  }
+}

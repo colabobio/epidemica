@@ -1,0 +1,133 @@
+[
+  {
+    "case": "status 'answered' with no value",
+    "why": "An answered item must carry its answer; without the conditional requirement, a client bug that drops values would look like valid data.",
+    "instance": {
+      "instrument_id": "daily_ema",
+      "instrument_version": "1.2.0",
+      "channel": "app",
+      "answers": [{ "item_id": "mood", "status": "answered" }]
+    }
+  },
+  {
+    "case": "channel omitted",
+    "why": "Mode effects mean a response without its channel is not interpretable in a multi-channel study.",
+    "instance": {
+      "instrument_id": "daily_ema",
+      "instrument_version": "1.2.0",
+      "answers": [{ "item_id": "mood", "status": "answered", "value": 3 }]
+    }
+  },
+  {
+    "case": "unknown channel",
+    "why": "Channels are enumerated and match the reach adapters; an open string would produce values no analysis could group on.",
+    "instance": {
+      "instrument_id": "daily_ema",
+      "instrument_version": "1.2.0",
+      "channel": "carrier_pigeon",
+      "answers": [{ "item_id": "mood", "status": "answered", "value": 3 }]
+    }
+  },
+  {
+    "case": "answer with no status",
+    "why": "Missingness mechanism is required on every item; a bare value plus absence is exactly the ambiguity this contract removes.",
+    "instance": {
+      "instrument_id": "daily_ema",
+      "instrument_version": "1.2.0",
+      "channel": "app",
+      "answers": [{ "item_id": "mood", "value": 3 }]
+    }
+  },
+  {
+    "case": "unknown status",
+    "why": "The status enum encodes distinct missing-data mechanisms; ad hoc values collapse them again.",
+    "instance": {
+      "instrument_id": "daily_ema",
+      "instrument_version": "1.2.0",
+      "channel": "app",
+      "answers": [{ "item_id": "mood", "status": "dunno", "value": null }]
+    }
+  },
+  {
+    "case": "instrument_version omitted",
+    "why": "Instruments get revised mid-study; pooling across versions unknowingly is a silent measurement error.",
+    "instance": {
+      "instrument_id": "daily_ema",
+      "channel": "app",
+      "answers": [{ "item_id": "mood", "status": "answered", "value": 3 }]
+    }
+  },
+  {
+    "case": "instrument_version not semver",
+    "why": "A fixed shape makes ordering and comparison possible without parsing conventions per study.",
+    "instance": {
+      "instrument_id": "daily_ema",
+      "instrument_version": "v1.2",
+      "channel": "app",
+      "answers": [{ "item_id": "mood", "status": "answered", "value": 3 }]
+    }
+  },
+  {
+    "case": "answers as an item_id-to-value map",
+    "why": "The array-of-objects shape is what allows per-item latency, revisions and missingness; a map cannot express any of them.",
+    "instance": {
+      "instrument_id": "daily_ema",
+      "instrument_version": "1.2.0",
+      "channel": "app",
+      "answers": { "mood": 3, "cravings": 1 }
+    }
+  },
+  {
+    "case": "item_id in the wrong case",
+    "why": "Item identifiers are lowercase snake_case so they survive use as column names in exports.",
+    "instance": {
+      "instrument_id": "daily_ema",
+      "instrument_version": "1.2.0",
+      "channel": "app",
+      "answers": [{ "item_id": "Mood", "status": "answered", "value": 3 }]
+    }
+  },
+  {
+    "case": "negative latency",
+    "why": "A negative response time indicates a clock or instrumentation bug rather than a fast participant.",
+    "instance": {
+      "instrument_id": "daily_ema",
+      "instrument_version": "1.2.0",
+      "channel": "app",
+      "answers": [{ "item_id": "mood", "status": "answered", "value": 3, "latency_ms": -50 }]
+    }
+  },
+  {
+    "case": "assigned_for carrying a full timestamp",
+    "why": "The reference period is a date; storing a timestamp invites timezone ambiguity in exactly the field meant to resolve it.",
+    "instance": {
+      "instrument_id": "daily_ema",
+      "instrument_version": "1.2.0",
+      "channel": "app",
+      "assigned_for": "2026-08-11T19:31:02Z",
+      "answers": [{ "item_id": "mood", "status": "answered", "value": 3 }]
+    }
+  },
+  {
+    "case": "identifiable staff member in administered_by",
+    "why": "Interviewer effects need a stable identifier, not an identifiable person; the pattern rejects names and email addresses.",
+    "instance": {
+      "instrument_id": "contact_diary",
+      "instrument_version": "1.0.0",
+      "channel": "manual",
+      "administered_by": "maria.gomez@example.edu",
+      "answers": [{ "item_id": "contact_setting", "status": "answered", "value": "home" }]
+    }
+  },
+  {
+    "case": "undeclared extra field",
+    "why": "Closed contracts stop a module quietly shipping data nobody agreed to store.",
+    "instance": {
+      "instrument_id": "daily_ema",
+      "instrument_version": "1.2.0",
+      "channel": "app",
+      "participant_name": "Alex",
+      "answers": [{ "item_id": "mood", "status": "answered", "value": 3 }]
+    }
+  }
+]

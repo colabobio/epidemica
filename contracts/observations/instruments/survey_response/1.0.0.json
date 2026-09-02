@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.epidemica.info/observations/instruments/survey_response/1.0.0.json",
+  "title": "Survey response",
+  "description": "One participant's response to one instrument, from any channel: app, mobile web, SMS conversation, voice/IVR, staff-administered, or a CIAS session. Carried as the `payload` of an observation envelope; the envelope's `observed_at` is when the response was completed (or abandoned).\n\nThe answer *values* are not validated here. Item types live in the instrument definition, which versions independently, so validation against `instrument_id` + `instrument_version` is a separate step -- the same layering as envelope to payload.",
+  "type": "object",
+  "$comment": "Free-text answers can contain PII that no schema can prevent ('I saw Dr Smith at Mercy Hospital'). The observation store is pseudonymous by policy, not by construction, for any instrument containing free text. Studies should minimise free-text items, and exports containing them need review before sharing.",
+  "required": ["instrument_id", "instrument_version", "channel", "answers"],
+  "additionalProperties": false,
+  "properties": {
+    "instrument_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{1,63}$",
+      "description": "Stable identifier of the instrument, as named in the Study Protocol Bundle."
+    },
+    "instrument_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version of the instrument definition. Instruments are revised mid-study more often than anyone plans for, and pooling responses across versions without knowing which is which is a common and silent source of measurement error."
+    },
+    "session_id": {
+      "$ref": "#/$defs/uuid",
+      "description": "Groups answers that were given in one sitting. Distinct from the instrument: a long instrument may be completed across several sessions, and an escalation may re-present an instrument in a different channel."
+    },
+    "channel": {
+      "enum": ["app", "web", "sms", "voice", "manual", "cias"],
+      "description": "How the instrument was delivered and answered. Required, because mode effects are real and well documented: the same question asked in an app, read aloud by an IVR, or asked by a staff member does not yield the same distribution of answers. Without this field a multi-channel study cannot adjust for mode, and 'multi-channel reach' becomes a confound rather than a feature."
+    },
+    "source": {
+      "enum": ["epidemica", "cias", "redcap", "other"],
+      "default": "epidemica",
+      "description": "Which system owns the instrument definition."
+    },
+    "trigger": {
+      "type": "object",
+      "description": "What caused this instrument to be presented.",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "enum": ["schedule", "event", "manual", "escalation", "participant_initiated"] },
+        "rule_id": { "type": "string", "maxLength": 64, "description": "The JITAI or scheduling rule that fired." },
+        "decision_point_id": {
+          "$ref": "#/$defs/uuid",
+          "description": "Links this response back to a micro-randomised decision point. Without it, a micro-randomised trial cannot be analysed at all, because responses cannot be joined to the randomised delivery decisions -- including the decision points where delivery was randomised *off*."
+        },
+        "escalation_step": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Position in the escalation ladder, e.g. 0 = push, 1 = SMS, 2 = staff call."
+        }
+      }
+    },
+    "answers": {
+      "type": "array",
+      "minItems": 0,
+      "description": "One entry per item presented -- including items that were presented but not answered. An array of objects rather than an item_id-to-value map, because per-item metadata is needed: response latency is a behavioural measure in its own right, and 'skipped' is not the same as 'refused' or 'never reached', a distinction a value map cannot express.",
+      "items": { "$ref": "#/$defs/answer" }
+    },
+    "scores": {
+      "type": "object",
+      "description": "Instrument-computed scores, e.g. a quiz score or a scale total. Recorded alongside the raw answers rather than instead of them, so scoring can be recomputed if the algorithm is later corrected.",
+      "additionalProperties": { "type": ["number", "null"] }
+    },
+    "assigned_for": {
+      "type": "string",
+      "format": "date",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "The date the response refers to, when that differs from when it was given -- an evening diary answered the next morning refers to the previous day. Travel Healthy carries exactly this distinction as `assignedDate`, and collapsing it into the submission time misdates every late response."
+    },
+    "started_at": { "$ref": "#/$defs/utcTimestamp" },
+    "completed_at": { "$ref": "#/$defs/utcTimestamp", "description": "Redundant with the envelope's observed_at for completed responses; explicit here so a partial response can record when it was abandoned." },
+    "duration_ms": { "type": "integer", "minimum": 0 },
+    "partial": {
+      "type": "boolean",
+      "default": false,
+      "description": "True when the participant began but did not finish. Partial responses are uploaded rather than discarded: attrition within an instrument is itself a measurement."
+    },
+    "language": {
+      "type": "string",
+      "pattern": "^[a-z]{2}(-[A-Za-z0-9]{2,8})*$",
+      "description": "BCP 47 tag of the language the instrument was presented in. Translation affects responses, so it belongs with the data."
+    },
+    "offline": {
+      "type": "boolean",
+      "description": "Whether the response was captured with no connectivity, and therefore held in the outbox before upload."
+    },
+    "administered_by": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "description": "Pseudonymous identifier of the staff member, for channel 'manual'. Pseudonymous for the same reason participants are: interviewer effects need to be modelled, which requires a stable identifier, but not an identifiable person."
+    },
+    "external_ref": {
+      "type": "object",
+      "description": "Identifier in the originating system, for responses that came back through a connector.",
+      "required": ["system", "id"],
+      "additionalProperties": false,
+      "properties": {
+        "system": { "enum": ["cias", "redcap", "mydatahelps", "other"] },
+        "id": { "type": "string", "maxLength": 256 }
+      }
+    }
+  },
+  "$defs": {
+    "answer": {
+      "type": "object",
+      "required": ["item_id", "status"],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "answered" } }, "required": ["status"] },
+          "then": { "required": ["value"] }
+        }
+      ],
+      "properties": {
+        "item_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+          "description": "Item identifier within the instrument definition."
+        },
+        "instance": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Repetition index for looped or repeated items; omit for items presented once."
+        },
+        "status": {
+          "enum": ["answered", "skipped", "refused", "not_applicable", "not_reached", "timed_out"],
+          "description": "skipped = presented and passed over; refused = explicitly declined; not_applicable = branched around; not_reached = instrument abandoned first; timed_out = the channel's response window expired, which is common on SMS and IVR. These are different missing-data mechanisms and must not be collapsed into a single null."
+        },
+        "value": {
+          "type": ["string", "number", "boolean", "array", "object", "null"],
+          "description": "The answer. Typed by the instrument definition, not by this schema."
+        },
+        "answered_at": { "$ref": "#/$defs/utcTimestamp" },
+        "latency_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Time from item presentation to answer. A behavioural measure, and the basis for detecting speeding and straightlining."
+        },
+        "revisions": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "How many times the participant changed this answer before moving on."
+        }
+      }
+    },
+    "uuid": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    },
+    "utcTimestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$"
+    }
+  }
+}
