@@ -1,0 +1,485 @@
+openapi: 3.1.0
+
+info:
+  title: Epidemica Ingest API
+  version: "1.0.0"
+  license:
+    name: Apache-2.0
+    identifier: Apache-2.0
+  summary: Device-facing API for enrolling in a study and uploading observations.
+  description: |
+    The ingest plane of the Epidemica platform. Narrow, versioned, batched and idempotent, so that a
+    client can drive it from a background isolate with simple retry logic. Exploratory and
+    researcher-facing access is a separate GraphQL surface; see ADR-0004.
+
+    ## What this API guarantees
+
+    **Uploads are idempotent.** Every observation carries `(device_id, seq)`, and `seq` is monotonic
+    per device install. Re-sending a batch after an ambiguous failure is always safe: the server
+    reports the repeats as `duplicate` and stores nothing twice. There is deliberately no
+    request-level idempotency key, because per-observation keys are strictly stronger — a partially
+    delivered batch resolves correctly, which a request-level key cannot express.
+
+    **Schema problems never lose data.** The server does not reject an observation because it cannot
+    validate it. Anything it can identify but not validate is stored with `validated = false` and
+    reported as `quarantined`. A newer app can outrun a server upgrade, and field deployments are
+    usually the last thing updated; rejecting would silently destroy data that cannot be recollected,
+    whereas a quarantine is recoverable once the server catches up. See ADR-0002.
+
+    **A 200 does not mean everything was accepted.** Read the counts. The `exceptions` array lists
+    only the observations that were *not* plainly accepted, so a fully successful batch returns an
+    empty array rather than a thousand redundant entries.
+
+    ## Batch rules
+
+    A batch is homogeneous: every observation in it must carry the same `device_id` and `study_id`,
+    and both must match the bearer token, which is bound to one device and one study. A device
+    enrolled in two studies uploads two batches. This keeps cross-attribution impossible rather than
+    merely discouraged.
+
+    Batches are capped at 1000 observations. Clients should send `Content-Encoding: gzip`; servers
+    must also accept uncompressed bodies. Per ADR-0002 there is no batch header — every observation
+    repeats its envelope, and gzip absorbs the repetition.
+
+    ## How a client should retry
+
+    | Outcome | What the client does |
+    | --- | --- |
+    | `200` | Prune `accepted`, `duplicate` and `quarantined` from the outbox. Move `rejected` to a local dead-letter store and surface it; do not retry automatically. |
+    | Network error, timeout, `502`, `503`, `504` | Retry the same batch, unchanged, with exponential backoff and jitter. Idempotency makes this safe. |
+    | `429` | Honour `Retry-After`. |
+    | `401` | Refresh the token, then retry once. |
+    | `403` | Do not retry. The batch is mis-attributed, which is a client bug, not a transient failure. |
+    | `400` | Do not retry unchanged. Surface it: the client is emitting something structurally wrong. |
+
+    `rejected` deliberately does not mean "discard". A rejected observation could not be stored
+    because its identifying fields were unreadable, but the underlying measurement may still be
+    recoverable from the device, so the client keeps it locally rather than deleting it.
+
+    ## Clock reference
+
+    Every response carries `server_time`. Clients that cannot reach NTP may use it to estimate
+    `clock_offset_ms` for the envelope, accounting for round-trip latency — it is a fallback with
+    accuracy on the order of the RTT, not a substitute for NTP. Recording a bad offset is worse than
+    recording `null`.
+
+    ## Versioning
+
+    The API version is in the server URL. The observation envelope and the payload contracts version
+    independently of it, so adding an observation type never requires an API release.
+
+servers:
+  - url: https://{host}/v1
+    description: Institutional deployment
+    variables:
+      host:
+        default: api.epidemica.example.org
+
+security:
+  - participantToken: []
+
+tags:
+  - name: observations
+    description: Uploading measurements.
+  - name: enrollment
+    description: Joining a study and obtaining a token.
+  - name: operations
+    description: Deployment health.
+
+paths:
+  /observations:
+    post:
+      operationId: uploadObservations
+      tags: [observations]
+      summary: Upload a batch of observations
+      description: |
+        Accepts up to 1000 observations from one device for one study. Each is processed
+        independently, so one bad record never blocks the rest of a field site's data.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "../../observations/batch/1.0.0.json"
+      responses:
+        "200":
+          description: |
+            The batch was processed. Individual observations may still have been quarantined or
+            rejected — check the counts and `exceptions`.
+          headers:
+            Date:
+              description: Server time, also available as `server_time` in the body.
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/IngestResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "413": { $ref: "#/components/responses/PayloadTooLarge" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+
+  /observations/ack:
+    get:
+      operationId: getIngestWatermark
+      tags: [observations]
+      summary: What the server has already received from this device
+      description: |
+        Lets a client prune its outbox after an ambiguous failure without re-uploading a large batch
+        to discover what landed. Retrying is always safe, so this is an optimisation — but a
+        meaningful one on the metered or intermittent connections typical of field sites.
+
+        The device is taken from the bearer token; there is no path parameter, so one device cannot
+        probe another's progress.
+      responses:
+        "200":
+          description: Current watermark for the authenticated device and study.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/IngestWatermark" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /enrollments:
+    post:
+      operationId: enroll
+      tags: [enrollment]
+      summary: Join a study with a join code
+      description: |
+        Exchanges a study join code for a device-bound, study-scoped access token.
+
+        The client generates its own `subject` pseudonym and presents it; the server binds the token
+        to it. Keeping generation on the device is what allows a study to hold no participant
+        identifier at all. Randomised arm assignment, where the protocol defines arms, happens here
+        and is returned so the app can configure itself.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EnrollmentRequest" }
+      responses:
+        "201":
+          description: Enrolled.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnrollmentResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404":
+          description: No open study matches the join code. Deliberately not distinguished from a
+            closed or full study, so join codes cannot be enumerated.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "409":
+          description: This `subject` is already enrolled with a different device.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /tokens:
+    post:
+      operationId: refreshToken
+      tags: [enrollment]
+      summary: Exchange a refresh token for a new access token
+      description: |
+        Access tokens are short-lived so that a lost or extracted token has a small blast radius;
+        refresh tokens are long-lived but revocable per device, which is what makes it possible to
+        cut off one installation without disrupting a study.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TokenRequest" }
+      responses:
+        "200":
+          description: A new access token.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TokenResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401":
+          description: The refresh token is unknown, expired or revoked. The client must re-enroll.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /health:
+    get:
+      operationId: health
+      tags: [operations]
+      summary: Liveness and version
+      security: []
+      responses:
+        "200":
+          description: The service is up.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+
+components:
+  securitySchemes:
+    participantToken:
+      type: http
+      scheme: bearer
+      description: |
+        An opaque, short-lived token bound to one `device_id` and scoped to one `study_id`, issued
+        at enrollment. It replaces the shared API key used by the earlier Epigames backend: a single
+        key baked into every installed app is a credential that cannot be rotated or revoked per
+        participant. Token lifetime and rotation policy belong to ADR-0005, which is not yet written.
+
+  schemas:
+    IngestResult:
+      type: object
+      description: Outcome of a batch upload.
+      required: [received, accepted, duplicate, quarantined, rejected, exceptions, server_time]
+      additionalProperties: false
+      properties:
+        received:
+          type: integer
+          minimum: 0
+          description: Observations in the request body.
+        accepted:
+          type: integer
+          minimum: 0
+          description: Stored and validated.
+        duplicate:
+          type: integer
+          minimum: 0
+          description: Already held under the same `(device_id, seq)`. Not an error; the expected
+            result of a safe retry.
+        quarantined:
+          type: integer
+          minimum: 0
+          description: Stored with `validated = false`, pending a schema the server does not yet
+            have or a fix to the producing client.
+        rejected:
+          type: integer
+          minimum: 0
+          description: Not stored, because the identifying fields could not be read.
+        highest_seq_accepted:
+          type: [integer, "null"]
+          description: Largest `seq` accepted in this request; null if none were.
+        exceptions:
+          type: array
+          description: Only the observations that were not plainly accepted. Empty on a clean batch.
+          items: { $ref: "#/components/schemas/ObservationOutcome" }
+        server_time: { $ref: "#/components/schemas/UtcTimestamp" }
+
+    ObservationOutcome:
+      type: object
+      required: [status]
+      additionalProperties: false
+      properties:
+        seq:
+          type: [integer, "null"]
+          description: Null when `seq` itself was unreadable, in which case `index` locates the item.
+        index:
+          type: integer
+          minimum: 0
+          description: Zero-based position in the submitted array.
+        status:
+          enum: [duplicate, quarantined, rejected]
+          description: Accepted observations are omitted entirely.
+        reason:
+          enum:
+            - unknown_envelope_version
+            - unknown_payload_schema
+            - envelope_invalid
+            - payload_invalid
+            - unparseable
+          description: |
+            `unknown_envelope_version` and `unknown_payload_schema` mean the server is behind the
+            client and will re-validate after an upgrade — recoverable, and alerted quietly.
+            `envelope_invalid` and `payload_invalid` mean a producer is emitting something that
+            violates a contract the server *does* know, which is a defect and alerted loudly.
+            `unparseable` means core identifying fields were missing, so nothing could be stored.
+        detail:
+          type: string
+          maxLength: 1024
+          description: Human-readable explanation, safe to log. Never echoes payload content, which
+            may carry participant data.
+
+    IngestWatermark:
+      type: object
+      required: [device_id, study_id, highest_contiguous_seq, highest_seq, accepted_count, server_time]
+      additionalProperties: false
+      properties:
+        device_id: { $ref: "#/components/schemas/Uuid" }
+        study_id: { $ref: "#/components/schemas/Uuid" }
+        highest_contiguous_seq:
+          type: [integer, "null"]
+          description: |
+            The largest `s` for which every `seq` from 0 to `s` has been received. This, not
+            `highest_seq`, is what a client may safely prune below: a gap means something in between
+            never arrived.
+        highest_seq:
+          type: [integer, "null"]
+          description: Largest `seq` received, gaps included. A gap between this and
+            `highest_contiguous_seq` indicates observations still owed by the client.
+        accepted_count: { type: integer, minimum: 0 }
+        quarantined_count: { type: integer, minimum: 0 }
+        server_time: { $ref: "#/components/schemas/UtcTimestamp" }
+
+    EnrollmentRequest:
+      type: object
+      required: [join_code, subject, device_id, platform]
+      additionalProperties: false
+      properties:
+        join_code:
+          type: string
+          minLength: 4
+          maxLength: 64
+          description: Case-insensitive code from the Study Protocol Bundle.
+        subject:
+          type: string
+          minLength: 8
+          maxLength: 128
+          pattern: "^[A-Za-z0-9_-]+$"
+          description: Client-generated pseudonym. The character class rejects anything containing
+            '@', '.' or whitespace, so an email address cannot be submitted here by accident.
+        device_id: { $ref: "#/components/schemas/Uuid" }
+        platform: { enum: [ios, android, web] }
+        app_version: { type: string, maxLength: 32 }
+        locale:
+          type: string
+          pattern: "^[a-z]{2}(-[A-Za-z0-9]{2,8})*$"
+          description: BCP 47 tag, used to select the instrument translation.
+
+    EnrollmentResponse:
+      type: object
+      required: [subject, study_id, protocol_hash, protocol_url, access_token, token_type, expires_in, server_time]
+      additionalProperties: false
+      properties:
+        subject: { type: string }
+        study_id: { $ref: "#/components/schemas/Uuid" }
+        arm:
+          type: [string, "null"]
+          description: Randomised arm, where the protocol defines arms. Assigned server-side so that
+            allocation cannot be influenced by the client, and returned so the app can configure
+            itself without a second request.
+        protocol_hash:
+          type: string
+          pattern: "^sha256:[0-9a-f]{64}$"
+          description: Hash of the protocol bundle in force. The client stamps this on every
+            observation it records.
+        protocol_url:
+          type: string
+          format: uri
+          description: Where to fetch the bundle itself.
+        access_token: { type: string }
+        token_type: { const: Bearer }
+        expires_in:
+          type: integer
+          minimum: 1
+          description: Access-token lifetime in seconds.
+        refresh_token: { type: string }
+        server_time: { $ref: "#/components/schemas/UtcTimestamp" }
+
+    TokenRequest:
+      type: object
+      required: [grant_type, refresh_token]
+      additionalProperties: false
+      properties:
+        grant_type: { const: refresh_token }
+        refresh_token: { type: string }
+
+    TokenResponse:
+      type: object
+      required: [access_token, token_type, expires_in, server_time]
+      additionalProperties: false
+      properties:
+        access_token: { type: string }
+        token_type: { const: Bearer }
+        expires_in: { type: integer, minimum: 1 }
+        refresh_token:
+          type: string
+          description: Present when the refresh token was rotated; the client must then replace its
+            stored copy.
+        server_time: { $ref: "#/components/schemas/UtcTimestamp" }
+
+    Health:
+      type: object
+      required: [status, server_time]
+      additionalProperties: false
+      properties:
+        status: { enum: [ok, degraded] }
+        version: { type: string }
+        envelope_versions:
+          type: array
+          items: { type: string }
+          description: Envelope versions this server can validate. A client seeing its own version
+            absent here should expect its uploads to be quarantined rather than lost.
+        server_time: { $ref: "#/components/schemas/UtcTimestamp" }
+
+    Problem:
+      type: object
+      description: RFC 9457 problem details.
+      required: [title, status]
+      properties:
+        type: { type: string, format: uri, default: "about:blank" }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string, format: uri }
+      additionalProperties: true
+
+    Uuid:
+      type: string
+      format: uuid
+      pattern: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+
+    UtcTimestamp:
+      type: string
+      format: date-time
+      pattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$"
+
+  responses:
+    BadRequest:
+      description: |
+        Malformed JSON, a batch over the size limit, or observations disagreeing with each other on
+        `device_id` or `study_id`. Note that a *schema* problem in an individual observation is not a
+        400 — it is quarantined and reported in the 200 body.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Unauthorized:
+      description: Missing, malformed or expired token. Refresh and retry once.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Forbidden:
+      description: |
+        The token does not authorise this batch — its `device_id` or `study_id` does not match the
+        token's binding. Not retryable: this is mis-attribution, and silently accepting it would let
+        one participant's device write observations attributed to another.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    PayloadTooLarge:
+      description: The request body exceeds the deployment's byte limit. Split the batch.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    TooManyRequests:
+      description: Rate limited.
+      headers:
+        Retry-After:
+          description: Seconds to wait before retrying.
+          schema: { type: integer, minimum: 0 }
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    ServiceUnavailable:
+      description: Temporarily unavailable. Retry with backoff; the batch is unchanged and safe to
+        resend.
+      headers:
+        Retry-After:
+          schema: { type: integer, minimum: 0 }
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }

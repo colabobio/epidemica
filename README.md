@@ -22,7 +22,7 @@ Directories appear as their first real content lands. Empty scaffolding is delib
 
 | Path | Contents | Status |
 |---|---|---|
-| `contracts/` | JSON Schemas, OpenAPI, GraphQL SDL, protocol bundle spec, test fixtures | **started** — envelope, batch, `contact_episode`, `location_fix`, `survey_response` |
+| `contracts/` | JSON Schemas, OpenAPI, GraphQL SDL, protocol bundle spec, test fixtures | **started** — envelope, batch, 3 payload contracts, ingest API |
 | `packages/` | Dart/Flutter packages (melos workspace) | not started |
 | `server/` | Phoenix application, incl. `epidemica_reach` and the contact registry | not started |
 | `models/` | `starsim_epidemica`: Starsim network/disease modules and protocol loader | **started** — spike complete |
@@ -47,6 +47,23 @@ Explanations of how the platform works, as opposed to why decisions were made:
 
 - [The Observation Envelope](docs/concepts/observation-envelope.md) — how every module's data
   reaches the server, exactly once, with enough context to interpret it years later.
+
+## Contracts
+
+| Contract | What it defines |
+|---|---|
+| `contracts/observations/envelope/1.0.0.json` | The wrapper every observation travels in |
+| `contracts/observations/batch/1.0.0.json` | The `POST /observations` request body |
+| `contracts/observations/proximity/contact_episode/1.0.0.json` | Bluetooth proximity episodes |
+| `contracts/observations/location/location_fix/1.0.0.json` | Geographic position, with explicit minimisation |
+| `contracts/observations/instruments/survey_response/1.0.0.json` | Instrument responses from any channel |
+| `contracts/api/ingest/v1.yaml` | The device-facing ingest API (OpenAPI 3.1) |
+
+All of it is exercised by the fixture-driven suite in [`analysis/`](analysis/README.md).
+
+> The ingest spec assumes two decisions whose ADRs are not yet written: **ADR-0004** (REST for
+> ingest, GraphQL for query/admin) and **ADR-0005** (participant tokens replacing shared API keys).
+> The spec is the de facto record until those are drafted.
 
 ## License
 

@@ -67,3 +67,14 @@ ADR-0009 dependency allow-list.
 Where a `format` keyword and a `pattern` overlap in a contract, **the pattern is normative**: JSON
 Schema's format vocabulary is optional and unevenly supported, and the Elixir server, the Dart client
 and this package do not agree on which formats they check.
+
+## The OpenAPI spec
+
+`tests/test_openapi.py` validates `contracts/api/ingest/v1.yaml` against OpenAPI 3.1 and then checks
+that the promises its prose makes are actually encoded: that upload returns 200 rather than 201,
+that every outcome class is reported, that quarantine reasons distinguish a recoverable version lag
+from a contract defect, that the watermark takes its device from the token rather than a parameter,
+and that enrollment agrees with the envelope on what a pseudonym is.
+
+A spec can validate cleanly while having quietly lost its semantics, so structural validation alone
+would not be worth much.

@@ -12,7 +12,8 @@
       "minItems": 1,
       "maxItems": 1000,
       "description": "Clients chunk their outbox to this bound. The server processes each item independently: one invalid observation is quarantined (validated=false) and never fails the batch, because a single bad record must not block delivery of good ones from a field site.",
-      "items": { "$ref": "https://schemas.epidemica.info/observations/envelope/1.0.0.json" }
+      "items": { "$ref": "../envelope/1.0.0.json" }
     }
-  }
+  },
+  "$comment": "The $ref is relative rather than absolute on purpose. Because every contract's $id mirrors its path in the tree, a relative reference resolves identically two ways: as a file path for plain tooling that reads the repository, and as a URI relative to this schema's $id for anything resolving over the network. Absolute refs work only for the second."
 }
