@@ -292,6 +292,11 @@ moved `EmbeddedModule` in W2, arriving on schedule the moment there were two app
 - [x] The app's copy of the scoring rules passes the same vectors the server does
 - [x] Deploy recipes per study, since a game needs a schedule and a simulation environment that a
       collection pilot does not
+- [x] A study seeds its own outbreak; without an index case the whole thing simulates nothing and
+      looks like a disease that failed to spread
+- [x] Joining before the study opens is allowed and explained, since codes go out in advance
+- [x] The last day ends the game: a final score, no protection button, and a server that refuses
+      decisions outside the study window
 
 ## 6. Sequencing
 

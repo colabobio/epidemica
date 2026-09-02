@@ -173,5 +173,65 @@
         "days": 1
       }
     }
+  },
+  {
+    "case": "a study that seeds its outbreak among the simulated population",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "cccccccc-dddd-4eee-8fff-000000000000",
+      "title": "Seeded",
+      "modules": {
+        "proximity": {}
+      },
+      "twin": {
+        "engine": "starsim",
+        "state_uri": "https://schemas.epidemica.info/state/epigame/1.0.0.json",
+        "population": 60,
+        "seed": {
+          "infections": 3,
+          "among": "virtual"
+        }
+      }
+    }
+  },
+  {
+    "case": "a study where the index case is a real participant",
+    "why": "Available deliberately: it costs whoever is chosen most of the game, so it should never be a default.",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "cccccccc-dddd-4eee-8fff-000000000000",
+      "title": "Seeded",
+      "modules": {
+        "proximity": {}
+      },
+      "twin": {
+        "engine": "starsim",
+        "state_uri": "https://schemas.epidemica.info/state/epigame/1.0.0.json",
+        "population": 60,
+        "seed": {
+          "infections": 1,
+          "among": "participants"
+        }
+      }
+    }
+  },
+  {
+    "case": "a study that seeds nothing",
+    "why": "Valid, and worth admitting: a study importing its own initial states has no use for a lottery.",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "cccccccc-dddd-4eee-8fff-000000000000",
+      "title": "Seeded",
+      "modules": {
+        "proximity": {}
+      },
+      "twin": {
+        "engine": "starsim",
+        "state_uri": "https://schemas.epidemica.info/state/epigame/1.0.0.json",
+        "seed": {
+          "infections": 0
+        }
+      }
+    }
   }
 ]

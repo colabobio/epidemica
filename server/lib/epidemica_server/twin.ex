@@ -144,6 +144,7 @@ defmodule EpidemicaServer.Twin do
       existing = agents(study_id)
       existing = enrol_newcomers(study_id, day, existing)
       existing = fill_population(study_id, twin, day, existing)
+      existing = seed_outbreak(study_id, twin, day, existing)
       Enum.sort_by(existing, & &1.slot)
     end)
     |> case do
@@ -151,6 +152,51 @@ defmodule EpidemicaServer.Twin do
       {:error, reason} -> raise "twin roster failed: #{inspect(reason)}"
     end
   end
+
+  @doc """
+  Infect the study's index cases, once, before its first day.
+
+  Without this nobody is ever infected and a study runs to completion having simulated nothing —
+  which on screen is indistinguishable from a disease that failed to spread.
+
+  Who is chosen is derived from the study and the slot rather than drawn, so the same study always
+  starts the same way and a replayed history matches. The default pool is the virtual population:
+  a real participant infected on day one loses most of the game to a lottery they can neither see
+  nor influence, and every real infection then has a contact behind it instead of an unexplainable
+  beginning.
+  """
+  def seed_outbreak(study_id, twin, day, existing) do
+    seed = Map.get(twin, "seed") || %{}
+    count = Map.get(seed, "infections", 0)
+    already_seeded? = Enum.any?(existing, &(&1.infected_on_day != nil))
+
+    if count == 0 or already_seeded? or
+         Repo.exists?(from t in Tick, where: t.study_id == type(^study_id, :binary_id)) do
+      existing
+    else
+      chosen =
+        existing
+        |> Enum.filter(&(&1.active and eligible?(&1, Map.get(seed, "among", "virtual"))))
+        |> Enum.sort_by(&:erlang.phash2({study_id, &1.slot}))
+        |> Enum.take(count)
+        |> Enum.map(& &1.id)
+        |> MapSet.new()
+
+      Enum.map(existing, fn agent ->
+        if MapSet.member?(chosen, agent.id) do
+          # Infected the day before the study opens, so they are already infectious when day one
+          # runs. The recovery deadline is left for the engine to draw.
+          Repo.update!(Agent.changeset(agent, %{state: "infected", infected_on_day: day - 1}))
+        else
+          agent
+        end
+      end)
+    end
+  end
+
+  defp eligible?(_agent, "any"), do: true
+  defp eligible?(agent, "participants"), do: not agent.virtual
+  defp eligible?(agent, _virtual), do: agent.virtual
 
   defp enrol_newcomers(study_id, day, existing) do
     known = existing |> Enum.map(& &1.subject) |> MapSet.new()

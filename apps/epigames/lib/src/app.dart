@@ -82,6 +82,20 @@ class _HomeState extends State<_Home> {
     }
 
     final game = GameState.from(widget.controller.participantState);
+    final startsAt = widget.controller.enrollment?.bundle.startsAt;
+
+    // Joining before the study opens is normal — codes go out in advance — so the app says when
+    // play starts rather than leaving a participant to wonder whether something is broken.
+    if (!game.hasState && startsAt != null && DateTime.now().toUtc().isBefore(startsAt)) {
+      return _WaitingScreen(
+        startsAt: startsAt,
+        onLeave: () async {
+          final confirmed = await _confirmLeave(context);
+          if (confirmed) await widget.controller.withdraw();
+        },
+      );
+    }
+
     return _GameScreen(
       game: game,
       busy: _busy,
@@ -92,6 +106,67 @@ class _HomeState extends State<_Home> {
         final confirmed = await _confirmLeave(context);
         if (confirmed) await widget.controller.withdraw();
       },
+    );
+  }
+}
+
+/// Shown to a participant who joined before the study opens.
+class _WaitingScreen extends StatelessWidget {
+  const _WaitingScreen({required this.startsAt, required this.onLeave});
+
+  final DateTime startsAt;
+  final Future<void> Function() onLeave;
+
+  @override
+  Widget build(BuildContext context) {
+    final until = startsAt.difference(DateTime.now().toUtc());
+    final when = until.inHours >= 24
+        ? 'in ${until.inDays + 1} days'
+        : until.inHours >= 1
+        ? 'in ${until.inHours} hours'
+        : 'in ${until.inMinutes} minutes';
+
+    return Scaffold(
+      backgroundColor: const Color(0xFF37474F),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.hourglass_empty, size: 56, color: Colors.white70),
+              const SizedBox(height: 24),
+              const Text(
+                "You're in.",
+                style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w300),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'The game starts $when.',
+                style: const TextStyle(color: Colors.white, fontSize: 18),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Your phone is already recording who you spend time near, so leave the app '
+                'installed. Nothing counts towards your score until the game begins.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white70),
+              ),
+              const SizedBox(height: 32),
+              TextButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(builder: (_) => const InfoScreen()),
+                ),
+                child: const Text('How this works', style: TextStyle(color: Colors.white)),
+              ),
+              TextButton(
+                onPressed: onLeave,
+                child: const Text('Leave the study', style: TextStyle(color: Colors.white54)),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -149,11 +224,20 @@ class _GameScreen extends StatelessWidget {
               Center(
                 child: Column(
                   children: [
-                    if (game.protected)
+                    if (game.finished)
+                      Text(
+                        'GAME OVER',
+                        style: TextStyle(
+                          color: onColour.withValues(alpha: 0.9),
+                          letterSpacing: 4,
+                          fontSize: 18,
+                        ),
+                      ),
+                    if (game.protected && !game.finished)
                       Icon(Icons.shield, size: 64, color: onColour.withValues(alpha: 0.9)),
-                    if (game.protected) const SizedBox(height: 8),
+                    if (game.protected && !game.finished) const SizedBox(height: 8),
                     Text(
-                      'POINTS',
+                      game.finished ? 'FINAL SCORE' : 'POINTS',
                       style: TextStyle(
                         color: onColour.withValues(alpha: 0.7),
                         letterSpacing: 6,
@@ -170,7 +254,7 @@ class _GameScreen extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      game.stateLabel,
+                      game.finished ? 'You finished ${game.stateLabel.toLowerCase()}' : game.stateLabel,
                       style: TextStyle(color: onColour, fontSize: 22, letterSpacing: 1),
                     ),
                   ],
@@ -181,7 +265,9 @@ class _GameScreen extends StatelessWidget {
               const SizedBox(height: 16),
               _Aggregate(game: game, onColour: onColour),
               const SizedBox(height: 32),
-              if (game.hasState)
+              // The decision disappears when there is no longer a day it could apply to. Leaving a
+              // live button on a finished game invites a participant to spend a point on nothing.
+              if (game.hasState && !game.finished)
                 FilledButton.tonal(
                   onPressed: busy || game.protectionForced ? null : onProtect,
                   child: Text(
@@ -190,6 +276,18 @@ class _GameScreen extends StatelessWidget {
                         : game.protected
                         ? 'Stop protecting'
                         : 'Protect me',
+                  ),
+                ),
+              if (game.finished)
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      'Thank you for taking part. You can leave the study now; your phone has '
+                      'stopped recording.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: onColour.withValues(alpha: 0.85)),
+                    ),
                   ),
                 ),
               TextButton(

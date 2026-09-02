@@ -38,6 +38,10 @@
     "state_uri": "https://schemas.epidemica.info/state/epigame/1.0.0.json",
     "tick_interval_seconds": 86400,
     "population": 60,
+    "seed": {
+      "infections": 3,
+      "among": "virtual"
+    },
     "pars": {
       "diseases": {
         "type": "sir",

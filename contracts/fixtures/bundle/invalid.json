@@ -238,5 +238,63 @@
         "days": 7
       }
     }
+  },
+  {
+    "case": "a seed block with no count",
+    "why": "The whole point of the block is how many; defaulting it would decide the shape of the epidemic silently.",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "cccccccc-dddd-4eee-8fff-000000000000",
+      "title": "Seeded",
+      "modules": {
+        "proximity": {}
+      },
+      "twin": {
+        "engine": "starsim",
+        "state_uri": "https://schemas.epidemica.info/state/epigame/1.0.0.json",
+        "seed": {
+          "among": "virtual"
+        }
+      }
+    }
+  },
+  {
+    "case": "a negative number of seed infections",
+    "why": "There is no coherent reading of it, and it would otherwise sit in a bundle until the first tick failed.",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "cccccccc-dddd-4eee-8fff-000000000000",
+      "title": "Seeded",
+      "modules": {
+        "proximity": {}
+      },
+      "twin": {
+        "engine": "starsim",
+        "state_uri": "https://schemas.epidemica.info/state/epigame/1.0.0.json",
+        "seed": {
+          "infections": -1
+        }
+      }
+    }
+  },
+  {
+    "case": "seeding among a pool that does not exist",
+    "why": "A typo here would silently seed nobody and produce a study where the disease never arrived.",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "cccccccc-dddd-4eee-8fff-000000000000",
+      "title": "Seeded",
+      "modules": {
+        "proximity": {}
+      },
+      "twin": {
+        "engine": "starsim",
+        "state_uri": "https://schemas.epidemica.info/state/epigame/1.0.0.json",
+        "seed": {
+          "infections": 2,
+          "among": "everyone"
+        }
+      }
+    }
   }
 ]

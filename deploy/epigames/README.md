@@ -83,9 +83,17 @@ disagree, which is the signal the whole arrangement exists to give.
 
 ## What to expect on the phones
 
-A solid colour: green healthy, red infected, blue recovered. The points are the large number; a
-shield appears when protected. The screen states how old the computation is, because it is a daily
-one and an interface that looks live would claim a freshness it does not have.
+Before the study opens, a participant who has joined sees when play starts — codes go out in
+advance, and someone who joined in good time should not be left on a blank screen wondering whether
+the app is broken. Their phone is already recording; nothing counts yet.
+
+During the game: a solid colour — green healthy, red infected, blue recovered. The points are the
+large number; a shield appears when protected. The screen states how old the computation is,
+because it is a daily one and an interface that looks live would claim a freshness it does not have.
+
+After the final day's tick, the same screen becomes a result: **GAME OVER**, the final score, and
+no protection button — leaving a live one would invite a participant to spend a point on a day that
+will never be settled. The server refuses actions outside the study window for the same reason.
 
 If a phone stops sensing — Bluetooth off, app killed, battery flat — that participant is treated as
 protected and their day is not scored. They are not charged the protection point either. This is

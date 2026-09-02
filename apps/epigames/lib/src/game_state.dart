@@ -72,6 +72,12 @@ class GameState {
   /// Protection the participant did not choose, and cannot release: their phone stopped sensing.
   bool get protectionForced => protectionSource == 'not_sensing';
 
+  /// Whether the last day has been settled.
+  ///
+  /// Read from the document rather than from the device's clock: the game is over when the server
+  /// says the final day has been scored, not when a phone thinks the week is up.
+  bool get finished => hasState && daysTotal > 0 && day >= daysTotal;
+
   /// The whole screen is this colour. One glance has to answer "how am I doing".
   Color get colour => switch (epiState) {
     'susceptible' => const Color(0xFF1B7F3B),
@@ -89,8 +95,9 @@ class GameState {
     _ => 'Waiting for your first update',
   };
 
-  String get dayLabel => hasState ? 'Day $day of $daysTotal' : 'Not started';
-
+  String get dayLabel => hasState
+      ? (finished ? 'Finished · $daysTotal days' : 'Day $day of $daysTotal')
+      : 'Not started';
   /// How old the computation is, said plainly.
   String get freshness {
     if (asOf == null) return '';

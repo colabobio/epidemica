@@ -89,4 +89,20 @@ class ProtocolBundle {
 
   /// The server-side model this study runs, if any. Absent for studies that only collect.
   Map<String, Object?>? get twin => (raw['twin'] as Map?)?.cast<String, Object?>();
+
+  Map<String, Object?> get _schedule =>
+      (raw['schedule'] as Map?)?.cast<String, Object?>() ?? const {};
+
+  /// When day 1 begins, or null for a study with no schedule.
+  ///
+  /// Lets an app that joined early say when play starts rather than showing an unexplained blank:
+  /// codes are handed out before a study opens, and a participant who joined in good time should
+  /// not be left wondering whether something is broken.
+  DateTime? get startsAt {
+    final value = _schedule['starts_at'];
+    return value is String ? DateTime.tryParse(value)?.toUtc() : null;
+  }
+
+  /// How many days the study runs, or null for open-ended collection.
+  int? get scheduledDays => (_schedule['days'] as num?)?.toInt();
 }

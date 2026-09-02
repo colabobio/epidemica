@@ -112,6 +112,30 @@
         "pars": {
           "type": "object",
           "description": "Engine-specific parameters, opaque to the platform. Interpreted only by the named engine."
+        },
+        "seed": {
+          "type": "object",
+          "required": [
+            "infections"
+          ],
+          "additionalProperties": false,
+          "description": "How the outbreak starts. Without it nobody is ever infected and the study runs to completion having simulated nothing, which looks exactly like a study where the disease failed to spread.",
+          "properties": {
+            "infections": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "How many agents begin the first day already infected. Chosen deterministically from the study and the slot, so the same study always starts the same way and a re-run is a verification rather than a fresh draw."
+            },
+            "among": {
+              "enum": [
+                "virtual",
+                "participants",
+                "any"
+              ],
+              "default": "virtual",
+              "description": "Which agents may be chosen. `virtual` keeps the lottery away from real people: a participant infected on day one loses days of play for no reason they can see or influence, and every real infection then has a contact behind it rather than an unexplainable start. `participants` and `any` are available for studies that want the index case to be a player, and should be chosen deliberately."
+            }
+          }
         }
       }
     },

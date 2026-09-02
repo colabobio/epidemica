@@ -28,6 +28,13 @@ void main() {
       expect(parse(collectOnly).twin, isNull);
     });
 
+    test('has no start and no end', () {
+      final bundle = parse(collectOnly);
+
+      expect(bundle.startsAt, isNull);
+      expect(bundle.scheduledDays, isNull);
+    });
+
     test('names only the modules it uses', () {
       expect(parse(collectOnly).requiredModules, ['proximity']);
     });
@@ -53,6 +60,29 @@ void main() {
       });
 
       expect(bundle.healthInterval, const Duration(minutes: 15));
+    });
+  });
+
+  group('a scheduled study', () {
+    test('exposes when it starts and how long it runs', () {
+      final bundle = parse({
+        ...collectOnly,
+        'schedule': {'starts_at': '2026-09-07T06:00:00Z', 'days': 7},
+      });
+
+      // The app needs these to tell someone who joined early when play begins, rather than
+      // leaving them on a blank screen wondering whether the app is broken.
+      expect(bundle.startsAt, DateTime.utc(2026, 9, 7, 6));
+      expect(bundle.scheduledDays, 7);
+    });
+
+    test('a start it cannot parse is null rather than a guess', () {
+      final bundle = parse({
+        ...collectOnly,
+        'schedule': {'starts_at': 'the seventh', 'days': 7},
+      });
+
+      expect(bundle.startsAt, isNull);
     });
   });
 

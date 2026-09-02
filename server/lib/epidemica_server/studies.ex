@@ -66,6 +66,11 @@ defmodule EpidemicaServer.Studies do
 
   def scheduled_days(_study), do: nil
 
+  @doc "Whether `at` falls inside the study's run. Always true for a study that declares no schedule."
+  def running?(%Study{} = study, at \\ DateTime.utc_now()) do
+    starts_at(study) == nil or day_at(study, at) != nil
+  end
+
   @doc """
   Which study-day `at` falls in: 1 on the first day, `nil` before the study opens or after it ends.
 

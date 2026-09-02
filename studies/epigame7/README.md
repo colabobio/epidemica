@@ -23,6 +23,14 @@ population is 60 against a much smaller enrolment: the remainder are simulated p
 presence the app's information screen discloses. Without them a class-sized group would rarely
 produce an outbreak at all, and there would be no game.
 
+`twin.seed` starts the outbreak. Without it the study runs its full seven days, settles every
+score, and simulates nothing — which on a participant's screen is indistinguishable from a disease
+that failed to spread. Three cases are seeded `among: "virtual"`, so the lottery never falls on a
+real player: being infected on day one costs most of the game, for a reason the participant can
+neither see nor influence. It also means every real infection has a contact behind it rather than
+an unexplainable start. A study that wants a player as its index case sets `among: "participants"`
+deliberately.
+
 **`rules`** holds every number the score uses. Nothing about the economics is compiled into the
 app or the server.
 

@@ -35,6 +35,32 @@ defmodule EpidemicaServerWeb.GameActionTest do
     {:ok, conn: conn, study: study, enrolled: enrolled}
   end
 
+  # A study that has already finished, so every action arrives too late.
+  defp finished_study(conn) do
+    source =
+      Jason.encode!(%{
+        "bundle_version" => "1.0",
+        "study_id" => Ecto.UUID.generate(),
+        "title" => "Over",
+        "modules" => %{"proximity" => %{}},
+        "schedule" => %{"starts_at" => "2020-01-01T00:00:00Z", "days" => 7},
+        "rules" => %{"engine" => "epigame"}
+      })
+
+    {:ok, study} = Studies.create_study_from_bundle("Over", source)
+    {:ok, _} = Studies.add_join_code(study, "OVER-1")
+
+    {:ok, enrolled} =
+      Enrollment.enroll(%{
+        "join_code" => "OVER-1",
+        "subject" => "9c2e0f55-4d3b-4021-8e66-b2c3d4e5f607",
+        "device_id" => "2b3c4d5e-6f70-4182-93a4-b5c6d7e8f901",
+        "platform" => "android"
+      })
+
+    %{conn: conn, study: study, enrolled: enrolled}
+  end
+
   defp authed(conn, %{access_token: token}),
     do: put_req_header(conn, "authorization", "Bearer #{token}")
 
@@ -98,5 +124,45 @@ defmodule EpidemicaServerWeb.GameActionTest do
   test "an unauthenticated device cannot act", ctx do
     conn = post(ctx.conn, "/v1/participants/me/actions", %{"action" => "protect"})
     assert conn.status in [401, 403]
+  end
+
+  test "a decision cannot be taken after the study has ended", ctx do
+    over = finished_study(ctx.conn)
+
+    body = json_response(act(over, %{"action" => "protect"}), 409)
+
+    # Protection taken after the last day would be charged for on a day that will never be
+    # settled, so it is refused rather than recorded and quietly ignored.
+    assert body["title"] == "study_not_running"
+  end
+
+  test "a decision cannot be taken before the study begins", ctx do
+    source =
+      Jason.encode!(%{
+        "bundle_version" => "1.0",
+        "study_id" => Ecto.UUID.generate(),
+        "title" => "Later",
+        "modules" => %{"proximity" => %{}},
+        "schedule" => %{"starts_at" => "2099-01-01T00:00:00Z", "days" => 7},
+        "rules" => %{"engine" => "epigame"}
+      })
+
+    {:ok, study} = Studies.create_study_from_bundle("Later", source)
+    {:ok, _} = Studies.add_join_code(study, "LATER-1")
+
+    {:ok, enrolled} =
+      Enrollment.enroll(%{
+        "join_code" => "LATER-1",
+        "subject" => "3f4e5d66-7a8b-4c90-9d11-e2f3a4b5c6d7",
+        "device_id" => "3c4d5e6f-7081-4293-a4b5-c6d7e8f90123",
+        "platform" => "android"
+      })
+
+    # Enrolling early is fine — codes go out before play starts — but acting early is not.
+    body =
+      json_response(act(%{conn: ctx.conn, enrolled: enrolled}, %{"action" => "protect"}), 409)
+
+    assert body["title"] == "study_not_running"
+    assert study.id
   end
 end

@@ -159,4 +159,37 @@ void main() {
       expect(game.totalCases, 5);
     });
   });
+
+  group('the end of the game', () {
+    test('a study still running is not finished', () {
+      expect(GameState.from(document(healthy)).finished, isFalse);
+    });
+
+    test('the last settled day ends the game', () {
+      final game = GameState.from(document({...healthy, 'day': 7}));
+
+      expect(game.finished, isTrue);
+      expect(game.dayLabel, 'Finished · 7 days');
+    });
+
+    test('the end is decided by the server, not the phone\'s clock', () {
+      // The document says which day was settled. A device with a wrong clock must not be able to
+      // end a participant's game early or keep it open after everyone else has finished.
+      final stale = GameState.from(
+        document({...healthy, 'day': 7}, asOf: DateTime.now().toUtc().subtract(const Duration(days: 30))),
+      );
+
+      expect(stale.finished, isTrue);
+    });
+
+    test('a study with no declared length never reports finished', () {
+      final game = GameState.from({...healthy, 'days_total': 0}.let(document));
+
+      expect(game.finished, isFalse);
+    });
+  });
+}
+
+extension<T> on T {
+  R let<R>(R Function(T) f) => f(this);
 }
