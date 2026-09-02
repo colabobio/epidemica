@@ -68,10 +68,9 @@ another participant.
 
 ## Still to build for W4
 
-- HTTP layer: router, controllers, participant-token plug, gzip request bodies
-- Enrollment and token issuance
-- The `contacts` projection and its rebuild path
-- Release configuration and a bare-VM deployment check
+Nothing — all nine acceptance criteria are met. Remaining server work belongs to later milestones:
+the researcher console, protocol bundle delivery, and re-validation of quarantined observations
+after a schema is added.
 
 ## Phoenix
 

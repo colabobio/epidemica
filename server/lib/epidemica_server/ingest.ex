@@ -34,6 +34,10 @@ defmodule EpidemicaServer.Ingest do
   `:heterogeneous_batch` (a 400) or `:forbidden` (a 403).
   """
   def submit(%Auth{} = auth, envelopes) when is_list(envelopes) do
+    # Binding is checked before schema validation, and that ordering matters. An envelope naming a
+    # subject the token does not authorise is refused outright rather than quarantined, because
+    # quarantining would store a row attributed to a subject the server cannot vouch for — which is
+    # the mis-attribution this check exists to prevent, merely with `validated: false` on it.
     with :ok <- check_size(envelopes),
          :ok <- check_batch_binding(auth, envelopes) do
       received_at = DateTime.utc_now()
@@ -51,19 +55,32 @@ defmodule EpidemicaServer.Ingest do
   defp check_size(list) when length(list) > @max_batch, do: {:error, :too_large}
   defp check_size(_), do: :ok
 
-  # A batch is homogeneous and must match the token. Accepting a batch that disagrees with its
-  # token would let one device write observations attributed to another participant, so this is a
-  # 403 rather than a per-item outcome.
+  # A batch is homogeneous and must match the token on all three identifiers. Checking device and
+  # study but not subject would still let a device write observations attributed to another
+  # participant in the same study, which is the mis-attribution this check exists to prevent.
   defp check_batch_binding(auth, envelopes) do
-    devices = envelopes |> Enum.map(&Map.get(&1, "device_id")) |> Enum.uniq()
-    studies = envelopes |> Enum.map(&Map.get(&1, "study_id")) |> Enum.uniq()
+    devices = distinct_values(envelopes, "device_id")
+    studies = distinct_values(envelopes, "study_id")
+    subjects = distinct_values(envelopes, "subject")
 
     cond do
-      length(devices) > 1 or length(studies) > 1 -> {:error, :heterogeneous_batch}
+      length(devices) > 1 or length(studies) > 1 or length(subjects) > 1 ->
+        {:error, :heterogeneous_batch}
+
       devices != [auth.device_id] -> {:error, :forbidden}
       studies != [auth.study_id] -> {:error, :forbidden}
+      subjects != [auth.subject] -> {:error, :forbidden}
       true -> :ok
     end
+  end
+
+  defp distinct_values(envelopes, key) do
+    envelopes
+    |> Enum.map(fn
+      envelope when is_map(envelope) -> Map.get(envelope, key)
+      _ -> nil
+    end)
+    |> Enum.uniq()
   end
 
   # -- classification ---------------------------------------------------------------------------

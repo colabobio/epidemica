@@ -14,16 +14,32 @@ defmodule EpidemicaServerWeb.Router do
     plug :accepts, ["json"]
   end
 
+  pipeline :participant do
+    plug EpidemicaServerWeb.Plugs.ParticipantToken
+  end
+
+  # The API version lives in the path prefix. The observation envelope and the payload contracts
+  # version independently of it, so adding an observation type never requires an API release.
+  scope "/v1", EpidemicaServerWeb do
+    pipe_through :api
+
+    get "/health", EnrollmentController, :health
+    post "/enrollments", EnrollmentController, :create
+    post "/tokens", EnrollmentController, :refresh
+  end
+
+  scope "/v1", EpidemicaServerWeb do
+    pipe_through [:api, :participant]
+
+    post "/observations", ObservationController, :create
+    get "/observations/ack", ObservationController, :ack
+  end
+
   scope "/", EpidemicaServerWeb do
     pipe_through :browser
 
     get "/", PageController, :home
   end
-
-  # Other scopes may use custom stacks.
-  # scope "/api", EpidemicaServerWeb do
-  #   pipe_through :api
-  # end
 
   # Enable LiveDashboard in development
   if Application.compile_env(:epidemica_server, :dev_routes) do

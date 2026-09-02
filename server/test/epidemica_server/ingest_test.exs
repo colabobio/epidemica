@@ -38,6 +38,15 @@ defmodule EpidemicaServer.IngestTest do
     end)
   end
 
+  # One invalid fixture's defect *is* its subject, which the binding check catches before schema
+  # validation ever runs. It is exercised separately as a forbidden batch; mixing it in here would
+  # test the binding check while appearing to test quarantine.
+  defp bindable_invalid_fixtures do
+    fixtures = Enum.filter(fixtures("invalid"), &(is_map(&1) and &1["subject"] == @subject))
+    refute Enum.empty?(fixtures)
+    renumbered(fixtures)
+  end
+
   describe "valid fixtures" do
     test "are all accepted and stored" do
       envelopes = renumbered(fixtures("valid"))
@@ -77,19 +86,29 @@ defmodule EpidemicaServer.IngestTest do
 
   describe "invalid fixtures" do
     test "are never rejected wholesale and never raise" do
-      for envelope <- renumbered(fixtures("invalid")) do
+      for envelope <- bindable_invalid_fixtures() do
         assert {:ok, _result} = Ingest.submit(auth(), [envelope])
       end
     end
 
     test "are stored rather than discarded, except when unidentifiable" do
-      envelopes = renumbered(fixtures("invalid"))
+      envelopes = bindable_invalid_fixtures()
       {:ok, result} = Ingest.submit(auth(), envelopes)
 
       assert result.accepted == 0
       assert result.quarantined + result.rejected == length(envelopes)
       # Everything storable was in fact stored.
       assert length(all_observations()) == result.quarantined
+    end
+
+    test "a subject the token does not authorise is refused, not quarantined" do
+      envelope =
+        fixtures("invalid")
+        |> Enum.find(&(is_map(&1) and &1["subject"] != @subject))
+        |> Map.put("seq", 0)
+
+      assert {:error, :forbidden} = Ingest.submit(auth(), [envelope])
+      assert all_observations() == []
     end
 
     test "a future envelope version is quarantined as a version lag, not a defect" do

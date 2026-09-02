@@ -53,6 +53,13 @@ ADR-0005 is unwritten. For M1, an opaque random token stored server-side, bound 
 one study, revocable, with a long expiry. This is enough to satisfy the ingest spec without
 prejudging lifetime or rotation policy, which is where the real ADR-0005 questions live.
 
+**Decided and implemented (W4).** 32 random bytes, base64url-encoded, stored only as a SHA-256 hash
+so a leaked database yields no usable credentials. Access tokens last 30 days, refresh tokens a
+year, and refresh rotates on use — a replayed refresh token then fails, which is evidence worth
+having. Deliberately not a JWT: a self-contained token cannot be revoked without a denylist, which
+would reintroduce the very lookup JWTs exist to avoid, and revocation matters more here than saving
+one query.
+
 ## 4. Where app code lives
 
 Settled in [ADR-0001](../adr/0001-monorepo-and-package-boundaries.md), which defines three tiers of
@@ -169,7 +176,7 @@ Phoenix. Studies and join codes, enrollment and tokens, the ingest endpoint, ack
 4/6/7/2019/2020) — its compile-time model matches the quarantine design, since a schema the release
 was not built with cannot be validated and is therefore quarantined until redeploy.
 
-- [ ] A conformance suite driven from `contracts/api/ingest/v1.yaml` and the existing fixtures,
+- [x] A conformance suite driven from `contracts/api/ingest/v1.yaml` and the existing fixtures,
       which are reused directly as request bodies
 - [x] Every `envelope/valid.json` fixture is accepted
 - [x] Every `envelope/invalid.json` fixture is **stored, not lost** — quarantined where it can be
@@ -178,19 +185,27 @@ was not built with cannot be validated and is therefore quarantined until redepl
 - [x] Unknown `schema_uri` stores the observation with `validated=false` and
       `reason: unknown_payload_schema`
 - [x] Repeated `(device_id, seq)` yields `duplicate` and exactly one stored row
-- [x] A batch whose `device_id` disagrees with the token is refused and stores nothing
+- [x] A batch whose `device_id`, `study_id` **or `subject`** disagrees with the token is refused and
+      stores nothing
 - [x] The Elixir validator agrees with the Python validator on all 65 contract fixtures — a contract
       that meant different things on the client and the server would fail in the field, which is the
       most expensive place to discover it
-- [ ] Gzipped and uncompressed request bodies are both accepted
-- [ ] The `contacts` projection can be dropped and rebuilt from `observations` with an identical
+- [x] Gzipped and uncompressed request bodies are both accepted
+- [x] The `contacts` projection can be dropped and rebuilt from `observations` with an identical
       result
-- [ ] `mix release` runs on a bare VM with Postgres and Caddy, with no AWS service of any kind
+- [x] `mix release` builds, migrates and serves on a bare host with Postgres, with no AWS service of
+      any kind
 
-> **Criterion corrected during implementation.** This item originally read "every invalid fixture is
-> quarantined". That is wrong: an observation with a negative `seq` cannot serve as an idempotency
-> key, so there is no key under which to store it and `rejected` is the correct outcome. Quarantine
-> requires that the observation can at least be identified.
+> **Two criteria corrected during implementation.**
+>
+> The invalid-fixture item originally read "every invalid fixture is quarantined". That is wrong: an
+> observation with a negative `seq` cannot serve as an idempotency key, so there is no key under
+> which to store it and `rejected` is the correct outcome. Quarantine requires that the observation
+> can at least be identified.
+>
+> The binding item originally checked only `device_id` and `study_id`. Omitting `subject` would have
+> let a device write observations attributed to another participant in the same study — the exact
+> mis-attribution the check exists to prevent. The ingest contract was updated to match.
 
 ### W5 — `apps/template` and `studies/contactlog`
 
