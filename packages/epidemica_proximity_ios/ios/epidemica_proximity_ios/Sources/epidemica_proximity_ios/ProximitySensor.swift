@@ -58,6 +58,12 @@ final class ProximitySensor: NSObject, SensorDelegate {
         BLESensorConfiguration.customServiceUUID = CBUUID(nsuuid: uuid)
         BLESensorConfiguration.customServiceDetectionEnabled = true
         BLESensorConfiguration.customServiceAdvertisingEnabled = true
+        // Herald enables a CoreLocation "mobility sensor" by default, which turns on background
+        // location updates. It crashes any app that has not declared the `location` background
+        // mode, and on one that has, it quietly collects location — which this study promises not
+        // to do and Android is explicitly configured against. Off, on purpose. Herald for Android
+        // has no equivalent, which is why only iOS was affected.
+        BLESensorConfiguration.mobilitySensorEnabled = nil
         // Study scoping: with the standard Herald service off, devices in other studies — and other
         // Herald apps entirely — are neither seen nor visible.
         BLESensorConfiguration.standardHeraldServiceDetectionEnabled = false

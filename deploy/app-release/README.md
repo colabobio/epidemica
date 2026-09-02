@@ -34,16 +34,14 @@ Include the trailing `/v1/`.
 
 ## iOS: declare what the plugin needs
 
-`apps/epigames/ios/Runner/Info.plist` is still the Flutter scaffold. The proximity plugin checks
-for these at start and reports them through `missingPlatformRequirements` rather than failing
-silently, so the app will run and simply never sense anything.
-
-Add to `Info.plist`, inside the top-level `<dict>`:
+Both apps now ship these keys, so there is nothing to add. They are recorded here because the
+failure mode if they go missing is confusing: the app runs, senses nothing, and reports the
+omission only through `missingPlatformRequirements`.
 
 ```xml
 <key>NSBluetoothAlwaysUsageDescription</key>
-<string>Epigame records which other participants you spend time near, so the study can measure
-how contact patterns shape an outbreak. It does not record where you are.</string>
+<string>Detects which other study participants are nearby, and for how long, so the study can
+measure how contact patterns shape an outbreak. Your location is never recorded.</string>
 
 <key>UIBackgroundModes</key>
 <array>
@@ -59,9 +57,23 @@ Both background modes are needed: the module both scans (central) and advertises
 declaring one gives you an app that discovers others but is invisible to them — which produces a
 contact network that reconciles to half the truth.
 
+**Do not add `location` to `UIBackgroundModes`**, however tempting it looks when something crashes
+asking for it. Herald enables a CoreLocation mobility sensor by default, and it aborts the app on
+launch with
+
+```
+Invalid parameter not satisfying: !stayUp || CLClientIsBackgroundable(...)
+```
+
+The fix is to disable that sensor — `ProximitySensor.swift` sets
+`BLESensorConfiguration.mobilitySensorEnabled = nil` — not to grant the background mode it is
+asking for. Adding `location` silences the crash and starts collecting location, which contradicts
+the sentence directly above it in the permission prompt.
+
 Android needs nothing added. The plugin's own manifest is merged into the app, including
 `neverForLocation` on `BLUETOOTH_SCAN`, which keeps a research app off the location permission
-entirely on Android 12 and later.
+entirely on Android 12 and later. Herald for Android has no mobility sensor, which is why this
+problem is iOS-only.
 
 ## Android: signing
 

@@ -101,6 +101,19 @@ module records a peer pseudonym and a signal strength, and never a location.
 `NSBluetoothPeripheralUsageDescription` is only needed below iOS 13, and this plugin requires iOS 13
 or later.
 
+**Do not add `location` to `UIBackgroundModes`.** Herald ships a CoreLocation mobility sensor that
+is *enabled by default* and switches on background location updates, which aborts the app on launch
+with `Invalid parameter not satisfying: !stayUp || CLClientIsBackgroundable(...)`. The background
+mode it is asking for would silence that and start collecting location, contradicting the usage
+string above. `ProximitySensor` disables the sensor instead:
+
+```swift
+BLESensorConfiguration.mobilitySensorEnabled = nil
+```
+
+Herald for Android has no such sensor, which is why this is an iOS-only trap and why the Android
+side reached the same privacy position without needing anything switched off.
+
 Omitting any of the above does **not** produce a crash. The app simply stops sensing when the screen
 locks, and the study discovers it at analysis time. Because that failure is invisible, `start()`
 refuses to run and reports what is missing:
