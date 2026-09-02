@@ -1,0 +1,27 @@
+name: epidemica_core
+description: >-
+  Identity, enrollment, the observation outbox, sync and clock reconciliation for Epidemica apps.
+  Modules record observations here; this package is what gets them to a server exactly once.
+version: 0.1.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.9.0
+  flutter: ">=3.29.0"
+
+dependencies:
+  crypto: ^3.0.6
+  flutter:
+    sdk: flutter
+  flutter_secure_storage: ^9.2.4
+  http: ^1.2.2
+  meta: ^1.16.0
+  path: ^1.9.1
+  sqlite3: ^2.4.6
+  sqlite3_flutter_libs: ^0.5.26
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter

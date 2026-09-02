@@ -7,6 +7,7 @@ environment:
   sdk: ^3.9.0
 
 workspace:
+  - packages/epidemica_core
   - packages/epidemica_proximity_platform_interface
   - packages/epidemica_proximity
   - packages/epidemica_proximity_android
