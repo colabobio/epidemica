@@ -48,6 +48,11 @@ Explanations of how the platform works, as opposed to why decisions were made:
 - [The Observation Envelope](docs/concepts/observation-envelope.md) — how every module's data
   reaches the server, exactly once, with enough context to interpret it years later.
 
+## Milestones
+
+- [M1 — Contact logging end to end](docs/milestones/m1-contact-logging.md) — the first vertical
+  slice through every layer: contract, module, core, server, analysis.
+
 ## Contracts
 
 | Contract | What it defines |
