@@ -13,10 +13,12 @@ import 'package:http/testing.dart';
 const _bundleUrl = 'https://example.test/bundles/contactlog.json';
 
 String _bundleJson({List<String> modules = const ['proximity']}) => jsonEncode({
+  'bundle_version': '1.0',
   'study_id': '11111111-2222-4333-8444-555555555555',
-  'modules': modules,
-  'proximity': {
-    'on_device': {'max_episode_seconds': 900},
+  'title': 'Contact logging pilot',
+  'modules': {
+    for (final m in modules)
+      m: m == 'proximity' ? {'on_device': {'max_episode_seconds': 900}} : {},
   },
 });
 
@@ -272,8 +274,8 @@ void main() {
     test('the hash covers the served bytes, not a re-encoding', () {
       // Two documents that parse identically but serialise differently must not share a hash;
       // the hash has to identify what was actually served.
-      final a = utf8.encode('{"study_id":"s","modules":[]}');
-      final b = utf8.encode('{"modules":[],"study_id":"s"}');
+      final a = utf8.encode('{"study_id":"s","modules":{}}');
+      final b = utf8.encode('{"modules":{},"study_id":"s"}');
       expect(ProtocolBundle.hashOf(a), isNot(ProtocolBundle.hashOf(b)));
     });
   });

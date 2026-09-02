@@ -1,0 +1,83 @@
+[
+  {
+    "case": "a bundle that names no modules",
+    "why": "A study that activates nothing collects nothing. It would enrol successfully, show a healthy app, and produce an empty dataset that is only noticed at analysis.",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "11111111-2222-4333-8444-555555555555",
+      "title": "Collects nothing",
+      "modules": {}
+    }
+  },
+  {
+    "case": "title missing",
+    "why": "The title is what a participant reads when deciding whether they are in the right study, so it cannot be optional.",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "11111111-2222-4333-8444-555555555555",
+      "modules": { "proximity": {} }
+    }
+  },
+  {
+    "case": "an unrecognised top-level key",
+    "why": "Closed at the top level so a researcher's typo fails loudly instead of silently leaving the intended setting at its default.",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "11111111-2222-4333-8444-555555555555",
+      "title": "Typo study",
+      "modules": { "proximity": {} },
+      "retention_days": 90
+    }
+  },
+  {
+    "case": "study_id is not a UUID",
+    "why": "The study identifier seeds the proximity service UUID; a malformed one would silently isolate every device into its own study.",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "contactlog",
+      "title": "Contact logging pilot",
+      "modules": { "proximity": {} }
+    }
+  },
+  {
+    "case": "a bundle version this schema does not define",
+    "why": "An app must refuse a bundle it cannot fully interpret rather than apply the parts it recognises.",
+    "instance": {
+      "bundle_version": "2.0",
+      "study_id": "11111111-2222-4333-8444-555555555555",
+      "title": "From the future",
+      "modules": { "proximity": {} }
+    }
+  },
+  {
+    "case": "module configuration is not an object",
+    "why": "A module block is a configuration document. A bare true would leave the module's settings undefined while looking deliberate.",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "11111111-2222-4333-8444-555555555555",
+      "title": "Contact logging pilot",
+      "modules": { "proximity": true }
+    }
+  },
+  {
+    "case": "sync interval below the floor",
+    "why": "A device asked to sync every ten seconds would drain a participant's battery and achieve nothing the outbox does not already guarantee.",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "11111111-2222-4333-8444-555555555555",
+      "title": "Contact logging pilot",
+      "modules": { "proximity": {} },
+      "sync": { "min_interval_seconds": 10 }
+    }
+  },
+  {
+    "case": "an empty title",
+    "why": "Present but blank is the same failure as absent, and is easier to introduce by templating.",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "11111111-2222-4333-8444-555555555555",
+      "title": "",
+      "modules": { "proximity": {} }
+    }
+  }
+]

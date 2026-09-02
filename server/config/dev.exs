@@ -20,9 +20,14 @@ config :epidemica_server, EpidemicaServer.Repo,
 # watchers to your application. For example, we can use it
 # to bundle .js and .css sources.
 config :epidemica_server, EpidemicaServerWeb.Endpoint,
-  # Binding to loopback ipv4 address prevents access from other machines.
-  # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
-  http: [ip: {127, 0, 0, 1}, port: 4000],
+  # Loopback by default. A field trial needs real phones to reach this machine, so set
+  # EPIDEMICA_HOST to this machine's LAN address and the endpoint binds to every interface and
+  # hands out absolute URLs the devices can actually resolve.
+  http: [
+    ip: if(System.get_env("EPIDEMICA_HOST"), do: {0, 0, 0, 0}, else: {127, 0, 0, 1}),
+    port: 4000
+  ],
+  url: [host: System.get_env("EPIDEMICA_HOST") || "localhost", port: 4000, scheme: "http"],
   check_origin: false,
   code_reloader: true,
   debug_errors: true,

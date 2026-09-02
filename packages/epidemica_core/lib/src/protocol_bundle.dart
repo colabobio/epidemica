@@ -23,18 +23,23 @@ class ModuleRegistry {
 
 /// The study's configuration, as fetched from `protocol_url`.
 ///
-/// Only the fields core needs are modelled. Module-specific blocks are handed to modules as raw
-/// maps, so adding a module never requires changing this class.
+/// Only the fields core needs are modelled. Module blocks are handed to modules as raw maps, so
+/// adding a module never requires changing this class.
 @immutable
 class ProtocolBundle {
   const ProtocolBundle({
     required this.studyId,
+    required this.title,
     required this.requiredModules,
     required this.raw,
   });
 
   final String studyId;
+  final String title;
+
+  /// Sorted, so an error message naming missing modules reads the same every time.
   final List<String> requiredModules;
+
   final Map<String, Object?> raw;
 
   /// `sha256:` followed by the hex digest of the exact bytes fetched.
@@ -46,16 +51,24 @@ class ProtocolBundle {
 
   static ProtocolBundle parse(List<int> bytes) {
     final json = (jsonDecode(utf8.decode(bytes)) as Map).cast<String, Object?>();
+    final modules = (json['modules'] as Map?)?.cast<String, Object?>() ?? const {};
     return ProtocolBundle(
       studyId: json['study_id']! as String,
-      requiredModules: [
-        for (final m in (json['modules'] as List? ?? const [])) m! as String,
-      ],
+      title: json['title'] as String? ?? '',
+      // Declaring a module and configuring it are the same act, so the bundle cannot name one it
+      // forgot to configure or configure one it never declared.
+      requiredModules: modules.keys.toList()..sort(),
       raw: json,
     );
   }
 
   /// The configuration block for one module, or an empty map.
   Map<String, Object?> configFor(String module) =>
-      (raw[module] as Map?)?.cast<String, Object?>() ?? const {};
+      ((raw['modules'] as Map?)?[module] as Map?)?.cast<String, Object?>() ?? const {};
+
+  /// Floor between sync attempts, when the study states one.
+  Duration? get minSyncInterval {
+    final seconds = ((raw['sync'] as Map?)?['min_interval_seconds'] as num?)?.toInt();
+    return seconds == null ? null : Duration(seconds: seconds);
+  }
 }

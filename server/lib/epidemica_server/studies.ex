@@ -10,6 +10,33 @@ defmodule EpidemicaServer.Studies do
     %Study{} |> Study.changeset(attrs) |> Repo.insert()
   end
 
+  @doc """
+  Register a study from the exact bytes of an authored bundle.
+
+  The hash is derived here rather than supplied, so a study cannot be created whose stated hash
+  describes something other than what it will serve.
+  """
+  def create_study_from_bundle(name, source) when is_binary(source) do
+    with {:ok, decoded} <- Jason.decode(source) do
+      create_study(%{
+        name: name,
+        protocol_source: source,
+        protocol: decoded,
+        protocol_hash: Study.hash_of(source)
+      })
+    end
+  end
+
+  @doc "The bytes to serve for a study, byte-identical to what was registered."
+  def fetch_protocol_source(id) do
+    case Repo.one(from s in Study, where: s.id == ^id, select: s.protocol_source) do
+      nil -> {:error, :not_found}
+      source -> {:ok, source}
+    end
+  rescue
+    Ecto.Query.CastError -> {:error, :not_found}
+  end
+
   def add_join_code(%Study{} = study, code, arm \\ nil) do
     %JoinCode{}
     |> JoinCode.changeset(%{study_id: study.id, code: code, arm: arm})

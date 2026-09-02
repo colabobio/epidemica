@@ -213,5 +213,8 @@ defmodule EpidemicaServer.Enrollment do
 
   defp hash(raw), do: :crypto.hash(:sha256, raw)
 
-  defp protocol_url(study_id), do: "/v1/studies/#{study_id}/protocol"
+  # Absolute, because the client fetches it directly. A relative path would work only for callers
+  # that already knew where the server was, which the bundle URL exists to avoid assuming.
+  defp protocol_url(study_id),
+    do: EpidemicaServerWeb.Endpoint.url() <> "/v1/studies/#{study_id}/protocol"
 end

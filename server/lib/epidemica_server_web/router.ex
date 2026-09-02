@@ -31,6 +31,7 @@ defmodule EpidemicaServerWeb.Router do
   scope "/v1", EpidemicaServerWeb do
     pipe_through [:api, :participant]
 
+    get "/studies/:id/protocol", ProtocolController, :show
     post "/observations", ObservationController, :create
     get "/observations/ack", ObservationController, :ack
   end

@@ -1,0 +1,28 @@
+{
+  "bundle_version": "1.0",
+  "study_id": "c0badf00-1111-4222-8333-444455556666",
+  "title": "Contact logging pilot",
+  "description": "Measures how much time you spend near other people taking part in this study. Your phone records a random code for each nearby participant and how close they were, nothing else. It does not record where you are.",
+  "join_code": "CONTACTLOG-2026",
+  "modules": {
+    "proximity": {
+      "on_device": {
+        "max_episode_seconds": 900,
+        "max_gap_seconds": 600,
+        "sample_credit_seconds": 90,
+        "dropout_threshold_seconds": 75,
+        "include_rssi": true,
+        "include_min_distance": true,
+        "include_pair_key": true,
+        "include_device_class": true
+      },
+      "upload": {
+        "min_duration_seconds": 0,
+        "min_sample_count": 1
+      }
+    }
+  },
+  "sync": {
+    "min_interval_seconds": 900
+  }
+}

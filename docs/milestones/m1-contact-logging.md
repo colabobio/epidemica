@@ -394,17 +394,52 @@ was not built with cannot be validated and is therefore quarantined until redepl
 The generic app binary, plus the protocol bundle that makes it a contact-logging study. The bundle
 is the deliverable that a researcher would author; the binary is the platform's.
 
-- [ ] Join by code enrolls, fetches the protocol bundle, and records its hash on every observation
+- [x] Join by code enrolls, fetches the protocol bundle, and records its hash on every observation
 - [ ] Permission flow for Bluetooth and background execution on both platforms
-- [ ] Visible state: enrolled, scanning, last sync, pending observation count
-- [ ] **`studies/contactlog/` contains no Dart code** — only a protocol bundle. If the milestone
+- [x] Visible state: enrolled, scanning, last sync, pending observation count
+- [x] **`studies/contactlog/` contains no Dart code** — only a protocol bundle. If the milestone
       cannot be completed without study-specific application code, Tier 1 does not work as described
       and ADR-0001 needs revisiting
-- [ ] The same binary, given a different bundle, collects a different module's data without a rebuild
-- [ ] A bundle naming an absent module is **refused with an actionable message** ("this study needs a
+- [x] The same binary, given a different bundle, collects a different module's data without a rebuild
+- [x] A bundle naming an absent module is **refused with an actionable message** ("this study needs a
       newer version of the app"), and the participant is never left enrolled in a study that collects
       nothing
-- [ ] Withdrawing stops collection and clears local data
+- [x] Withdrawing stops collection and clears local data
+
+**The bundle is now a contract.** `contracts/bundle/1.0.0.json` with 11 fixtures, so a researcher's
+bundle is validated rather than trusted. Closed at the top level, which turns a typo'd key into a
+loud failure instead of a setting that silently stays at its default — the specific way a
+misconfigured study would otherwise collect the wrong thing for a month without anyone noticing.
+
+**Declaring a module and configuring it are the same act.** `modules` is a map from module id to
+that module's configuration, not a list plus separate blocks. A bundle therefore cannot name a
+module it forgot to configure, or configure one it never declared.
+
+**A module is handed its own block, never the whole bundle.** `AggregatorConfig.fromModuleConfig`
+replaced `fromBundle` for this reason: a module with access to the whole document can grow opinions
+about another module's settings, and that coupling is invisible until two studies disagree.
+
+**The module registry is derived from what is embedded**, not hand-maintained:
+`ModuleRegistry({for (final m in modules) m.id})`. A hand-written list is a second source of truth
+that can claim a module the binary does not contain, which would defeat the satisfiability check
+that exists to catch exactly that.
+
+**Tier 1 is mechanically tested, in two places.** A Python test asserts `studies/` contains no file
+with a code suffix; a Dart test starts the same controller with the same module set twice, hands it
+two different bundles, and asserts different modules activate. If Tier 1 stops being true, both
+fail.
+
+**Withdrawal destroys the pseudonym too.** Retaining it would let a later enrollment be linked to
+the withdrawn one, which is precisely what withdrawing is meant to prevent. Queued observations are
+destroyed rather than flushed first: a participant who withdraws has not consented to the upload
+that has not happened yet.
+
+Deferred: background sync scheduling. Foreground sync on a five-minute timer is enough for a
+one-hour pilot, and the outbox already guarantees nothing is lost while offline, so the scheduler is
+about promptness rather than safety. It is also better decided once the app's foreground-service
+topology is settled — the proximity module already runs one, and a second `dataSync` service would
+mean a second permanent notification.
+
 
 ## 6. Sequencing
 

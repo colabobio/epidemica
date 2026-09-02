@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.epidemica.info/bundle/1.0.0.json",
+  "title": "Study protocol bundle",
+  "description": "The document that turns a generic Epidemica binary into a specific study. It names the modules the study uses and configures each of them, and it is the only artefact a researcher authors for a Tier 1 study: no application code is written, compiled or signed. The bundle is fetched after enrolment and verified against the `protocol_hash` returned there, and that hash is stamped on every observation so a dataset always says which configuration produced it.",
+  "type": "object",
+  "required": ["bundle_version", "study_id", "title", "modules"],
+  "additionalProperties": false,
+  "properties": {
+    "bundle_version": {
+      "enum": ["1.0"],
+      "description": "Selects the bundle schema an app validates against. A binary that does not know this version must refuse the study rather than interpret it partially."
+    },
+    "study_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "The study these observations belong to. Also the seed for the proximity service UUID, so devices in different studies never discover one another."
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "description": "Shown to participants. This is the name a person sees when deciding whether they are in the right study."
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 2000,
+      "description": "Participant-facing explanation of what the study collects."
+    },
+    "join_code": {
+      "type": "string",
+      "minLength": 4,
+      "maxLength": 64,
+      "description": "The code distributed to participants. Present so the authored bundle is self-describing; the app never reads it, having already used it to enrol."
+    },
+    "modules": {
+      "type": "object",
+      "description": "Module identifier to that module's configuration. Declaring a module and configuring it are the same act, so a bundle cannot name a module it forgot to configure, or configure one it never declared. An app that does not embed every module named here must refuse the study.",
+      "minProperties": 1,
+      "propertyNames": { "pattern": "^[a-z][a-z0-9_]{1,31}$" },
+      "additionalProperties": {
+        "type": "object",
+        "description": "Interpreted by the named module. Open by design: adding a module must not require a change to this schema."
+      }
+    },
+    "sync": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "How eagerly the device tries to deliver what it has recorded.",
+      "properties": {
+        "min_interval_seconds": {
+          "type": "integer",
+          "minimum": 60,
+          "description": "Lower bound between sync attempts. A floor rather than a schedule: the operating system decides when background work actually runs, and the exactly-once guarantees do not depend on it being punctual."
+        }
+      }
+    }
+  }
+}

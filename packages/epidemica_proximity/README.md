@@ -205,24 +205,24 @@ Timer.periodic(const Duration(minutes: 1), (_) async {
 
 ## Configuration comes from the study, not the build
 
-`AggregatorConfig.fromBundle` reads the protocol bundle's `proximity.on_device` and
-`proximity.upload` blocks. Two studies with opposite minimisation rules run on the same signed
-binary:
+`AggregatorConfig.fromModuleConfig` reads the study bundle's `proximity` module block. Two studies
+with opposite minimisation rules run on the same signed binary:
 
 ```yaml
-proximity:
-  on_device:
-    max_episode_seconds: 900
-    max_gap_seconds: 600
-    sample_credit_seconds: 90
-    dropout_threshold_seconds: 75
-    include_rssi: false          # drop the calibration detail
-    include_pair_key: false      # no cross-participant reconciliation
-    include_min_distance: false
-    include_device_class: true
-  upload:
-    min_duration_seconds: 60     # ignore passing contacts
-    min_sample_count: 3
+modules:
+  proximity:
+    on_device:
+      max_episode_seconds: 900
+      max_gap_seconds: 600
+      sample_credit_seconds: 90
+      dropout_threshold_seconds: 75
+      include_rssi: false          # drop the calibration detail
+      include_pair_key: false      # no cross-participant reconciliation
+      include_min_distance: false
+      include_device_class: true
+    upload:
+      min_duration_seconds: 60     # ignore passing contacts
+      min_sample_count: 3
 ```
 
 ## The three time thresholds

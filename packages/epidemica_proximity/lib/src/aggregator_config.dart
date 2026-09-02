@@ -51,15 +51,16 @@ class AggregatorConfig {
   final Duration minUploadDuration;
   final int minUploadSamples;
 
-  /// Reads the `proximity.on_device` and `proximity.upload` blocks of a protocol bundle.
+  /// Reads a study bundle's `proximity` module block — its `on_device` and `upload` sections.
   /// Absent keys keep their defaults, so a bundle only states what it changes.
-  factory AggregatorConfig.fromBundle(Map<String, Object?> bundle) {
-    final proximity =
-        (bundle['proximity'] as Map?)?.cast<String, Object?>() ?? const {};
+  ///
+  /// Takes the module's own block rather than the whole bundle: a module has no business reading
+  /// another module's configuration.
+  factory AggregatorConfig.fromModuleConfig(Map<String, Object?> config) {
     final onDevice =
-        (proximity['on_device'] as Map?)?.cast<String, Object?>() ?? const {};
+        (config['on_device'] as Map?)?.cast<String, Object?>() ?? const {};
     final upload =
-        (proximity['upload'] as Map?)?.cast<String, Object?>() ?? const {};
+        (config['upload'] as Map?)?.cast<String, Object?>() ?? const {};
 
     const defaults = AggregatorConfig();
     Duration seconds(Map<String, Object?> from, String key, Duration fallback) {

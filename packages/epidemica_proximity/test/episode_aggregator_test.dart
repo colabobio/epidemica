@@ -335,20 +335,18 @@ void main() {
 
   group('bundle-driven configuration', () {
     test('reads the on_device and upload blocks', () {
-      final config = AggregatorConfig.fromBundle(const {
-        'proximity': {
-          'on_device': {
-            'max_episode_seconds': 600,
-            'max_gap_seconds': 120,
-            'sample_credit_seconds': 45,
-            'dropout_threshold_seconds': 30,
-            'include_rssi': false,
-            'include_min_distance': false,
-            'include_pair_key': false,
-            'include_device_class': false,
-          },
-          'upload': {'min_duration_seconds': 60, 'min_sample_count': 3},
+      final config = AggregatorConfig.fromModuleConfig(const {
+        'on_device': {
+          'max_episode_seconds': 600,
+          'max_gap_seconds': 120,
+          'sample_credit_seconds': 45,
+          'dropout_threshold_seconds': 30,
+          'include_rssi': false,
+          'include_min_distance': false,
+          'include_pair_key': false,
+          'include_device_class': false,
         },
+        'upload': {'min_duration_seconds': 60, 'min_sample_count': 3},
       });
 
       expect(config.maxEpisode, const Duration(seconds: 600));
@@ -365,7 +363,7 @@ void main() {
 
     test('an empty bundle leaves every default in place', () {
       const defaults = AggregatorConfig();
-      final config = AggregatorConfig.fromBundle(const {});
+      final config = AggregatorConfig.fromModuleConfig(const {});
 
       expect(config.maxEpisode, defaults.maxEpisode);
       expect(config.includeRssi, defaults.includeRssi);
@@ -383,14 +381,12 @@ void main() {
       final rich = feed(makeAggregator(), detections).single.toPayload();
       final minimal = feed(
         makeAggregator(
-          config: AggregatorConfig.fromBundle(const {
-            'proximity': {
-              'on_device': {
-                'include_rssi': false,
-                'include_min_distance': false,
-                'include_pair_key': false,
-                'include_device_class': false,
-              },
+          config: AggregatorConfig.fromModuleConfig(const {
+            'on_device': {
+              'include_rssi': false,
+              'include_min_distance': false,
+              'include_pair_key': false,
+              'include_device_class': false,
             },
           }),
         ),
@@ -405,10 +401,8 @@ void main() {
     });
 
     test('upload filters discard episodes below the study thresholds', () {
-      final config = AggregatorConfig.fromBundle(const {
-        'proximity': {
-          'upload': {'min_duration_seconds': 300, 'min_sample_count': 2},
-        },
+      final config = AggregatorConfig.fromModuleConfig(const {
+        'upload': {'min_duration_seconds': 300, 'min_sample_count': 2},
       });
 
       final brief = feed(

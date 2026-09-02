@@ -1,0 +1,40 @@
+[
+  {
+    "case": "the contact-logging study, with one module",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "11111111-2222-4333-8444-555555555555",
+      "title": "Contact logging pilot",
+      "modules": {
+        "proximity": {
+          "on_device": { "max_episode_seconds": 900 },
+          "upload": { "min_duration_seconds": 60 }
+        }
+      }
+    }
+  },
+  {
+    "case": "several modules, each configured independently",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "11111111-2222-4333-8444-555555555555",
+      "title": "Multi-module study",
+      "description": "Collects proximity and periodic questionnaires.",
+      "join_code": "CONTACT-2026",
+      "modules": {
+        "proximity": { "on_device": { "include_rssi": false } },
+        "instruments": { "schedule": "daily" }
+      },
+      "sync": { "min_interval_seconds": 900 }
+    }
+  },
+  {
+    "case": "a module configured with no options, which is still a declaration",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+      "title": "Defaults only",
+      "modules": { "proximity": {} }
+    }
+  }
+]

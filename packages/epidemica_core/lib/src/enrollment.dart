@@ -117,7 +117,10 @@ class EnrollmentService {
     final body = (jsonDecode(response.body) as Map).cast<String, Object?>();
 
     final protocolHash = body['protocol_hash']! as String;
-    final bundleBytes = await _fetchBundle(body['protocol_url']! as String);
+    final bundleBytes = await _fetchBundle(
+      body['protocol_url']! as String,
+      body['access_token']! as String,
+    );
 
     final actualHash = ProtocolBundle.hashOf(bundleBytes);
     if (actualHash != protocolHash) {
@@ -223,9 +226,15 @@ class EnrollmentService {
     };
   }
 
-  Future<List<int>> _fetchBundle(String url) async {
+  /// The bundle can carry the study's join code, so the endpoint is authenticated and the token
+  /// just issued is presented. A bundle served from a CDN instead must therefore contain nothing
+  /// that is not safe to read publicly.
+  Future<List<int>> _fetchBundle(String url, String accessToken) async {
     try {
-      final response = await _http.get(Uri.parse(url));
+      final response = await _http.get(
+        Uri.parse(url),
+        headers: {'authorization': 'Bearer $accessToken'},
+      );
       if (response.statusCode != 200) {
         throw EnrollmentException(
           EnrollmentFailure.bundleUnavailable,
