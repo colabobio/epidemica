@@ -5,7 +5,7 @@ epidemiological data and deliver interventions.
 
 > **Status: pre-alpha.** Nothing here is usable yet. The repository currently contains architecture
 > decision records only. See [`docs/adr/`](docs/adr/) and the
-> [architecture and roadmap](../proposal/Epidemica-Architecture-and-Roadmap.md).
+> [architecture and roadmap](docs/architecture-and-roadmap.md).
 
 ## What this is
 
