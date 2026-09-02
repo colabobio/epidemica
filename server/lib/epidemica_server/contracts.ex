@@ -18,6 +18,9 @@ defmodule EpidemicaServer.Contracts do
   @external_resource "../contracts/observations/proximity/contact_episode/1.0.0.json"
   @external_resource "../contracts/observations/location/location_fix/1.0.0.json"
   @external_resource "../contracts/observations/instruments/survey_response/1.0.0.json"
+  @external_resource "../contracts/observations/health/module_status/1.0.0.json"
+  @external_resource "../contracts/state/participant_state/1.0.0.json"
+  @external_resource "../contracts/state/epigame/1.0.0.json"
 
   Exonerate.function_from_file(
     :def,
@@ -43,12 +46,57 @@ defmodule EpidemicaServer.Contracts do
     "../contracts/observations/instruments/survey_response/1.0.0.json"
   )
 
+  Exonerate.function_from_file(
+    :def,
+    :validate_module_status,
+    "../contracts/observations/health/module_status/1.0.0.json"
+  )
+
+  # The downward channel. Validated on the way out as well as on the way in: a malformed state
+  # document would be rejected by every client at once, and the server is where that is cheap to
+  # notice.
+  Exonerate.function_from_file(
+    :def,
+    :validate_participant_state,
+    "../contracts/state/participant_state/1.0.0.json"
+  )
+
+  Exonerate.function_from_file(
+    :def,
+    :validate_epigame_state,
+    "../contracts/state/epigame/1.0.0.json"
+  )
+
+  @state_base "https://schemas.epidemica.info/state/"
+
+  @state_validators %{
+    @state_base <> "epigame/1.0.0.json" => :validate_epigame_state
+  }
+
+  @doc "State URIs this build can validate."
+  def known_state_schemas, do: Map.keys(@state_validators)
+
+  @doc """
+  Validate a study's state document against the contract it names.
+
+  Unknown `state_uri` values pass. A study may define its own state shape that this build has never
+  seen, and refusing to serve it would make the channel useless to exactly the studies it exists
+  for.
+  """
+  def validate_state(state_uri, state) do
+    case Map.fetch(@state_validators, state_uri) do
+      {:ok, validator} -> apply(__MODULE__, validator, [state])
+      :error -> :ok
+    end
+  end
+
   @base "https://schemas.epidemica.info/observations/"
 
   @payload_validators %{
     @base <> "proximity/contact_episode/1.0.0.json" => :validate_contact_episode,
     @base <> "location/location_fix/1.0.0.json" => :validate_location_fix,
-    @base <> "instruments/survey_response/1.0.0.json" => :validate_survey_response
+    @base <> "instruments/survey_response/1.0.0.json" => :validate_survey_response,
+    @base <> "health/module_status/1.0.0.json" => :validate_module_status
   }
 
   @doc "Schema URIs this build can validate."

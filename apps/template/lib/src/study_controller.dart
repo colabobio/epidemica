@@ -2,7 +2,6 @@ import 'package:epidemica_core/epidemica_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
-import 'modules/embedded_module.dart';
 
 /// What the participant is shown, and what the app is actually doing.
 enum StudyState { notEnrolled, enrolled, collecting, refused }
@@ -59,6 +58,7 @@ class StudyController extends ChangeNotifier {
 
   Enrollment? _enrollment;
   final Set<String> _running = {};
+  ModuleHealthReporter? _health;
   StudyState _state = StudyState.notEnrolled;
   String? _message;
   DateTime? _lastSyncAt;
@@ -133,6 +133,21 @@ class StudyController extends ChangeNotifier {
       }
     }
     _state = _running.isEmpty ? StudyState.enrolled : StudyState.collecting;
+
+    if (_running.isNotEmpty) {
+      // Coverage has to be stated positively: a study that infers exposure from an absence of
+      // contacts cannot otherwise tell "met nobody" from "was not listening".
+      _health = ModuleHealthReporter(
+        modules: [for (final m in modules) if (_running.contains(m.id)) m],
+        recorderFor: (moduleId) => recorderFor(
+          outbox: _outbox,
+          enrollment: enrollment,
+          clock: _clock,
+          module: moduleId,
+        ),
+      )..start();
+    }
+
     notifyListeners();
   }
 
@@ -149,6 +164,12 @@ class StudyController extends ChangeNotifier {
   /// Observations already delivered are the server's to erase; what this can promise is that the
   /// device keeps nothing, including anything queued but not yet sent.
   Future<void> withdraw() async {
+    // Close the coverage window before stopping, so the final period is not left looking
+    // unobserved merely because collection ended tidily.
+    await _health?.flush();
+    _health?.stop();
+    _health = null;
+
     for (final module in modules) {
       await module.stop();
     }

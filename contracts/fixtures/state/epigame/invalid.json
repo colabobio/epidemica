@@ -1,0 +1,76 @@
+[
+  {
+    "case": "an epi state outside the model",
+    "why": "The app colours the whole screen from this field; an unrecognised value has no colour and no safe default.",
+    "instance": { "day": 4, "days_total": 7, "epi_state": "exposed", "points": 11 }
+  },
+  {
+    "case": "no epi state at all",
+    "why": "There is no defensible default. Assuming susceptible would tell an infected player they are healthy.",
+    "instance": { "day": 4, "days_total": 7, "points": 11 }
+  },
+  {
+    "case": "no points",
+    "why": "The score is the centre of the screen; absent is not the same as zero.",
+    "instance": { "day": 4, "days_total": 7, "epi_state": "susceptible" }
+  },
+  {
+    "case": "fractional points",
+    "why": "The game is scored in whole points; a fraction means a rule was applied that nobody designed.",
+    "instance": { "day": 4, "days_total": 7, "epi_state": "susceptible", "points": 11.5 }
+  },
+  {
+    "case": "protection expiry that is not UTC",
+    "why": "The app counts down from this instant; an offset it misreads would expire protection at the wrong time.",
+    "instance": {
+      "day": 4,
+      "days_total": 7,
+      "epi_state": "susceptible",
+      "points": 11,
+      "protected_until": "2026-09-05T03:00:00+02:00"
+    }
+  },
+  {
+    "case": "a day before the game starts",
+    "why": "Day counts forward from enrolment. A negative day would mean a tick ran for a period the study did not cover.",
+    "instance": { "day": -1, "days_total": 7, "epi_state": "susceptible", "points": 0 }
+  },
+  {
+    "case": "a game of no days",
+    "why": "A zero-length game would divide by zero in every progress display and can only come from a misconfigured bundle.",
+    "instance": { "day": 0, "days_total": 0, "epi_state": "susceptible", "points": 0 }
+  },
+  {
+    "case": "negative cases",
+    "why": "Cumulative counts only rise. A negative one means the tick that produced it double-counted a recovery.",
+    "instance": {
+      "day": 4,
+      "days_total": 7,
+      "epi_state": "susceptible",
+      "points": 11,
+      "total_cases": -1
+    }
+  },
+  {
+    "case": "a field the app would silently ignore",
+    "why": "Closed, so a server that starts sending something new fails loudly instead of being quietly dropped by every client.",
+    "instance": {
+      "day": 4,
+      "days_total": 7,
+      "epi_state": "susceptible",
+      "points": 11,
+      "leaderboard_rank": 3
+    }
+  },
+  {
+    "case": "an unrecognised protection source",
+    "why": "The enumeration is what lets analysis separate a deliberate choice from a dead battery; a free-text source would make that distinction unusable.",
+    "instance": {
+      "day": 4,
+      "days_total": 7,
+      "epi_state": "susceptible",
+      "points": 11,
+      "protection_source": "vaccinated"
+    }
+  }
+]

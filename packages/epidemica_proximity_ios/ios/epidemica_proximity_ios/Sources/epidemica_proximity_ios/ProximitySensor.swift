@@ -24,6 +24,16 @@ final class ProximitySensor: NSObject, SensorDelegate {
 
     var isRunning: Bool { sensorArray != nil }
 
+    /// Last Bluetooth state Herald reported.
+    ///
+    /// Taken from `didUpdateState` rather than by instantiating a `CBCentralManager` here: a second
+    /// manager would duplicate Herald's own and can trigger a power alert. Nil until Herald has
+    /// said anything, and treated as off, because claiming observation we cannot demonstrate is
+    /// the failure this exists to prevent.
+    private var lastSensorState: SensorState?
+
+    var isRadioEnabled: Bool { lastSensorState == .on }
+
     func start(pseudonym: String, serviceUuid: String) throws {
         if sensorArray != nil && !hasStartedThisSession {
             os_log("Discarding a sensor left over from a previous session", log: Self.log, type: .info)
@@ -98,7 +108,10 @@ final class ProximitySensor: NSObject, SensorDelegate {
     func sensor(_ sensor: SensorType, didMeasure: Proximity, fromTarget: TargetIdentifier) {}
     func sensor(_ sensor: SensorType, didVisit: Location?) {}
     func sensor(_ sensor: SensorType, didShare: [PayloadData], fromTarget: TargetIdentifier) {}
-    func sensor(_ sensor: SensorType, didUpdateState: SensorState) {}
+
+    func sensor(_ sensor: SensorType, didUpdateState: SensorState) {
+        lastSensorState = didUpdateState
+    }
 }
 
 enum ProximityError: Error {

@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.epidemica.info/state/participant_state/1.0.0.json",
+  "title": "Participant state",
+  "description": "What the server tells a device about its own participant. The mirror image of the observation envelope: observations flow up carrying a `schema_uri` and an opaque payload, and state flows down carrying a `state_uri` and an opaque state document. `epidemica_core` validates and caches this without ever learning what a particular study's state means, which is what keeps one study's vocabulary out of the platform. Scoped to the bearer token's own participant; a device can never read another's.",
+  "type": "object",
+  "required": ["state_version", "study_id", "subject", "state_uri", "revision", "as_of", "state"],
+  "additionalProperties": false,
+  "properties": {
+    "state_version": {
+      "enum": ["1.0"],
+      "description": "Selects the envelope this document is read as. A client that does not know this version must refuse it rather than interpret the parts it recognises."
+    },
+    "study_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "subject": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "minLength": 8,
+      "maxLength": 128,
+      "description": "The pseudonym this state belongs to. Present so a cached document cannot be shown to the wrong participant after a re-enrolment on the same device."
+    },
+    "state_uri": {
+      "type": "string",
+      "pattern": "^https?://",
+      "description": "Absolute, immutable URI of the contract governing `state`. Dereferences to a JSON Schema, exactly as `schema_uri` does for an observation payload."
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Increases every time the server changes this participant's state. Lets a client tell a stale cached document from a current one without comparing timestamps, and lets it ignore a reordered response."
+    },
+    "as_of": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$",
+      "description": "When the computation that produced this state ran -- not when it was served. A study whose state is recomputed daily is a day stale by design, and the interface should be able to say so rather than implying the number is live."
+    },
+    "state": {
+      "type": "object",
+      "description": "Study-defined content, validated separately against `state_uri`. Opaque to core, as an observation payload is."
+    }
+  }
+}

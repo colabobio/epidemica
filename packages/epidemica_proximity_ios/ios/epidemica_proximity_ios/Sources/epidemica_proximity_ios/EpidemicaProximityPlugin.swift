@@ -23,6 +23,8 @@ public class EpidemicaProximityPlugin: NSObject, FlutterPlugin, FlutterStreamHan
             result(nil)
         case "isRunning":
             result(ProximitySensor.shared.isRunning)
+        case "isRadioEnabled":
+            result(ProximitySensor.shared.isRadioEnabled)
         case "observerDeviceClass":
             result("ios")
         case "missingPlatformRequirements":

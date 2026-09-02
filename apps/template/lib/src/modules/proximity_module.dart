@@ -1,8 +1,7 @@
 import 'dart:async';
 
+import 'package:epidemica_core/epidemica_core.dart';
 import 'package:epidemica_proximity/epidemica_proximity.dart';
-
-import 'embedded_module.dart';
 
 /// Adapts the proximity module to the app's outbox.
 ///
@@ -74,6 +73,30 @@ class ProximityModule implements EmbeddedModule {
     _aggregator = null;
     _subscription = null;
     _tick = null;
+  }
+
+  @override
+  Future<ModuleStatus> status() async {
+    if (_aggregator == null) {
+      return const ModuleStatus(ModuleState.stopped);
+    }
+
+    final missing = await _platform.missingPlatformRequirements();
+    if (missing.isNotEmpty) {
+      return ModuleStatus(ModuleState.permissionDenied, detail: missing.first);
+    }
+
+    // Checked separately from isRunning, and the order matters: a running sensor with the radio
+    // off produces no detections and is indistinguishable from a participant who met nobody.
+    if (!await _platform.isRadioEnabled()) {
+      return const ModuleStatus(ModuleState.radioOff, detail: 'bluetooth');
+    }
+
+    if (!await _platform.isRunning()) {
+      return const ModuleStatus(ModuleState.stopped, detail: 'sensor not running');
+    }
+
+    return const ModuleStatus(ModuleState.sensing);
   }
 
   void _onEvent(ProximityEvent event) {

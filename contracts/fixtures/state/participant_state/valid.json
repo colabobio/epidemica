@@ -1,0 +1,46 @@
+[
+  {
+    "case": "a participant partway through a seven-day game",
+    "instance": {
+      "state_version": "1.0",
+      "study_id": "c0badf00-1111-4222-8333-444455556666",
+      "subject": "c9e2f1a0-6b3d-4c88-9a71-2f3e4d5c6b7a",
+      "state_uri": "https://schemas.epidemica.info/state/epigame/1.0.0.json",
+      "revision": 4,
+      "as_of": "2026-09-04T03:00:00Z",
+      "state": {
+        "day": 4,
+        "epi_state": "susceptible",
+        "points": 11,
+        "protected_until": null,
+        "total_cases": 6
+      }
+    }
+  },
+  {
+    "case": "state before anything has happened",
+    "why": "Revision zero is a real state, not an absent one: the participant has enrolled and nothing has been computed yet.",
+    "instance": {
+      "state_version": "1.0",
+      "study_id": "c0badf00-1111-4222-8333-444455556666",
+      "subject": "c9e2f1a0-6b3d-4c88-9a71-2f3e4d5c6b7a",
+      "state_uri": "https://schemas.epidemica.info/state/epigame/1.0.0.json",
+      "revision": 0,
+      "as_of": "2026-09-01T03:00:00Z",
+      "state": {}
+    }
+  },
+  {
+    "case": "a study whose state is something else entirely",
+    "why": "Core does not know what a state document contains. An adherence study returning a streak must pass through the same channel unchanged.",
+    "instance": {
+      "state_version": "1.0",
+      "study_id": "11111111-2222-4333-8444-555555555555",
+      "subject": "a1b2c3d4-e5f6-4708-9a0b-1c2d3e4f5061",
+      "state_uri": "https://schemas.epidemica.info/state/adherence/1.0.0.json",
+      "revision": 91,
+      "as_of": "2026-09-02T12:30:00.250Z",
+      "state": { "streak_days": 12, "next_check_in": "2026-09-03T09:00:00Z" }
+    }
+  }
+]

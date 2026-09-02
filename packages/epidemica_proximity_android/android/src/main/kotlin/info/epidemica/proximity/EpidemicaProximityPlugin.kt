@@ -1,5 +1,6 @@
 package info.epidemica.proximity
 
+import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -43,6 +44,7 @@ class EpidemicaProximityPlugin : FlutterPlugin, MethodChannel.MethodCallHandler,
                 result.success(null)
             }
             "isRunning" -> result.success(ProximityService.isRunning())
+            "isRadioEnabled" -> result.success(isRadioEnabled())
             "observerDeviceClass" -> result.success("android")
             "missingPlatformRequirements" -> result.success(missingPlatformRequirements())
             else -> result.notImplemented()
@@ -87,4 +89,13 @@ class EpidemicaProximityPlugin : FlutterPlugin, MethodChannel.MethodCallHandler,
 
     private fun missingPlatformRequirements(): List<String> =
         ProximityService.missingPermissions(context).map { "permission not granted: $it" }
+
+    /// Unavailable or unreadable counts as off: assuming otherwise would claim observation the
+    /// device cannot provide.
+    private fun isRadioEnabled(): Boolean =
+        try {
+            context.getSystemService(BluetoothManager::class.java)?.adapter?.isEnabled == true
+        } catch (e: SecurityException) {
+            false
+        }
 }

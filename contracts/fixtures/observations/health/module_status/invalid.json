@@ -1,0 +1,58 @@
+[
+  {
+    "case": "no window start",
+    "why": "A claim with no beginning covers nothing. Inferring one from the previous observation would make coverage depend on delivery order.",
+    "instance": { "state": "sensing", "window_end": "2026-09-02T13:00:00Z" }
+  },
+  {
+    "case": "no window end",
+    "why": "An open-ended claim would assert observation indefinitely, which is exactly the assumption this contract exists to prevent.",
+    "instance": { "state": "sensing", "window_start": "2026-09-02T12:00:00Z" }
+  },
+  {
+    "case": "no state",
+    "why": "Absent is not the same as sensing, and defaulting it to sensing would manufacture coverage.",
+    "instance": {
+      "window_start": "2026-09-02T12:00:00Z",
+      "window_end": "2026-09-02T13:00:00Z"
+    }
+  },
+  {
+    "case": "a state outside the enumeration",
+    "why": "A reader that does not recognise a state cannot tell whether it asserts observation, and guessing either way is unsafe.",
+    "instance": {
+      "state": "degraded",
+      "window_start": "2026-09-02T12:00:00Z",
+      "window_end": "2026-09-02T13:00:00Z"
+    }
+  },
+  {
+    "case": "a window start that is not UTC",
+    "why": "Coverage is unioned across devices; mixed offsets would silently misalign the intervals.",
+    "instance": {
+      "state": "sensing",
+      "window_start": "2026-09-02T12:00:00+02:00",
+      "window_end": "2026-09-02T13:00:00Z"
+    }
+  },
+  {
+    "case": "the module named in the payload as well as the envelope",
+    "why": "Closed, so the two cannot disagree about which module a status describes.",
+    "instance": {
+      "module": "proximity",
+      "state": "sensing",
+      "window_start": "2026-09-02T12:00:00Z",
+      "window_end": "2026-09-02T13:00:00Z"
+    }
+  },
+  {
+    "case": "a detail long enough to be carrying content",
+    "why": "Detail names a permission or a radio. A large free-text field is where participant data ends up by accident.",
+    "instance": {
+      "state": "permission_denied",
+      "window_start": "2026-09-02T12:00:00Z",
+      "window_end": "2026-09-02T13:00:00Z",
+      "detail": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  }
+]

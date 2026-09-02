@@ -1,0 +1,105 @@
+[
+  {
+    "case": "no state_uri",
+    "why": "Without it the state document is uninterpretable and unvalidatable -- the same reason an observation cannot omit schema_uri.",
+    "instance": {
+      "state_version": "1.0",
+      "study_id": "c0badf00-1111-4222-8333-444455556666",
+      "subject": "c9e2f1a0-6b3d-4c88-9a71-2f3e4d5c6b7a",
+      "revision": 4,
+      "as_of": "2026-09-04T03:00:00Z",
+      "state": { "points": 11 }
+    }
+  },
+  {
+    "case": "no revision",
+    "why": "A client cannot tell a stale cached document from a current one without it, and would show whichever response arrived last.",
+    "instance": {
+      "state_version": "1.0",
+      "study_id": "c0badf00-1111-4222-8333-444455556666",
+      "subject": "c9e2f1a0-6b3d-4c88-9a71-2f3e4d5c6b7a",
+      "state_uri": "https://schemas.epidemica.info/state/epigame/1.0.0.json",
+      "as_of": "2026-09-04T03:00:00Z",
+      "state": { "points": 11 }
+    }
+  },
+  {
+    "case": "as_of is not UTC",
+    "why": "Mixed offsets are the recurring multi-site data-quality failure the envelope already rejects; staleness is not computable across them.",
+    "instance": {
+      "state_version": "1.0",
+      "study_id": "c0badf00-1111-4222-8333-444455556666",
+      "subject": "c9e2f1a0-6b3d-4c88-9a71-2f3e4d5c6b7a",
+      "state_uri": "https://schemas.epidemica.info/state/epigame/1.0.0.json",
+      "revision": 4,
+      "as_of": "2026-09-04T03:00:00+02:00",
+      "state": { "points": 11 }
+    }
+  },
+  {
+    "case": "an email address as subject",
+    "why": "The same character-class guard as the envelope, for the same reason: accidental PII must fail loudly.",
+    "instance": {
+      "state_version": "1.0",
+      "study_id": "c0badf00-1111-4222-8333-444455556666",
+      "subject": "participant@example.org",
+      "state_uri": "https://schemas.epidemica.info/state/epigame/1.0.0.json",
+      "revision": 4,
+      "as_of": "2026-09-04T03:00:00Z",
+      "state": { "points": 11 }
+    }
+  },
+  {
+    "case": "a negative revision",
+    "why": "Revisions only ever move forward; a negative one would make staleness comparison meaningless.",
+    "instance": {
+      "state_version": "1.0",
+      "study_id": "c0badf00-1111-4222-8333-444455556666",
+      "subject": "c9e2f1a0-6b3d-4c88-9a71-2f3e4d5c6b7a",
+      "state_uri": "https://schemas.epidemica.info/state/epigame/1.0.0.json",
+      "revision": -1,
+      "as_of": "2026-09-04T03:00:00Z",
+      "state": { "points": 11 }
+    }
+  },
+  {
+    "case": "state is a scalar rather than a document",
+    "why": "A state document must be an object so it can gain fields additively, exactly as a payload must.",
+    "instance": {
+      "state_version": "1.0",
+      "study_id": "c0badf00-1111-4222-8333-444455556666",
+      "subject": "c9e2f1a0-6b3d-4c88-9a71-2f3e4d5c6b7a",
+      "state_uri": "https://schemas.epidemica.info/state/epigame/1.0.0.json",
+      "revision": 4,
+      "as_of": "2026-09-04T03:00:00Z",
+      "state": 11
+    }
+  },
+  {
+    "case": "a server-set field the client would not be able to verify",
+    "why": "Closed so the channel cannot quietly grow fields that only one implementation knows about.",
+    "instance": {
+      "state_version": "1.0",
+      "study_id": "c0badf00-1111-4222-8333-444455556666",
+      "subject": "c9e2f1a0-6b3d-4c88-9a71-2f3e4d5c6b7a",
+      "state_uri": "https://schemas.epidemica.info/state/epigame/1.0.0.json",
+      "revision": 4,
+      "as_of": "2026-09-04T03:00:00Z",
+      "state": {},
+      "served_at": "2026-09-04T08:12:00Z"
+    }
+  },
+  {
+    "case": "an unknown state envelope version",
+    "why": "A later version may reuse these field names differently, so guessing is unsafe.",
+    "instance": {
+      "state_version": "2.0",
+      "study_id": "c0badf00-1111-4222-8333-444455556666",
+      "subject": "c9e2f1a0-6b3d-4c88-9a71-2f3e4d5c6b7a",
+      "state_uri": "https://schemas.epidemica.info/state/epigame/1.0.0.json",
+      "revision": 4,
+      "as_of": "2026-09-04T03:00:00Z",
+      "state": {}
+    }
+  }
+]

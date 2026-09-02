@@ -31,6 +31,12 @@ class MethodChannelProximity extends ProximityPlatform {
   Future<bool> isRunning() async =>
       await methods.invokeMethod<bool>('isRunning') ?? false;
 
+  /// Absent or unanswerable is treated as off. Assuming the radio is on would manufacture coverage
+  /// the device cannot actually provide.
+  @override
+  Future<bool> isRadioEnabled() async =>
+      await methods.invokeMethod<bool>('isRadioEnabled') ?? false;
+
   @override
   Future<DeviceClass> observerDeviceClass() async =>
       DeviceClass.fromJson(await methods.invokeMethod<String>('observerDeviceClass'));

@@ -45,6 +45,14 @@ abstract class ProximityPlatform extends PlatformInterface {
   /// [start] — the system can relaunch the app for a Bluetooth event.
   Future<bool> isRunning();
 
+  /// Whether the Bluetooth radio is switched on.
+  ///
+  /// Distinct from [isRunning], and the distinction decides whether a study can trust a quiet
+  /// period. A running sensor with the radio off produces no detections and looks exactly like a
+  /// participant who met nobody — so a module that reported only "running" would let a model infer
+  /// no exposure from what was really no observation.
+  Future<bool> isRadioEnabled();
+
   /// Hardware class of the device the app is running on.
   Future<DeviceClass> observerDeviceClass();
 

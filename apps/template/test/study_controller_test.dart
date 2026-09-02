@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:epidemica_core/epidemica_core.dart';
-import 'package:epidemica_template/src/modules/embedded_module.dart';
 import 'package:epidemica_template/src/study_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -23,6 +22,9 @@ class _FakeModule implements EmbeddedModule {
 
   @override
   Future<void> stop() async => stops++;
+
+  @override
+  Future<ModuleStatus> status() async => const ModuleStatus(ModuleState.sensing);
 }
 
 const _bundleUrl = 'https://example.test/bundles/study.json';
