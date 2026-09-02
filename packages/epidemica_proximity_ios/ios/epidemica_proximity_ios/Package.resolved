@@ -1,0 +1,14 @@
+{
+  "pins" : [
+    {
+      "identity" : "herald-for-ios",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/theheraldproject/herald-for-ios.git",
+      "state" : {
+        "revision" : "0c0c6c2754e30029ae45a7ce4134d9b8a44df821",
+        "version" : "2.2.0"
+      }
+    }
+  ],
+  "version" : 2
+}

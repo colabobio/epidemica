@@ -111,25 +111,75 @@ Two consequences for how `apps/template` is built:
 
 ### W1 — `epidemica_proximity` (federated plugin)
 
-Lift the Herald integration out of `epigames-app` into the platform packages created alongside W2:
-`epidemica_proximity_android` and `epidemica_proximity_ios`, against the platform interface W2
-defines. Swift and Kotlin move across substantially unchanged. The BLE payload is reduced to identity
-only — no `epi`, `clin`, `mod`, `strain`, `ps/pi/pr`. The plugin exposes a stream of
-`ProximityDetection` records (`peer`, `rssi`, `observed_at`, `peer_device_class`).
+Lift the Herald integration out of `epigames-app` into `epidemica_proximity_android` and
+`epidemica_proximity_ios`, against the platform interface W2 defines.
 
+**W2 shrank this work.** Because banding moved to Dart, six native files — `DistanceEstimator`,
+`CoarseDistanceModel`, `SimpleKalmanFilter` on both platforms — do not move at all. Native now does
+three things per platform: supply the payload, run the sensor, bridge the channels. Native reports
+raw RSSI and nothing else.
+
+**Packaging: four packages, endorsement-based.** An app depends on `epidemica_proximity` alone and
+gets Herald, the Kotlin service and the Swift lifecycle with no native edits. The reason to federate
+rather than ship one package with two native folders is specific to this project: an institution
+that needs a different radio — dedicated badges, or a nationally mandated stack — registers its own
+`ProximityPlatform` instead of forking, which ADR-0001 forbids. Herald types appear in exactly two
+packages, which also contains the risk below.
+
+**Herald is unmaintained.** v2.2.0 is the latest release on both platforms and the last commits are
+roughly three years old; the READMEs claim testing only to iOS 14.6 and Android 10. It remains the
+best-validated BLE proximity stack in existence and its efficacy data is why we use it, but there is
+no upstream to fix an OS regression. Containment is the mitigation, and it is why the wire format is
+specified independently of Herald.
+
+**Android gets its platform requirements for free; iOS cannot.** A plugin's `AndroidManifest.xml` is
+merged into the host app, so permissions and the foreground service arrive automatically. iOS has no
+equivalent: `Info.plist` keys must be in the app target. So the iOS package checks its own
+`Info.plist` at `start()` and refuses with a list of what is missing. Without that check the failure
+is silent — no crash, just no sensing once the screen locks, discovered at analysis time.
+
+**Location is requested only where the platform forces it.** `BLUETOOTH_SCAN` is declared
+`neverForLocation`, and `ACCESS_FINE_LOCATION` is capped at `maxSdkVersion="30"`. On Android 12 and
+later a participant never sees a location prompt, which removes a consent and app-review liability
+the module does not need.
+
+**Swift Package Manager, verified rather than assumed.** Herald resolves cleanly via SPM at 2.2.0.
+A CocoaPods podspec stays as the fallback path.
+
+**The wire format is a contract with shared vectors.** `contracts/wire/proximity_payload/1.0.0.md`
+plus `1.0.0.vectors.json`, decoded by both the Kotlin and Swift implementations in their own test
+suites. Two implementations that can only meet on real hardware are otherwise free to disagree about
+byte order or trailing data, and the symptom is two phones side by side detecting nothing, with no
+error anywhere. The payload is 18 bytes — version, 16-byte pseudonym, device class — down from
+Epigames' 28, with every simulated epidemiological field removed rather than zeroed.
+
+One rule in that spec cannot be retrofitted: **readers must ignore trailing bytes.** It is what lets
+a future version append an opaque application extension — which is how Epigames could migrate onto
+this module without forking it — while already-deployed builds keep detecting updated ones.
+
+- [x] Wire format specified and held to shared vectors by both native implementations
+- [x] No epidemiological field appears anywhere in the public API or on the wire
+- [x] The platform packages have no dependency on `epidemica_core`
+- [x] Distance estimation is behind a `DistanceEstimator` interface with the `CoarseDistanceModel`
+      thresholds as the default — delivered by W2, in Dart
+- [x] Detections observed while Dart is detached are buffered and any overflow is reported, not
+      silently dropped
+- [x] Missing iOS `Info.plist` requirements are reported rather than failing silently
+- [x] The package README states its **platform requirements verbatim** — every `Info.plist` key,
+      Android permission and background mode, with usage strings written to cover any study that
+      uses proximity rather than this one. This is what an institution copies into its build, and
+      what a manifest generator will later consume
 - [ ] A bare example app builds and runs on both platforms with no monorepo path assumptions
 - [ ] One iOS and one Android device discover each other within 30 s
 - [ ] Detections continue with the app backgrounded for ≥ 30 minutes on both platforms
 - [ ] iOS relaunch via BLE state restoration resumes detection with no user interaction — the
       stale-`sensorArray` handling in `SimulationService.start` is hard-won and must not regress
-- [ ] No epidemiological field appears anywhere in the public API
-- [ ] The platform packages have no dependency on `epidemica_core`
-- [ ] Distance estimation is behind a `DistanceEstimator` interface, with the existing
-      `CoarseDistanceModel` thresholds as the default implementation
-- [ ] The package README states its **platform requirements verbatim** — every `Info.plist` key,
-      Android permission and background mode, with usage strings written to cover any study that
-      uses proximity rather than this one. This is what an institution copies into its build, and
-      what a manifest generator will later consume
+
+Open: the Android plugin is Kotlin, and Flutter now warns that plugins applying the Kotlin Gradle
+Plugin will eventually fail to build. Herald for Android and the Epigames integration are both pure
+Java, so rewriting these ~300 lines in Java would retire the warning and a toolchain dependency at
+once.
+
 
 ### W2 — Episode aggregator
 

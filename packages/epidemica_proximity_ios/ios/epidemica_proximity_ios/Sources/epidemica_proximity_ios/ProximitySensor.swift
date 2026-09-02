@@ -1,0 +1,107 @@
+import CoreBluetooth
+import Foundation
+import Herald
+import ProximityWire
+import os.log
+
+/// Owns the Herald sensor for the lifetime of the process.
+final class ProximitySensor: NSObject, SensorDelegate {
+
+    static let shared = ProximitySensor()
+
+    private static let log = OSLog(subsystem: "info.epidemica.proximity", category: "sensor")
+
+    private var sensorArray: SensorArray?
+    private var lastServiceUuid: String?
+
+    /// False until this *process* has started sensing.
+    ///
+    /// The distinction matters because iOS relaunches the app for Bluetooth state restoration, and
+    /// a `sensorArray` left over from the previous session points at a dead BLE stack. It looks
+    /// alive and reports nothing, which is the worst kind of failure here — silent and total. This
+    /// flag is what tells a genuine cold start apart from a restart.
+    private var hasStartedThisSession = false
+
+    var isRunning: Bool { sensorArray != nil }
+
+    func start(pseudonym: String, serviceUuid: String) throws {
+        if sensorArray != nil && !hasStartedThisSession {
+            os_log("Discarding a sensor left over from a previous session", log: Self.log, type: .info)
+            stop()
+        }
+
+        if let last = lastServiceUuid, last != serviceUuid, sensorArray != nil {
+            os_log("Study changed; reinitialising", log: Self.log, type: .info)
+            stop()
+        }
+
+        if sensorArray != nil { return }
+
+        guard let supplier = EpidemicaPayloadSupplier(pseudonym: pseudonym) else {
+            throw ProximityError.invalidPseudonym
+        }
+        guard let uuid = UUID(uuidString: serviceUuid) else {
+            throw ProximityError.invalidServiceUuid
+        }
+
+        BLESensorConfiguration.payloadDataUpdateTimeInterval = TimeInterval.minute
+        BLESensorConfiguration.customServiceUUID = CBUUID(nsuuid: uuid)
+        BLESensorConfiguration.customServiceDetectionEnabled = true
+        BLESensorConfiguration.customServiceAdvertisingEnabled = true
+        // Study scoping: with the standard Herald service off, devices in other studies — and other
+        // Herald apps entirely — are neither seen nor visible.
+        BLESensorConfiguration.standardHeraldServiceDetectionEnabled = false
+        BLESensorConfiguration.standardHeraldServiceAdvertisingEnabled = false
+
+        let array = SensorArray(supplier)
+        array.add(delegate: self)
+        array.start()
+
+        sensorArray = array
+        lastServiceUuid = serviceUuid
+        hasStartedThisSession = true
+        ProximityEvents.shared.emit(["type": "started"])
+    }
+
+    func stop() {
+        sensorArray?.stop()
+        sensorArray = nil
+    }
+
+    // MARK: - SensorDelegate
+
+    /// The only callback used. The payload-only and proximity-only callbacks cannot be turned into
+    /// a detection without guessing at the other half.
+    func sensor(
+        _ sensor: SensorType, didMeasure: Proximity, fromTarget: TargetIdentifier,
+        withPayload: PayloadData
+    ) {
+        guard let rssi = didMeasure.value as Double?,
+            let decoded = ProximityPayload.decode(withPayload.data)
+        else { return }
+
+        var event: [String: Any] = [
+            "type": "detection",
+            "peer": decoded.pseudonym,
+            "rssi": rssi,
+            // Stamped here, not on arrival in Dart: iOS batches background delivery, and the error
+            // would land on exactly the long background encounters that matter most.
+            "observed_at_ms": Int64(Date().timeIntervalSince1970 * 1000),
+        ]
+        event["peer_device_class"] = decoded.deviceClass
+        ProximityEvents.shared.emit(event)
+    }
+
+    func sensor(_ sensor: SensorType, didDetect: TargetIdentifier) {}
+    func sensor(_ sensor: SensorType, didRead: PayloadData, fromTarget: TargetIdentifier) {}
+    func sensor(_ sensor: SensorType, didReceive: Data, fromTarget: TargetIdentifier) {}
+    func sensor(_ sensor: SensorType, didMeasure: Proximity, fromTarget: TargetIdentifier) {}
+    func sensor(_ sensor: SensorType, didVisit: Location?) {}
+    func sensor(_ sensor: SensorType, didShare: [PayloadData], fromTarget: TargetIdentifier) {}
+    func sensor(_ sensor: SensorType, didUpdateState: SensorState) {}
+}
+
+enum ProximityError: Error {
+    case invalidPseudonym
+    case invalidServiceUuid
+}

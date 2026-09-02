@@ -13,6 +13,10 @@ environment:
 
 dependencies:
   crypto: ^3.0.6
+  epidemica_proximity_android:
+    path: ../epidemica_proximity_android
+  epidemica_proximity_ios:
+    path: ../epidemica_proximity_ios
   epidemica_proximity_platform_interface:
     path: ../epidemica_proximity_platform_interface
   flutter:
@@ -23,3 +27,14 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   flutter_test:
     sdk: flutter
+
+# Endorsement. An app depends on this package alone and gets Herald, the Kotlin service and the
+# Swift lifecycle with no native edits. An institution needing a different radio — dedicated badges,
+# say — registers its own implementation instead of forking this one.
+flutter:
+  plugin:
+    platforms:
+      android:
+        default_package: epidemica_proximity_android
+      ios:
+        default_package: epidemica_proximity_ios

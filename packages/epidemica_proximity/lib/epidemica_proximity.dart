@@ -18,3 +18,4 @@ export 'src/distance_estimator.dart';
 export 'src/episode_aggregator.dart';
 export 'src/open_episode_store.dart';
 export 'src/pair_key.dart';
+export 'src/service_uuid.dart';

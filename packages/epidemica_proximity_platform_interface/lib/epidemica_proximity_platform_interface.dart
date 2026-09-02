@@ -6,5 +6,7 @@
 library;
 
 export 'src/device_class.dart';
-export 'src/proximity_detection.dart';
+export 'src/method_channel_proximity.dart';
+export 'src/proximity_config.dart';
+export 'src/proximity_event.dart';
 export 'src/proximity_platform.dart';

@@ -10,8 +10,14 @@ server/priv/static/assets/
 
 # Lockfiles are committed in every language. A published dataset has to stay re-derivable
 # years later, and estimator_version only pins our own code.
-#   uv.lock, mix.lock, pubspec.lock -> tracked
+#   uv.lock, mix.lock, pubspec.lock, Package.resolved -> tracked
 # Per-package Dart lockfiles are noise: the workspace root holds the one resolution.
 .dart_tool/
 build/
 packages/*/pubspec.lock
+
+# Swift Package Manager working directories. .build holds the resolved dependency checkouts —
+# the Herald clone alone is several thousand files. Package.resolved is deliberately not listed
+# here: it pins Herald's exact revision, which is the SPM equivalent of a lockfile.
+.build/
+.swiftpm/

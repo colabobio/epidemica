@@ -1,0 +1,74 @@
+{
+  "comment": "Shared test vectors for the proximity BLE payload. Swift and Kotlin both decode these, which is how the two implementations are held to the same wire format without two devices in a room. See 1.0.0.md.",
+  "format_version": 1,
+  "size_bytes": 18,
+
+  "roundtrip": [
+    {
+      "case": "iOS peer",
+      "pseudonym": "c9e2f1a0-6b3d-4c88-9a71-2f3e4d5c6b7a",
+      "device_class": "ios",
+      "hex": "01c9e2f1a06b3d4c889a712f3e4d5c6b7a00"
+    },
+    {
+      "case": "Android peer",
+      "pseudonym": "a1b2c3d4-e5f6-4708-9a0b-1c2d3e4f5061",
+      "device_class": "android",
+      "hex": "01a1b2c3d4e5f647089a0b1c2d3e4f506101"
+    },
+    {
+      "case": "sender did not know its own hardware class",
+      "pseudonym": "00000000-0000-4000-8000-000000000000",
+      "device_class": "unknown",
+      "hex": "0100000000000040008000000000000000ff"
+    },
+    {
+      "case": "all bits set, to catch sign-extension bugs in byte handling",
+      "pseudonym": "ffffffff-ffff-ffff-ffff-ffffffffffff",
+      "device_class": "ios",
+      "hex": "01ffffffffffffffffffffffffffffffff00"
+    }
+  ],
+
+  "decodes": [
+    {
+      "case": "trailing bytes from a later format version are ignored, not rejected",
+      "why": "The rule that makes additive extension possible. A reader that rejected this would go blind the day any peer shipped a longer payload.",
+      "hex": "01c9e2f1a06b3d4c889a712f3e4d5c6b7a00deadbeef",
+      "pseudonym": "c9e2f1a0-6b3d-4c88-9a71-2f3e4d5c6b7a",
+      "device_class": "ios"
+    },
+    {
+      "case": "an unrecognised device class reads as unknown rather than failing",
+      "why": "Leaves room for a future platform. Recording it as unknown loses one attribute; rejecting it loses the whole contact.",
+      "hex": "01c9e2f1a06b3d4c889a712f3e4d5c6b7a07",
+      "pseudonym": "c9e2f1a0-6b3d-4c88-9a71-2f3e4d5c6b7a",
+      "device_class": "unknown"
+    }
+  ],
+
+  "rejects": [
+    {
+      "case": "empty payload",
+      "hex": ""
+    },
+    {
+      "case": "one byte short of a complete record",
+      "why": "A truncated pseudonym would silently alias two different participants.",
+      "hex": "01c9e2f1a06b3d4c889a712f3e4d5c6b7a"
+    },
+    {
+      "case": "header only",
+      "hex": "01"
+    },
+    {
+      "case": "unknown format version",
+      "why": "A later version may reuse offsets 1-17 for something else, so guessing is unsafe.",
+      "hex": "02c9e2f1a06b3d4c889a712f3e4d5c6b7a00"
+    },
+    {
+      "case": "format version zero is not a valid version",
+      "hex": "00c9e2f1a06b3d4c889a712f3e4d5c6b7a00"
+    }
+  ]
+}

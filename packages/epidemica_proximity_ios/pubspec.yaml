@@ -1,0 +1,31 @@
+name: epidemica_proximity_ios
+description: >-
+  iOS implementation of the Epidemica proximity module. Wraps Herald and reports peer sightings;
+  contains no epidemiological logic.
+version: 0.1.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.9.0
+  flutter: ">=3.29.0"
+
+dependencies:
+  epidemica_proximity_platform_interface:
+    path: ../epidemica_proximity_platform_interface
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  plugin:
+    implements: epidemica_proximity
+    platforms:
+      ios:
+        pluginClass: EpidemicaProximityPlugin
+        dartPluginClass: EpidemicaProximityIOS
+        sharedDarwinSource: false
