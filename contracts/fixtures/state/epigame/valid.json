@@ -66,7 +66,12 @@
   {
     "case": "before the first tick",
     "why": "Day zero is a real state: enrolled, nothing computed yet.",
-    "instance": { "day": 0, "days_total": 7, "epi_state": "susceptible", "points": 0 }
+    "instance": {
+      "day": 0,
+      "days_total": 7,
+      "epi_state": "susceptible",
+      "points": 0
+    }
   },
   {
     "case": "a negative score, shown rather than hidden",
@@ -89,6 +94,111 @@
       "points": 0,
       "total_cases": 11,
       "population": 50
+    }
+  },
+  {
+    "case": "a settled day, with arithmetic a player can check",
+    "instance": {
+      "day": 5,
+      "days_total": 7,
+      "epi_state": "susceptible",
+      "points": 24,
+      "protected_until": null,
+      "protection_source": null,
+      "total_cases": 9,
+      "population": 50,
+      "settlement": {
+        "day": 4,
+        "opening": 13,
+        "closing": 24,
+        "lines": [
+          {
+            "reason": "healthy",
+            "points": 2
+          },
+          {
+            "reason": "contacts",
+            "points": 10,
+            "count": 2
+          },
+          {
+            "reason": "protection",
+            "points": -1
+          }
+        ]
+      }
+    }
+  },
+  {
+    "case": "a day the study could not observe",
+    "why": "The withheld accrual is stated rather than left as an unexplained gap in the balance.",
+    "instance": {
+      "day": 3,
+      "days_total": 7,
+      "epi_state": "susceptible",
+      "points": 8,
+      "protected_until": "2026-09-04T00:00:00Z",
+      "protection_source": "not_sensing",
+      "total_cases": 4,
+      "population": 50,
+      "settlement": {
+        "day": 2,
+        "opening": 8,
+        "closing": 8,
+        "lines": [
+          {
+            "reason": "not_sensing",
+            "points": 0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "case": "a contact whose other side arrived late",
+    "why": "Credited to the next settlement; the day it belonged to was already settled and is never rewritten.",
+    "instance": {
+      "day": 6,
+      "days_total": 7,
+      "epi_state": "recovered",
+      "points": 31,
+      "total_cases": 12,
+      "population": 50,
+      "settlement": {
+        "day": 5,
+        "opening": 24,
+        "closing": 31,
+        "lines": [
+          {
+            "reason": "infected",
+            "points": 0
+          },
+          {
+            "reason": "carried_over",
+            "points": 5,
+            "count": 1
+          },
+          {
+            "reason": "contacts",
+            "points": 5,
+            "count": 1
+          },
+          {
+            "reason": "protection",
+            "points": -3
+          }
+        ]
+      }
+    }
+  },
+  {
+    "case": "before the first day has been settled",
+    "instance": {
+      "day": 0,
+      "days_total": 7,
+      "epi_state": "susceptible",
+      "points": 0,
+      "settlement": null
     }
   }
 ]

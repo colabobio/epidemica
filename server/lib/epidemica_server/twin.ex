@@ -34,9 +34,7 @@ defmodule EpidemicaServer.Twin do
       received_before = Keyword.get(opts, :received_before, DateTime.utc_now())
 
       agents = reconcile_roster(study_id, twin, day)
-
-      inputs =
-        build_inputs(study_id, twin, day, agents, period_start, period_end, received_before)
+      inputs = build_inputs(study, twin, day, agents, period_start, period_end, received_before)
 
       # The engine runs outside any transaction: a subprocess that takes seconds should not hold a
       # database connection, and if it fails there is nothing to roll back because nothing has been
@@ -228,12 +226,13 @@ defmodule EpidemicaServer.Twin do
   # String keys throughout, because this map is written to the database and read back for
   # verification. Atom keys in memory and string keys after a reload would make a replayed tick
   # subtly different from the one that ran.
-  defp build_inputs(study_id, twin, day, agents, period_start, period_end, received_before) do
+  defp build_inputs(study, twin, day, agents, period_start, period_end, received_before) do
+    study_id = study.id
     active = Enum.filter(agents, & &1.active)
     slot_to_index = active |> Enum.with_index() |> Map.new(fn {a, i} -> {a.slot, i} end)
     subject_to_index = index_by_subject(active, slot_to_index)
 
-    protected = protected_subjects(study_id, active, period_start, period_end, twin)
+    protected = protected_subjects(study, active, period_start, period_end, twin)
 
     %{
       "study_id" => study_id,
@@ -297,18 +296,24 @@ defmodule EpidemicaServer.Twin do
     end)
   end
 
-  # A participant whose device was not sensing is treated as protected rather than as having had no
-  # contacts. Absence of evidence is not evidence of absence, and the alternative -- inferring that
-  # a phone in a drawer met nobody -- would silently understate transmission.
-  defp protected_subjects(study_id, active, from, to, twin) do
+  # Two independent sources. The platform infers protection from missing coverage — a phone in a
+  # drawer must not be read as a participant who met nobody — and the study's rules contribute
+  # whatever protection a participant chose. Neither can see the other's case.
+  defp protected_subjects(study, active, from, to, twin) do
     subjects = active |> Enum.map(& &1.subject) |> Enum.reject(&is_nil/1)
     threshold = Map.get(twin, "coverage_threshold", @default_coverage_threshold)
 
     unobserved =
-      Health.insufficiently_observed(study_id, @proximity_module, from, to, threshold, subjects)
+      Health.insufficiently_observed(study.id, @proximity_module, from, to, threshold, subjects)
 
-    MapSet.new(unobserved)
+    MapSet.union(MapSet.new(unobserved), chosen_protection(study, from, to))
   end
+
+  defp chosen_protection(%{protocol: %{"rules" => %{"engine" => "epigame"}}} = study, from, to) do
+    EpidemicaServer.Epigame.chosen_protection(study.id, from, to)
+  end
+
+  defp chosen_protection(_study, _from, _to), do: MapSet.new()
 
   defp protection_pars(twin) do
     pars = Map.get(twin, "pars", %{})

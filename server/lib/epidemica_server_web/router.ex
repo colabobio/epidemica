@@ -33,6 +33,7 @@ defmodule EpidemicaServerWeb.Router do
 
     get "/studies/:id/protocol", ProtocolController, :show
     get "/participants/me/state", ParticipantStateController, :show
+    post "/participants/me/actions", GameActionController, :create
     post "/observations", ObservationController, :create
     get "/observations/ack", ObservationController, :ack
   end

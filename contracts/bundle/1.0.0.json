@@ -4,11 +4,18 @@
   "title": "Study protocol bundle",
   "description": "The document that turns a generic Epidemica binary into a specific study. It names the modules the study uses and configures each of them, and it is the only artefact a researcher authors for a Tier 1 study: no application code is written, compiled or signed. The bundle is fetched after enrolment and verified against the `protocol_hash` returned there, and that hash is stamped on every observation so a dataset always says which configuration produced it.",
   "type": "object",
-  "required": ["bundle_version", "study_id", "title", "modules"],
+  "required": [
+    "bundle_version",
+    "study_id",
+    "title",
+    "modules"
+  ],
   "additionalProperties": false,
   "properties": {
     "bundle_version": {
-      "enum": ["1.0"],
+      "enum": [
+        "1.0"
+      ],
       "description": "Selects the bundle schema an app validates against. A binary that does not know this version must refuse the study rather than interpret it partially."
     },
     "study_id": {
@@ -37,7 +44,9 @@
       "type": "object",
       "description": "Module identifier to that module's configuration. Declaring a module and configuring it are the same act, so a bundle cannot name a module it forgot to configure, or configure one it never declared. An app that does not embed every module named here must refuse the study.",
       "minProperties": 1,
-      "propertyNames": { "pattern": "^[a-z][a-z0-9_]{1,31}$" },
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9_]{1,31}$"
+      },
       "additionalProperties": {
         "type": "object",
         "description": "Interpreted by the named module. Open by design: adding a module must not require a change to this schema."
@@ -60,7 +69,10 @@
       "additionalProperties": false,
       "description": "Whether devices report when their modules were actually collecting. On by default, because a study that cannot tell 'this participant met nobody' from 'we were not listening' has a defective dataset whether or not it notices. A study with no use for coverage can switch it off and save the observations.",
       "properties": {
-        "enabled": { "type": "boolean", "default": true },
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
         "interval_seconds": {
           "type": "integer",
           "minimum": 60,
@@ -70,7 +82,10 @@
     },
     "twin": {
       "type": "object",
-      "required": ["engine", "state_uri"],
+      "required": [
+        "engine",
+        "state_uri"
+      ],
       "additionalProperties": false,
       "description": "A model the server runs against this study's data, whose output reaches participants through the state channel. Absent for studies that only collect: a study without this block is never simulated and never has participant state computed for it.",
       "properties": {
@@ -97,6 +112,25 @@
         "pars": {
           "type": "object",
           "description": "Engine-specific parameters, opaque to the platform. Interpreted only by the named engine."
+        }
+      }
+    },
+    "rules": {
+      "type": "object",
+      "required": [
+        "engine"
+      ],
+      "additionalProperties": false,
+      "description": "The scoring rules a study plays by, evaluated by the server and mirrored by the app for immediate feedback. Separate from `twin` because a model decides what happened to a participant and rules decide what it was worth; a study may have either without the other. Absent for studies that only collect.",
+      "properties": {
+        "engine": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{1,31}$",
+          "description": "Which rule set applies, e.g. `epigame`. A server that does not implement it must refuse the study rather than silently score nothing."
+        },
+        "pars": {
+          "type": "object",
+          "description": "Every constant the rules use, so a second game with different economics needs no rebuild. Interpreted only by the named rule engine, and carried to the app unchanged so both sides score from one source."
         }
       }
     }

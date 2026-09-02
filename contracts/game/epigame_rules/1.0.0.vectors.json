@@ -1,0 +1,127 @@
+{
+  "comment": "Shared test vectors for the epigame scoring rules. The rules run twice -- once on the server, where the score is authoritative, and once in the app, where a participant sees it immediately -- so they exist in two languages and will drift unless something holds them together. These vectors are that thing. Each case gives the constants, the facts the participant could have known, and the settlement that must result.",
+  "rules_version": "1.0.0",
+  "pars": {
+    "healthy_points": 2,
+    "infected_points": 0,
+    "protection_cost": 1,
+    "contact_points": 5,
+    "contact_min_seconds": 600,
+    "contact_cooldown_days": 1,
+    "contact_points_while_infected": false,
+    "protection_window_seconds": 86400,
+    "carry_over_days": 3
+  },
+  "settlements": [
+    {
+      "case": "a healthy, observed day with no contacts",
+      "facts": { "day": 1, "opening": 0, "epi_state": "susceptible", "observed": true, "protection": null, "contacts": 0, "carried_over": 0 },
+      "expect": { "day": 1, "opening": 0, "closing": 2, "lines": [{ "reason": "healthy", "points": 2 }] }
+    },
+    {
+      "case": "the day a participant is shown as healthy is paid, whatever the tick then decides",
+      "why": "State shown, not state revealed. A participant told they were healthy all day and then docked for an infection they learned about afterwards has no way to reason about their score.",
+      "facts": { "day": 4, "opening": 10, "epi_state": "susceptible", "observed": true, "protection": null, "contacts": 0, "carried_over": 0 },
+      "expect": { "day": 4, "opening": 10, "closing": 12, "lines": [{ "reason": "healthy", "points": 2 }] }
+    },
+    {
+      "case": "an infected day earns nothing",
+      "facts": { "day": 5, "opening": 12, "epi_state": "infected", "observed": true, "protection": null, "contacts": 0, "carried_over": 0 },
+      "expect": { "day": 5, "opening": 12, "closing": 12, "lines": [{ "reason": "infected", "points": 0 }] }
+    },
+    {
+      "case": "chosen protection is paid for",
+      "facts": { "day": 2, "opening": 4, "epi_state": "susceptible", "observed": true, "protection": "chosen", "contacts": 0, "carried_over": 0 },
+      "expect": { "day": 2, "opening": 4, "closing": 5, "lines": [{ "reason": "healthy", "points": 2 }, { "reason": "protection", "points": -1 }] }
+    },
+    {
+      "case": "a day the study could not observe is neither scored nor charged",
+      "why": "Free would make going dark strictly better than every other play and the study would collect nothing; charged would correlate the score with how aggressively the participant's phone kills apps.",
+      "facts": { "day": 3, "opening": 6, "epi_state": "susceptible", "observed": false, "protection": "not_sensing", "contacts": 2, "carried_over": 0 },
+      "expect": { "day": 3, "opening": 6, "closing": 6, "lines": [{ "reason": "not_sensing", "points": 0 }] }
+    },
+    {
+      "case": "an unobserved day earns nothing even for contacts that were detected",
+      "why": "The contacts cannot be attested either; crediting them would restore the incentive to go dark.",
+      "facts": { "day": 3, "opening": 6, "epi_state": "susceptible", "observed": false, "protection": null, "contacts": 3, "carried_over": 1 },
+      "expect": { "day": 3, "opening": 6, "closing": 6, "lines": [{ "reason": "not_sensing", "points": 0 }] }
+    },
+    {
+      "case": "contacts pay per contact",
+      "facts": { "day": 2, "opening": 2, "epi_state": "susceptible", "observed": true, "protection": null, "contacts": 3, "carried_over": 0 },
+      "expect": { "day": 2, "opening": 2, "closing": 19, "lines": [{ "reason": "healthy", "points": 2 }, { "reason": "contacts", "points": 15, "count": 3 }] }
+    },
+    {
+      "case": "a late-arriving contact is credited to the next settlement",
+      "why": "The day it belonged to was settled and is never rewritten, but the participant still earned it.",
+      "facts": { "day": 6, "opening": 20, "epi_state": "susceptible", "observed": true, "protection": null, "contacts": 1, "carried_over": 2 },
+      "expect": { "day": 6, "opening": 20, "closing": 37, "lines": [{ "reason": "healthy", "points": 2 }, { "reason": "contacts", "points": 5, "count": 1 }, { "reason": "carried_over", "points": 10, "count": 2 }] }
+    },
+    {
+      "case": "an infected participant earns no contact points by default",
+      "why": "Otherwise the game pays an infectious player to seek company, which is the opposite of what it is teaching.",
+      "facts": { "day": 5, "opening": 12, "epi_state": "infected", "observed": true, "protection": null, "contacts": 4, "carried_over": 1 },
+      "expect": { "day": 5, "opening": 12, "closing": 12, "lines": [{ "reason": "infected", "points": 0 }] }
+    },
+    {
+      "case": "a study may choose to pay infected participants for contacts",
+      "pars": { "contact_points_while_infected": true },
+      "facts": { "day": 5, "opening": 12, "epi_state": "infected", "observed": true, "protection": null, "contacts": 2, "carried_over": 0 },
+      "expect": { "day": 5, "opening": 12, "closing": 22, "lines": [{ "reason": "infected", "points": 0 }, { "reason": "contacts", "points": 10, "count": 2 }] }
+    },
+    {
+      "case": "a balance may go negative rather than clamp",
+      "why": "A game whose costs can exceed its rewards should show that rather than hide it at zero.",
+      "pars": { "healthy_points": 0, "protection_cost": 3 },
+      "facts": { "day": 2, "opening": 1, "epi_state": "susceptible", "observed": true, "protection": "chosen", "contacts": 0, "carried_over": 0 },
+      "expect": { "day": 2, "opening": 1, "closing": -2, "lines": [{ "reason": "healthy", "points": 0 }, { "reason": "protection", "points": -3 }] }
+    },
+    {
+      "case": "a second game's economics need no rebuild",
+      "pars": { "healthy_points": 10, "contact_points": 1, "protection_cost": 4 },
+      "facts": { "day": 1, "opening": 0, "epi_state": "susceptible", "observed": true, "protection": "chosen", "contacts": 2, "carried_over": 0 },
+      "expect": { "day": 1, "opening": 0, "closing": 8, "lines": [{ "reason": "healthy", "points": 10 }, { "reason": "protection", "points": -4 }, { "reason": "contacts", "points": 2, "count": 2 }] }
+    }
+  ],
+  "awards": [
+    {
+      "case": "a long enough contact between two unprotected participants",
+      "network": [{ "pair": ["alice-0001", "bob-0001"], "seconds": 900 }],
+      "protected": [],
+      "already_awarded": [],
+      "expect": [["alice-0001", "bob-0001"]]
+    },
+    {
+      "case": "too brief to count",
+      "network": [{ "pair": ["alice-0001", "bob-0001"], "seconds": 300 }],
+      "protected": [],
+      "already_awarded": [],
+      "expect": []
+    },
+    {
+      "case": "protection removes the reward as well as the risk",
+      "why": "The trade-off the study measures. Protection that cost nothing in forgone points would not be a decision.",
+      "network": [{ "pair": ["alice-0001", "bob-0001"], "seconds": 1800 }],
+      "protected": ["bob-0001"],
+      "already_awarded": [],
+      "expect": []
+    },
+    {
+      "case": "a pair inside its cooldown is not paid twice",
+      "network": [{ "pair": ["alice-0001", "bob-0001"], "seconds": 1800 }],
+      "protected": [],
+      "already_awarded": [["alice-0001", "bob-0001"]],
+      "expect": []
+    },
+    {
+      "case": "one pair on cooldown does not suppress another",
+      "network": [
+        { "pair": ["alice-0001", "bob-0001"], "seconds": 1800 },
+        { "pair": ["alice-0001", "carol-0001"], "seconds": 1800 }
+      ],
+      "protected": [],
+      "already_awarded": [["alice-0001", "bob-0001"]],
+      "expect": [["alice-0001", "carol-0001"]]
+    }
+  ]
+}

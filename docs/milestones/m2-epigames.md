@@ -209,16 +209,61 @@ joiner never inherits a simulated person's infection history.
 
 ### W5 — Game rules
 
-Server-side, because points depend on state the client cannot see, and because a client-computed
-score is a client-editable score.
+**Points are a pure function of state the participant was shown.** Not of hidden state — a score
+you cannot derive from what you were told is a score you cannot check. A participant who is shown
+`susceptible` on day 4 earns day 4's points, even if the tick that closes day 4 infects them; the
+infection announces itself on day 5. Nobody is ever retroactively docked.
 
-- [ ] 2 points a day while healthy; none while infected
-- [ ] Protection costs 1 point a day, grants immunity, and expires after the bundle's window
-- [ ] A qualifying contact between two unprotected participants awards 5 points to each, subject to
+**The server is still authoritative, but for a different reason than "the client might cheat."** The
+study measures whether people accept a cost to protect themselves and others. Protection costs
+points. If the score were client-authoritative that cost would be fictional, and the central
+behavioural measurement would be of nothing. The score is not a layer on top of the research; it is
+the independent variable.
+
+Both sides therefore compute the same function: the client optimistically, for immediate feedback,
+and the server authoritatively, at settlement. That means the rule exists twice in two languages —
+the drift problem ADR-0012 exists to prevent — so the constants come from the bundle and the rule
+ships with shared test vectors, as the BLE wire format does.
+
+**Involuntary protection is withheld from, not charged for.** Three candidate rules, and only one
+survives contact with the incentives:
+
+| | earns | costs | net | immune |
+|---|---|---|---|---|
+| Playing normally | +2 | 0 | **+2** | no |
+| Chosen protection | +2 | −1 | **+1** | yes |
+| Not sensing, if free | +2 | 0 | **+2** | yes |
+| Not sensing, as adopted | 0 | 0 | **0** | yes |
+
+Making involuntary protection free is the kind-looking rule that guarantees no data: it strictly
+dominates everything, so a rational player disables Bluetooth on day one. Charging a penalty point
+is also wrong, and less obviously so — aggressive battery management kills apps far more often on
+older Android, so a penalty would correlate the score with the participant's hardware and the study
+would be measuring phones. Withholding is neither: not a punishment, an inability to attest. The
+coverage threshold already built in W4 is the grace band, so a restart or a charging gap costs
+nothing and only sustained absence bites.
+
+- [x] 2 points a day while healthy and observed; none while infected
+- [x] Protection costs 1 point a day, grants immunity, and expires after the bundle's window
+- [x] A participant below the coverage threshold accrues nothing and is charged nothing, and the
+      reason is recorded even though the game treats all protection identically
+- [x] A qualifying contact between two unprotected participants awards 5 points to each, subject to
       a cooldown
-- [ ] Points and epi state are derived from ticks and are reproducible from them
-- [ ] Every rule constant comes from the bundle — a second game with different economics needs no
+- [x] A daily settlement in the state document: opening balance, each line, closing balance, so a
+      participant can check the arithmetic rather than trust it
+- [x] Reconciliation can award contacts the participant did not know they had, not only withdraw
+      ones they expected — the union of two partial views can clear a bar neither view reached
+- [x] A contact whose other side arrives after the day was settled is credited to the next
+      settlement rather than lost, and never rewrites a settled day
+- [x] Points and epi state are derived from ticks and are reproducible from them
+- [x] Every rule constant comes from the bundle — a second game with different economics needs no
       rebuild
+- [x] Shared test vectors both runtimes execute, so the client and server rules cannot drift
+
+**Open decision: contact points while infected.** "None while infected" currently governs the daily
+rate only. Letting an infected participant keep contact points softens infection considerably;
+zeroing them makes it a cliff, and avoids a game that pays an infectious player to seek company.
+Implemented as a bundle constant, defaulting to zero, so the study can choose.
 
 ### W6 — `apps/epigames` and `studies/epigame7`
 

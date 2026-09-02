@@ -2,22 +2,40 @@
   {
     "case": "an epi state outside the model",
     "why": "The app colours the whole screen from this field; an unrecognised value has no colour and no safe default.",
-    "instance": { "day": 4, "days_total": 7, "epi_state": "exposed", "points": 11 }
+    "instance": {
+      "day": 4,
+      "days_total": 7,
+      "epi_state": "exposed",
+      "points": 11
+    }
   },
   {
     "case": "no epi state at all",
     "why": "There is no defensible default. Assuming susceptible would tell an infected player they are healthy.",
-    "instance": { "day": 4, "days_total": 7, "points": 11 }
+    "instance": {
+      "day": 4,
+      "days_total": 7,
+      "points": 11
+    }
   },
   {
     "case": "no points",
     "why": "The score is the centre of the screen; absent is not the same as zero.",
-    "instance": { "day": 4, "days_total": 7, "epi_state": "susceptible" }
+    "instance": {
+      "day": 4,
+      "days_total": 7,
+      "epi_state": "susceptible"
+    }
   },
   {
     "case": "fractional points",
     "why": "The game is scored in whole points; a fraction means a rule was applied that nobody designed.",
-    "instance": { "day": 4, "days_total": 7, "epi_state": "susceptible", "points": 11.5 }
+    "instance": {
+      "day": 4,
+      "days_total": 7,
+      "epi_state": "susceptible",
+      "points": 11.5
+    }
   },
   {
     "case": "protection expiry that is not UTC",
@@ -33,12 +51,22 @@
   {
     "case": "a day before the game starts",
     "why": "Day counts forward from enrolment. A negative day would mean a tick ran for a period the study did not cover.",
-    "instance": { "day": -1, "days_total": 7, "epi_state": "susceptible", "points": 0 }
+    "instance": {
+      "day": -1,
+      "days_total": 7,
+      "epi_state": "susceptible",
+      "points": 0
+    }
   },
   {
     "case": "a game of no days",
     "why": "A zero-length game would divide by zero in every progress display and can only come from a misconfigured bundle.",
-    "instance": { "day": 0, "days_total": 0, "epi_state": "susceptible", "points": 0 }
+    "instance": {
+      "day": 0,
+      "days_total": 0,
+      "epi_state": "susceptible",
+      "points": 0
+    }
   },
   {
     "case": "negative cases",
@@ -71,6 +99,67 @@
       "epi_state": "susceptible",
       "points": 11,
       "protection_source": "vaccinated"
+    }
+  },
+  {
+    "case": "a settlement line with no reason",
+    "why": "An unexplained movement is exactly what the settlement exists to prevent.",
+    "instance": {
+      "day": 5,
+      "days_total": 7,
+      "epi_state": "susceptible",
+      "points": 15,
+      "settlement": {
+        "day": 4,
+        "opening": 13,
+        "closing": 15,
+        "lines": [
+          {
+            "points": 2
+          }
+        ]
+      }
+    }
+  },
+  {
+    "case": "a settlement reason the app cannot render",
+    "why": "A player shown a movement they have no words for cannot check it.",
+    "instance": {
+      "day": 5,
+      "days_total": 7,
+      "epi_state": "susceptible",
+      "points": 15,
+      "settlement": {
+        "day": 4,
+        "opening": 13,
+        "closing": 15,
+        "lines": [
+          {
+            "reason": "bonus",
+            "points": 2
+          }
+        ]
+      }
+    }
+  },
+  {
+    "case": "a settlement with no opening balance",
+    "why": "Without it the lines cannot be reconciled against anything.",
+    "instance": {
+      "day": 5,
+      "days_total": 7,
+      "epi_state": "susceptible",
+      "points": 15,
+      "settlement": {
+        "day": 4,
+        "closing": 15,
+        "lines": [
+          {
+            "reason": "healthy",
+            "points": 2
+          }
+        ]
+      }
     }
   }
 ]

@@ -143,5 +143,38 @@
         "population": 0
       }
     }
+  },
+  {
+    "case": "rules with no engine",
+    "why": "A server cannot guess which economics a study meant; scoring nothing silently is worse than refusing.",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "99999999-aaaa-4bbb-8ccc-dddddddddddd",
+      "title": "No engine",
+      "modules": {
+        "proximity": {}
+      },
+      "rules": {
+        "pars": {
+          "healthy_points": 2
+        }
+      }
+    }
+  },
+  {
+    "case": "an unknown key in the rules block",
+    "why": "Constants belong under `pars`; a stray sibling would be silently ignored and the study would score differently than its author intended.",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "99999999-aaaa-4bbb-8ccc-dddddddddddd",
+      "title": "Stray key",
+      "modules": {
+        "proximity": {}
+      },
+      "rules": {
+        "engine": "epigame",
+        "healthy_points": 2
+      }
+    }
   }
 ]

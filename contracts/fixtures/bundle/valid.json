@@ -95,5 +95,44 @@
         "enabled": false
       }
     }
+  },
+  {
+    "case": "a study that both simulates and scores",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "77777777-8888-4999-8aaa-bbbbbbbbbbbb",
+      "title": "Epigame seven-day",
+      "modules": {
+        "proximity": {}
+      },
+      "twin": {
+        "engine": "starsim",
+        "state_uri": "https://schemas.epidemica.info/state/epigame/1.0.0.json",
+        "population": 50
+      },
+      "rules": {
+        "engine": "epigame",
+        "pars": {
+          "healthy_points": 2,
+          "protection_cost": 1,
+          "contact_points": 5
+        }
+      }
+    }
+  },
+  {
+    "case": "rules without a twin",
+    "why": "A study may score behaviour it measures directly, without simulating anything.",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "99999999-aaaa-4bbb-8ccc-dddddddddddd",
+      "title": "Scored, not simulated",
+      "modules": {
+        "proximity": {}
+      },
+      "rules": {
+        "engine": "epigame"
+      }
+    }
   }
 ]

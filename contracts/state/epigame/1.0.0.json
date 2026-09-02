@@ -2,9 +2,14 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://schemas.epidemica.info/state/epigame/1.0.0.json",
   "title": "Epigame participant state",
-  "description": "What a player is told about their own game, carried as the `state` of a participant state document. Everything here is computed by the server from the daily twin tick: the app renders it and never derives it, because points depend on other participants' protection status and a client-computed score is a client-editable score. Deliberately small -- a player sees their own situation and one aggregate, not the study's data.",
+  "description": "What a player is told about their own game, carried as the `state` of a participant state document. Points are a pure function of state the participant was already shown, so the app can compute the same answer for immediate feedback; the server's copy is authoritative because the cost of protection is what the study measures, and a cost the client can edit is not a cost. Deliberately small -- a player sees their own situation and one aggregate, not the study's data.",
   "type": "object",
-  "required": ["day", "days_total", "epi_state", "points"],
+  "required": [
+    "day",
+    "days_total",
+    "epi_state",
+    "points"
+  ],
   "additionalProperties": false,
   "properties": {
     "day": {
@@ -18,7 +23,12 @@
       "description": "How long the game lasts, so the app can show progress without reading the bundle again."
     },
     "epi_state": {
-      "enum": ["susceptible", "infected", "recovered", "dead"],
+      "enum": [
+        "susceptible",
+        "infected",
+        "recovered",
+        "dead"
+      ],
       "description": "The participant's state in the twin. `dead` is defined so the contract does not have to widen later; the default SIR model never produces it."
     },
     "points": {
@@ -26,12 +36,19 @@
       "description": "Confirmed score. Signed, because a game whose costs can exceed its rewards should show that rather than clamping to zero and hiding it."
     },
     "protected_until": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$",
       "description": "When protection lapses, or null when unprotected. An instant rather than a boolean so the app can count down and expire it locally without waiting for the next tick."
     },
     "protection_source": {
-      "enum": ["chosen", "not_sensing", null],
+      "enum": [
+        "chosen",
+        "not_sensing",
+        null
+      ],
       "description": "Why the participant is protected. The game treats a deliberate choice and a phone that stopped sensing identically, but research needs to tell them apart."
     },
     "total_cases": {
@@ -48,6 +65,70 @@
       "type": "integer",
       "minimum": 0,
       "description": "Scoring contacts detected since the last tick and not yet confirmed. Lets the app show that something is coming without keeping a second ledger."
+    },
+    "settlement": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "required": [
+        "day",
+        "opening",
+        "closing",
+        "lines"
+      ],
+      "additionalProperties": false,
+      "description": "How the last day's points were arrived at. Present so a participant can check the arithmetic rather than trust it, which is what makes a server-authoritative score acceptable. Null before the first day has been settled.",
+      "properties": {
+        "day": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Which day this settles. Always the day before `day` once the game is running."
+        },
+        "opening": {
+          "type": "integer",
+          "description": "Balance carried in, so `opening` plus the lines must equal `closing`."
+        },
+        "closing": {
+          "type": "integer",
+          "description": "Balance carried out. Equal to the `points` a participant is shown."
+        },
+        "lines": {
+          "type": "array",
+          "minItems": 0,
+          "description": "Every movement, including zero-valued ones. A day that earned nothing because the device was not sensing says so, rather than showing an unexplained gap.",
+          "items": {
+            "type": "object",
+            "required": [
+              "reason",
+              "points"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "reason": {
+                "enum": [
+                  "healthy",
+                  "infected",
+                  "protection",
+                  "not_sensing",
+                  "contacts",
+                  "carried_over"
+                ],
+                "description": "Why the balance moved. `not_sensing` is a withheld accrual rather than a charge: a day the study could not observe is not scored, but neither is it penalised. `carried_over` credits a contact whose other side arrived after its own day was settled, which is never rewritten."
+              },
+              "points": {
+                "type": "integer",
+                "description": "Signed. Zero is meaningful and is not omitted."
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "How many contacts this line represents, where the reason is a contact one."
+              }
+            }
+          }
+        }
+      }
     }
   }
 }
