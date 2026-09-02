@@ -28,8 +28,9 @@ Directories appear as their first real content lands. Empty scaffolding is delib
 | `models/` | `starsim_epidemica`: Starsim network/disease modules and protocol loader | **started** — spike complete |
 | `analysis/` | Python: contract validation, FAIR scoring, data-quality scripts | **started** — contract test suite |
 | `deploy/` | Docker Compose stack, single-VM installer, operator runbook | not started |
-| `apps/` | `epigames/`, `travelhealthy/`, `template/` — thin study apps | not started |
-| `docs/` | ADRs, module specs, tutorials, study cookbook | **started** |
+| `apps/` | Reference app binaries. An institution ships one, not one per study | not started |
+| `studies/` | Reference protocol bundles — study definitions containing no code | not started |
+| `docs/` | ADRs, concepts, milestones, tutorials | **started** |
 
 ## Architecture decisions
 

@@ -25,7 +25,7 @@ alternatives that were rejected. Its value is mostly to whoever inherits the cod
 
 | # | Title | Status |
 |---|---|---|
-| [0001](0001-monorepo-and-package-boundaries.md) | Monorepo and package boundaries | Proposed |
+| [0001](0001-monorepo-and-package-boundaries.md) | Monorepo, package boundaries and app hosting | **Accepted** |
 | [0002](0002-observation-envelope.md) | Observation Envelope as the universal ingest contract | **Accepted** |
 | [0003](0003-single-backend-runtime.md) | Phoenix as the single backend runtime | Proposed |
 | [0004](0004-rest-for-ingest-graphql-for-query.md) | REST for ingest, GraphQL for query and admin | **Accepted** |

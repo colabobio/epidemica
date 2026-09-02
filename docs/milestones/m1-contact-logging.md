@@ -55,48 +55,50 @@ prejudging lifetime or rotation policy, which is where the real ADR-0005 questio
 
 ## 4. Where app code lives
 
-The question behind the question is what building an Epidemica app should feel like. Three tiers,
-and the layout follows from them.
+Settled in [ADR-0001](../adr/0001-monorepo-and-package-boundaries.md), which defines three tiers of
+effort and makes **Tier 1 — no code at all — the target for the common case**. An institution ships
+one app, not one app per study; which study a binary is running is decided by the join code and the
+protocol bundle it fetches at enrollment.
 
-| Tier | Who | What they do | Needs |
-|---|---|---|---|
-| **1. No code** | Most studies | Define a protocol bundle in the console, hand out a join code, participants use a generic Epidemica app | Protocol bundle + a study-agnostic app binary |
-| **2. Custom app** | Studies needing their own branding, store presence or extra screens | Start from the template, add the module packages they need, ship under their own developer account | Published packages + a template |
-| **3. New module** | Groups contributing a new data type | Write a package against the module interface plus a payload contract | Module interface + contract conventions |
+The consequence for M1 is worth stating plainly, because it changes the shape of the work:
+**contactlog is not an app.** It is a protocol bundle at `studies/contactlog/`, and the binary it
+runs on is `apps/template`. M1 ships no study-specific Dart code, and that is the milestone's
+sharpest test of whether Tier 1 works as described.
 
-**Tier 1 is meant to be the common case.** That has a direct consequence for M1: the app should be
-built as *the template configured by a one-module protocol bundle*, not as a bespoke contact-logging
-app. Slightly more work now, but it is not throwaway work — it is the template.
+### 4.1 What an institution actually configures
 
-### Decision
+"No code" does not mean "no build". An institution does a **one-time** setup before its first study
+and then never touches the app again:
 
-**Platform-owned apps live in the monorepo at `apps/`** — `apps/template`, and later `apps/epigames`
-and `apps/travelhealthy`. M1's app is `apps/contactlog`, built as a thin configuration of the
-template. This keeps the dogfooding gate real: a contract change breaks the app in the same pull
-request that made it.
+| Setting | Where |
+|---|---|
+| Bundle identifier, app name, icon, splash | Native project config |
+| Signing certificates, store listings | Apple Developer / Play Console |
+| Server base URL | Build configuration |
+| **Module set** | Which module packages the binary embeds |
+| Permission usage strings | `Info.plist` and `AndroidManifest` |
 
-**External apps live in their own repositories** and depend on published packages. That path is not
-needed for M1, but it must not be allowed to rot, which is the classic way a platform ends up
-working only for the team that built it.
+The accurate claim is therefore **no code, and no rebuild per study**. Every subsequent study is a
+bundle authored in the console: no release, no store review, no participant update. That is the
+whole payoff of Tier 1.
 
-**Nothing is ever a fork of the monorepo.** Forking would give every study its own divergent copy of
-the platform, make upstream fixes a permanent merge burden, and make "which version of the platform
-produced this data" unanswerable — which would quietly undermine the reproducibility that
-`protocol_hash` exists to provide. It is the same fork problem the platform is being built to
-eliminate.
+**The module set is the awkward one.** ADR-0001 records that a study only runs if its modules are
+already in the binary, so the instinct is to embed everything that might ever be needed. But module
+permissions are declared at build time and are read by app reviewers and by participants at install.
+A binary declaring Bluetooth, background location, camera and health data "just in case" invites
+store-review scrutiny and looks alarming on the permission sheet. There is a real tension between
+*one binary runs every future study* and *a minimal, justifiable permission surface*, and an
+institution has to choose a portfolio, not a maximum.
 
-### Keeping the external path honest
+Two consequences for how `apps/template` is built:
 
-While everything is still in the monorepo, one cheap CI job proves the outside-in path works: copy
-`apps/template` to a directory *outside* the workspace, resolve the Epidemica packages as git
-dependencies pinned to the current commit, and build it. If that job fails, the packages have grown
-a dependency on monorepo-relative paths and Tier 2 is broken without anyone noticing.
-
-The trigger to actually publish to pub.dev and split out `epidemica-app-template` is whichever comes
-first: the first external group wanting to build an app, or the start of Phase 2.
-
-> This section records a decision that is expensive to revisit and should be promoted to an ADR
-> (extending ADR-0001, which defines the monorepo but not app hosting) once confirmed.
+1. **Each module documents its own platform requirements** — the exact `Info.plist` keys, manifest
+   permissions and background modes it needs, and a usage string general enough to cover any study
+   that uses the module. This is the authoritative list an institution copies from, and later the
+   input to a generator.
+2. **Native manifest entries should eventually be generated from the module list**, not hand-
+   maintained. With one module, M1 writes them by hand; the requirement is recorded here so that the
+   template is not structured in a way that makes generation impossible (see §8).
 
 ## 5. Work items
 
@@ -116,6 +118,10 @@ to identity only — no `epi`, `clin`, `mod`, `strain`, `ps/pi/pr`. The plugin e
 - [ ] The platform packages have no dependency on `epidemica_core`
 - [ ] Distance estimation is behind a `DistanceEstimator` interface, with the existing
       `CoarseDistanceModel` thresholds as the default implementation
+- [ ] The package README states its **platform requirements verbatim** — every `Info.plist` key,
+      Android permission and background mode, with usage strings written to cover any study that
+      uses proximity rather than this one. This is what an institution copies into its build, and
+      what a manifest generator will later consume
 
 ### W2 — Episode aggregator
 
@@ -151,6 +157,10 @@ isolate landmines are already defused there.
 - [ ] `clock_offset_ms` is recorded, and is `null` rather than `0` when no reference was available
 - [ ] `rejected` observations move to a local dead-letter store and are surfaced, never silently
       deleted
+- [ ] **Enrollment checks the bundle against the module registry** and fails when the bundle names a
+      module this binary does not embed. Silently enrolling into a study the app cannot service is
+      the worst available failure: it looks successful and is only discovered at analysis, by which
+      time the collection window has passed
 
 ### W4 — `epidemica_server`
 
@@ -172,22 +182,28 @@ was not built with cannot be validated and is therefore quarantined until redepl
       result
 - [ ] `mix release` runs on a bare VM with Postgres and Caddy, with no AWS service of any kind
 
-### W5 — `apps/contactlog`
+### W5 — `apps/template` and `studies/contactlog`
 
-The template app, configured by a one-module protocol bundle.
+The generic app binary, plus the protocol bundle that makes it a contact-logging study. The bundle
+is the deliverable that a researcher would author; the binary is the platform's.
 
 - [ ] Join by code enrolls, fetches the protocol bundle, and records its hash on every observation
 - [ ] Permission flow for Bluetooth and background execution on both platforms
 - [ ] Visible state: enrolled, scanning, last sync, pending observation count
-- [ ] **No study-specific logic in application code** — behaviour comes from the protocol bundle, so
-      the same binary could run a different study
+- [ ] **`studies/contactlog/` contains no Dart code** — only a protocol bundle. If the milestone
+      cannot be completed without study-specific application code, Tier 1 does not work as described
+      and ADR-0001 needs revisiting
+- [ ] The same binary, given a different bundle, collects a different module's data without a rebuild
+- [ ] A bundle naming an absent module is **refused with an actionable message** ("this study needs a
+      newer version of the app"), and the participant is never left enrolled in a study that collects
+      nothing
 - [ ] Withdrawing stops collection and clears local data
 
 ## 6. Sequencing
 
 ```
 W2 (aggregator) ─┐
-                 ├─→ W5 (app) ─→ milestone acceptance
+                 ├─→ W5 (template + bundle) ─→ milestone acceptance
 W4 (server) ─────┤
       └─→ W3 (core) ─┘
 W1 (plugin) ─────────┘
@@ -207,7 +223,21 @@ Beyond the app, M1 answers questions the plan has so far only asserted:
 - Whether the quarantine design behaves sensibly when a real client and a real server disagree
 - Whether "add a module" means only "add a contract and a package", per the ADR-0004 validation
   criterion that a new observation type requires **zero** changes to the ingest API
-- Whether an app can be a thin configuration of a template rather than a bespoke build, which is the
-  premise Tier 1 rests on
+- Whether a study can genuinely be a protocol bundle rather than a build, which is the premise Tier 1
+  rests on and the one M1 is most likely to falsify
 
 Each of those is worth writing down at the end, whichever way it goes.
+
+## 8. Deferred, with reasons
+
+Surfaced while planning M1, deliberately not in it. Recorded so they are decisions rather than
+oversights.
+
+| Item | Why deferred | When it becomes blocking |
+|---|---|---|
+| **Rotating BLE identifiers** | M1 broadcasts a stable pseudonym (§3.1), which is adequate for a consenting internal pilot | Immediately after M1. Any EU deployment, and the Oxford observational cohort, need this first |
+| **Generated native manifest entries** | With one module, hand-written entries are cheaper than a generator | The second or third module, when hand-maintained plists start drifting from what the app actually does |
+| **Third-party payload schema validation across institutions** | While institution and server owner are the same party, a module's schema can simply be compiled into that institution's server | The first study spanning two institutions. A collaborator's server not built with your schema quarantines every observation from your module *permanently* — the quarantine behaves correctly, but no upgrade is coming to release it |
+| **ADR-0005 (token lifetime and rotation)** | M1's opaque device-bound token satisfies the ingest spec without prejudging the policy | Before any deployment outside the lab |
+| **ADR-0006 (protocol bundle format)** | M1 needs a minimal bundle; formalising it before a second module exists would be guessing | The second module, when the bundle has to express interactions between modules |
+| **A second institutional deployment** | Not needed to prove the vertical slice | Sooner than feels necessary. Being the only user is how a platform ends up working only for the team that built it, and a second deployment — even a fictional one on the same hardware, with its own config, app identity and study — surfaces multi-tenancy assumptions long before Leibniz finds them |
