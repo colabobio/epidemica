@@ -292,20 +292,48 @@ isolate landmines are already defused there.
 
 - [ ] Pseudonym and `device_id` generated once, persisted, and stable across restarts
 - [ ] Tokens held in platform secure storage, never in shared preferences
-- [ ] Outbox is SQLite in WAL mode and is **writable from a background isolate** while the main
+- [x] Outbox is SQLite in WAL mode and is **writable from a background isolate** while the main
       isolate holds a connection
-- [ ] `seq` is allocated inside the same transaction as the row insert; concurrent writes from two
+- [x] `seq` is allocated inside the same transaction as the row insert; concurrent writes from two
       isolates produce no duplicates and no gaps
-- [ ] Batches are ≤ 1000, gzipped, and honour `Retry-After` on 429 and backoff on 5xx
-- [ ] Force-resending a delivered batch produces `duplicate` outcomes and no duplicated rows
-- [ ] 24 hours offline loses nothing and uploads on reconnect
-- [ ] `clock_offset_ms` is recorded, and is `null` rather than `0` when no reference was available
-- [ ] `rejected` observations move to a local dead-letter store and are surfaced, never silently
+- [x] Batches are ≤ 1000, gzipped, and honour `Retry-After` on 429 and backoff on 5xx
+- [x] Force-resending a delivered batch produces `duplicate` outcomes and no duplicated rows
+- [x] 24 hours offline loses nothing and uploads on reconnect
+- [x] `clock_offset_ms` is recorded, and is `null` rather than `0` when no reference was available
+- [x] `rejected` observations move to a local dead-letter store and are surfaced, never silently
       deleted
 - [ ] **Enrollment checks the bundle against the module registry** and fails when the bundle names a
       module this binary does not embed. Silently enrolling into a study the app cannot service is
       the worst available failure: it looks successful and is only discovered at analysis, by which
       time the collection window has passed
+
+**Multi-isolate persistence: WAL, one connection per isolate, and a busy timeout.** Not
+`DriftIsolate`, not a single owning writer. There is no actor to keep alive — which matters
+because the isolate that most needs to write is a background service the OS starts and kills
+without warning. `th-app` never solved this; it kept its upload queue as a JSON blob in secure
+storage so only one isolate touched a real database, at the cost of an O(n) rewrite per append.
+
+**`seq` is `INTEGER PRIMARY KEY AUTOINCREMENT`, not a plain rowid.** Delivered rows are deleted,
+and a plain rowid reuses values after deletion — so a drained outbox restarts numbering at 1 and
+reissues sequence numbers the server already holds under `(device_id, seq)`. The server would then
+deduplicate genuinely new observations away. The failure appears only after a device successfully
+syncs everything, looks healthy on both sides, and shows up as a participant who quietly stops
+contributing.
+
+**Claim-then-upload, not upload-then-delete.** Rows are claimed with a token before the request
+goes out; a process that dies mid-upload releases them after five minutes, and the server's
+`(device_id, seq)` deduplication turns the accidental resend into `duplicate` rather than a second
+row.
+
+**Accepted observations are omitted from `exceptions`.** A client that removed exactly what the
+server listed would delete its failures, keep every success, and resend them forever. Both this and
+the `AUTOINCREMENT` point were confirmed by seeding the defect and watching the suite fail.
+
+**The clock reference is the server, not NTP.** The skew that matters is each device's difference
+from the clock that orders them all, and the ingest response already carries it. The server
+timestamp is attributed to the midpoint of the exchange, so a slow field-site round trip does not
+masquerade as drift.
+
 
 ### W4 — `epidemica_server`
 
