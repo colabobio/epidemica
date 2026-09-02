@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:epidemica_core/epidemica_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -40,6 +42,7 @@ class StudyController extends ChangeNotifier {
       clock: _clock,
       client: IngestClient(baseUri: baseUri, tokens: _tokens, httpClient: _http),
     );
+    _states = StateChannel(baseUri: baseUri, db: _db, tokens: _tokens, httpClient: _http);
   }
 
   final Uri baseUri;
@@ -55,6 +58,7 @@ class StudyController extends ChangeNotifier {
   late final TokenStore _tokens;
   late final EnrollmentService _enrollments;
   late final SyncService _sync;
+  late final StateChannel _states;
 
   Enrollment? _enrollment;
   final Set<String> _running = {};
@@ -75,6 +79,51 @@ class StudyController extends ChangeNotifier {
   int? get clockOffsetMs => _clock.offsetMs;
   String get subject => _identity.subject;
   Set<String> get runningModules => Set.unmodifiable(_running);
+
+  /// The last state document the server computed for this participant, or null if none ever was.
+  ///
+  /// Never synthesised: an invented "you are healthy" is indistinguishable from a measured one.
+  ParticipantState? get participantState => _states.current(expectedSubject: _enrollment?.subject);
+
+  /// Asks the server for the current state. Swallows transport failure, because a stale document
+  /// the participant can see is more use than an error they cannot act on.
+  Future<void> refreshState() async {
+    try {
+      await _states.refresh();
+    } on Object catch (e) {
+      _message = '$e';
+    }
+    notifyListeners();
+  }
+
+  /// Posts a study-defined action, with a body this package does not interpret.
+  ///
+  /// The upward mirror of the state channel: as opaque here as an observation payload is to the
+  /// outbox, so that one study's vocabulary never reaches the platform.
+  Future<bool> postAction(Map<String, Object?> body) async {
+    try {
+      final response = await _http.post(
+        baseUri.resolve('participants/me/actions'),
+        headers: {
+          'authorization': 'Bearer ${await _tokens.accessToken()}',
+          'content-type': 'application/json',
+        },
+        body: jsonEncode(body),
+      );
+      if (response.statusCode != 200) {
+        _message = 'That did not go through. Try again in a moment.';
+        notifyListeners();
+        return false;
+      }
+    } on Object {
+      _message = 'No connection. Try again when you are online.';
+      notifyListeners();
+      return false;
+    }
+
+    await refreshState();
+    return true;
+  }
 
   /// Resumes a study joined in an earlier session.
   Future<void> initialize() async {
@@ -178,6 +227,7 @@ class StudyController extends ChangeNotifier {
     _running.clear();
 
     await _tokens.clear();
+    _states.clear();
     _db.transaction(() {
       _db.db.execute('DELETE FROM outbox');
       _db.db.execute('DELETE FROM dead_letter');

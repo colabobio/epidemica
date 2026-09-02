@@ -267,15 +267,31 @@ Implemented as a bundle constant, defaulting to zero, so the study can choose.
 
 ### W6 — `apps/epigames` and `studies/epigame7`
 
-- [ ] A solid-colour screen: green healthy, red infected, blue recovered, black dead, with
+**A study needs a start and an end, and did not have one.** The first day was anchored to
+`study.inserted_at` — whenever the row reached Postgres — so a study seeded at 14:37 ran its days
+from 14:37, and re-seeding moved every boundary. There was no end at all: `days_total` decorated
+the progress line and nothing stopped day 500 from running. A `schedule` block now carries both,
+as an absolute instant rather than a local date, so a study spanning a daylight-saving change keeps
+its days a fixed length.
+
+**Three things moved out of `apps/template` when a second app appeared.** `StudyController` into
+`epidemica_core`, and the proximity glue into a new `epidemica_proximity_module` — core defines the
+module interface and must not depend on any implementation of it. This is the same argument that
+moved `EmbeddedModule` in W2, arriving on schedule the moment there were two apps.
+
+- [x] A solid-colour screen: green healthy, red infected, blue recovered, black dead, with
       **POINTS n** centred and a shield when protected
-- [ ] Total cases so far, from the state document
-- [ ] Buttons to take and release protection, and to leave the study
-- [ ] An information screen at enrolment covering the rules **and the presence of simulated
+- [x] Total cases so far, from the state document
+- [x] Buttons to take and release protection, and to leave the study
+- [x] An information screen at enrolment covering the rules **and the presence of simulated
       participants**
-- [ ] Visible staleness — the participant is told their state is from the last daily update, not now
-- [ ] The app contains no epidemiology: it renders a state document and posts actions
-- [ ] `studies/epigame7/` contains no Dart
+- [x] Visible staleness — the participant is told their state is from the last daily update, not now
+- [x] The app contains no epidemiology: it renders a state document and posts actions
+- [x] `studies/epigame7/` contains no Dart
+- [x] A study declares when it starts and how long it runs; a day outside that is refused
+- [x] The app's copy of the scoring rules passes the same vectors the server does
+- [x] Deploy recipes per study, since a game needs a schedule and a simulation environment that a
+      collection pilot does not
 
 ## 6. Sequencing
 

@@ -16,6 +16,7 @@ export 'src/outbox.dart';
 export 'src/protocol_bundle.dart';
 export 'src/state/participant_state.dart';
 export 'src/state/state_channel.dart';
+export 'src/study_controller.dart';
 export 'src/sync/backoff.dart';
 export 'src/sync/ingest_client.dart';
 export 'src/sync/ingest_result.dart';

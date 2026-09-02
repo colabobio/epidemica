@@ -176,5 +176,67 @@
         "healthy_points": 2
       }
     }
+  },
+  {
+    "case": "a schedule with no start",
+    "why": "Without it the first day anchors to whenever the study was registered, so re-registering moves every boundary.",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+      "title": "No start",
+      "modules": {
+        "proximity": {}
+      },
+      "schedule": {
+        "days": 7
+      }
+    }
+  },
+  {
+    "case": "a schedule with no end",
+    "why": "A game that never ends never shows a final score, and the server would keep ticking for ever.",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+      "title": "No end",
+      "modules": {
+        "proximity": {}
+      },
+      "schedule": {
+        "starts_at": "2026-09-07T06:00:00Z"
+      }
+    }
+  },
+  {
+    "case": "a study of zero days",
+    "why": "There would be no day one to run, and the app would show progress out of nothing.",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+      "title": "Zero days",
+      "modules": {
+        "proximity": {}
+      },
+      "schedule": {
+        "starts_at": "2026-09-07T06:00:00Z",
+        "days": 0
+      }
+    }
+  },
+  {
+    "case": "a start with no timezone",
+    "why": "A local-looking timestamp is ambiguous by exactly the amount that decides which day a contact fell on.",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+      "title": "Naive start",
+      "modules": {
+        "proximity": {}
+      },
+      "schedule": {
+        "starts_at": "2026-09-07T06:00:00",
+        "days": 7
+      }
+    }
   }
 ]

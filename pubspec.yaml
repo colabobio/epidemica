@@ -8,9 +8,11 @@ environment:
 
 workspace:
   - apps/template
+  - apps/epigames
   - packages/epidemica_core
   - packages/epidemica_proximity_platform_interface
   - packages/epidemica_proximity
   - packages/epidemica_proximity_android
   - packages/epidemica_proximity_ios
+  - packages/epidemica_proximity_module
   - packages/epidemica_proximity/example

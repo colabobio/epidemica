@@ -12,14 +12,13 @@ environment:
 dependencies:
   epidemica_core:
     path: ../../packages/epidemica_core
-  epidemica_proximity:
-    path: ../../packages/epidemica_proximity
+  epidemica_proximity_module:
+    path: ../../packages/epidemica_proximity_module
   flutter:
     sdk: flutter
   http: ^1.2.2
   path: ^1.9.1
   path_provider: ^2.1.5
-  permission_handler: ^11.3.1
 
 dev_dependencies:
   flutter_lints: ^6.0.0

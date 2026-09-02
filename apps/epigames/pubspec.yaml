@@ -1,0 +1,30 @@
+name: epidemica_epigames
+description: >-
+  The Epigames app: a seven-day game about how an infection moves through a group. Renders the
+  state document the server computes and posts the participant's decisions. Contains no
+  epidemiology — what happened to a player is decided by the twin, not here.
+publish_to: none
+version: 0.1.0
+resolution: workspace
+
+environment:
+  sdk: ^3.9.0
+
+dependencies:
+  epidemica_core:
+    path: ../../packages/epidemica_core
+  epidemica_proximity_module:
+    path: ../../packages/epidemica_proximity_module
+  flutter:
+    sdk: flutter
+  http: ^1.2.2
+  path: ^1.9.1
+  path_provider: ^2.1.5
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true

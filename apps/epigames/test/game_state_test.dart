@@ -1,0 +1,162 @@
+import 'package:epidemica_core/epidemica_core.dart';
+import 'package:epidemica_epigames/src/game_state.dart';
+import 'package:epidemica_epigames/src/rules.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+/// Reading the state document onto the screen.
+///
+/// The app's whole job. Every case here is a way of showing a participant something the server did
+/// not say — the failure that matters most, because it is invisible to the server and completely
+/// convincing to the person holding the phone.
+void main() {
+  ParticipantState document(Map<String, Object?> state, {DateTime? asOf}) => ParticipantState(
+    stateVersion: '1.0',
+    studyId: 'c0badf00-1111-4222-8333-444455556666',
+    subject: 'alice-0001',
+    stateUri: 'https://schemas.epidemica.info/state/epigame/1.0.0.json',
+    revision: 3,
+    asOf: asOf ?? DateTime.now().toUtc(),
+    state: state,
+  );
+
+  const healthy = {
+    'day': 3,
+    'days_total': 7,
+    'epi_state': 'susceptible',
+    'points': 12,
+    'total_cases': 5,
+    'population': 60,
+  };
+
+  group('before the first update', () {
+    test('nothing is invented', () {
+      final game = GameState.from(null);
+
+      // A synthesised "you are healthy" is indistinguishable on screen from a measured one, and a
+      // participant would act on it.
+      expect(game.hasState, isFalse);
+      expect(game.stateLabel, 'Waiting for your first update');
+      expect(game.protected, isFalse);
+    });
+  });
+
+  group('the colour', () {
+    test('each state has its own', () {
+      Color colourFor(String state) =>
+          GameState.from(document({...healthy, 'epi_state': state})).colour;
+
+      final colours = {
+        for (final s in ['susceptible', 'infected', 'recovered', 'dead']) s: colourFor(s),
+      };
+
+      // The screen is read at arm's length in one glance; two states sharing a colour would be a
+      // participant misreading their own situation.
+      expect(colours.values.toSet().length, 4);
+      expect(colourFor('dead'), Colors.black);
+    });
+
+    test('an unrecognised state does not borrow a meaningful colour', () {
+      final game = GameState.from(document({...healthy, 'epi_state': 'exposed'}));
+
+      expect(game.colour, isNot(GameState.from(document(healthy)).colour));
+      expect(game.stateLabel, 'Waiting for your first update');
+    });
+  });
+
+  group('protection', () {
+    test('a chosen protection can be released', () {
+      final game = GameState.from(document({...healthy, 'protection_source': 'chosen'}));
+
+      expect(game.protected, isTrue);
+      expect(game.protectionForced, isFalse);
+    });
+
+    test('protection from a phone that stopped sensing cannot be released', () {
+      final game = GameState.from(document({...healthy, 'protection_source': 'not_sensing'}));
+
+      // Offering a button that cannot work would be worse than offering none: the participant
+      // would believe they had turned something off.
+      expect(game.protected, isTrue);
+      expect(game.protectionForced, isTrue);
+    });
+
+    test('no protection source means unprotected', () {
+      expect(GameState.from(document(healthy)).protected, isFalse);
+    });
+  });
+
+  group('staleness', () {
+    test('the age of the computation is stated, not implied', () {
+      final game = GameState.from(
+        document(healthy, asOf: DateTime.now().toUtc().subtract(const Duration(hours: 20))),
+      );
+
+      // The screen is a daily computation. An interface that looks live claims a freshness it
+      // does not have.
+      expect(game.freshness, contains('20 h ago'));
+    });
+
+    test('a fresh computation says so in minutes', () {
+      final game = GameState.from(
+        document(healthy, asOf: DateTime.now().toUtc().subtract(const Duration(minutes: 5))),
+      );
+
+      expect(game.freshness, contains('5 min ago'));
+    });
+  });
+
+  group('the settlement', () {
+    test('is read straight from the document', () {
+      final game = GameState.from(
+        document({
+          ...healthy,
+          'settlement': {
+            'day': 2,
+            'opening': 5,
+            'closing': 12,
+            'lines': [
+              {'reason': 'healthy', 'points': 2},
+              {'reason': 'contacts', 'points': 5, 'count': 1},
+            ],
+          },
+        }),
+      );
+
+      expect(game.settlement!.opening, 5);
+      expect(game.settlement!.closing, 12);
+      expect(game.settlement!.lines.length, 2);
+    });
+
+    test('a withheld day explains itself rather than showing a gap', () {
+      const line = SettlementLine('not_sensing', 0);
+
+      expect(GameState.describe(line), contains('not sensing'));
+    });
+
+    test('a late contact is described as such', () {
+      expect(GameState.describe(const SettlementLine('carried_over', 5, count: 1)),
+          contains('late'));
+    });
+
+    test('one contact is singular and two are plural', () {
+      expect(GameState.describe(const SettlementLine('contacts', 5, count: 1)), '1 contact');
+      expect(GameState.describe(const SettlementLine('contacts', 10, count: 2)), '2 contacts');
+    });
+  });
+
+  group('progress', () {
+    test('the day is shown against the length of the study', () {
+      expect(GameState.from(document(healthy)).dayLabel, 'Day 3 of 7');
+    });
+
+    test('the aggregate is the population, not the enrolment', () {
+      final game = GameState.from(document(healthy));
+
+      // `population` includes the simulated participants, which is why the information screen has
+      // to disclose them: the number would otherwise be quietly wrong.
+      expect(game.population, 60);
+      expect(game.totalCases, 5);
+    });
+  });
+}

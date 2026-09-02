@@ -1,9 +1,9 @@
 import 'dart:async';
 
+import 'package:epidemica_core/epidemica_core.dart';
+import 'package:epidemica_proximity_module/epidemica_proximity_module.dart';
 import 'package:flutter/material.dart';
 
-import 'permissions.dart';
-import 'study_controller.dart';
 
 class EpidemicaApp extends StatelessWidget {
   const EpidemicaApp({required this.controller, super.key});

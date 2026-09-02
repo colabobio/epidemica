@@ -148,7 +148,7 @@ Projections.rebuild_contacts(study_id)   # from scratch, after changing the logi
 ## Getting data out
 
 Today, retrieval is SQL against Postgres — the `observations` table for the record, `contacts` for
-the analysis-shaped view. `deploy/local/README.md` has worked queries for checking a run.
+the analysis-shaped view. `deploy/contactlog/README.md` has worked queries for checking a run.
 
 The path onward is `analysis/`, which validates exported observations against the same contracts the
 server used, and `models/`, which loads a contact network into the Starsim bridge. That round trip is

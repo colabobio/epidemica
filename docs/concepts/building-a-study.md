@@ -71,7 +71,7 @@ exactly what will be served. That hash is stamped on every observation the study
 dataset always says which configuration produced it — and changing the bundle changes the hash,
 which makes a mid-study configuration change visible in the data rather than silent.
 
-For a local run, [`deploy/local/up.sh`](../../deploy/local/up.sh) does the database, the migration,
+For a local run, [`deploy/contactlog/up.sh`](../../deploy/contactlog/up.sh) does the database, the migration,
 the registration and the server in one command.
 
 ### 3. Participants join

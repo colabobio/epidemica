@@ -54,7 +54,7 @@ defmodule EpidemicaServer.Epigame do
           {subject, Rules.settle(pars, facts)}
         end)
 
-      write(study_id, day, settlements, tick, pars, shown, chosen, observed, now)
+      write(study_id, day, settlements, tick, study, shown, chosen, observed, now)
     end
   end
 
@@ -295,7 +295,7 @@ defmodule EpidemicaServer.Epigame do
     |> MapSet.new()
   end
 
-  defp write(study_id, day, settlements, tick, pars, shown, chosen, observed, now) do
+  defp write(study_id, day, settlements, tick, study, shown, chosen, observed, now) do
     Repo.transaction(fn ->
       Enum.each(settlements, fn {subject, settlement} ->
         entry =
@@ -312,7 +312,7 @@ defmodule EpidemicaServer.Epigame do
 
         case entry do
           {:ok, _} ->
-            publish(study_id, subject, day, settlement, tick, pars, shown, chosen, observed)
+            publish(study_id, subject, day, settlement, tick, study, shown, chosen, observed)
 
           {:error, changeset} ->
             Repo.rollback(reason_for(changeset))
@@ -329,10 +329,11 @@ defmodule EpidemicaServer.Epigame do
       else: {:invalid_settlement, errors}
   end
 
-  defp publish(study_id, subject, day, settlement, tick, pars, shown, chosen, observed) do
+  defp publish(study_id, subject, day, settlement, tick, study, shown, chosen, observed) do
     state = %{
       "day" => day,
-      "days_total" => Map.get(pars, "days_total", 7),
+      # How long the game lasts is a property of the study's schedule, not of its economics.
+      "days_total" => Studies.scheduled_days(study) || day,
       "epi_state" => current_state(tick, subject, shown),
       "points" => settlement.closing,
       "protection_source" => protection_source(subject, chosen, observed),

@@ -4,7 +4,7 @@ Everything needed for the M1 acceptance run: five devices in one room for one ho
 contact network in Postgres.
 
 ```sh
-deploy/local/up.sh
+deploy/contactlog/up.sh
 ```
 
 That starts PostgreSQL if it is not already running, migrates, registers

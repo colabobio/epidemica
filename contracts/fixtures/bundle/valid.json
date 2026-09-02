@@ -134,5 +134,44 @@
         "engine": "epigame"
       }
     }
+  },
+  {
+    "case": "a study with a fixed start and length",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+      "title": "Epigame seven-day",
+      "modules": {
+        "proximity": {}
+      },
+      "schedule": {
+        "starts_at": "2026-09-07T06:00:00Z",
+        "days": 7
+      },
+      "twin": {
+        "engine": "starsim",
+        "state_uri": "https://schemas.epidemica.info/state/epigame/1.0.0.json",
+        "population": 50
+      },
+      "rules": {
+        "engine": "epigame"
+      }
+    }
+  },
+  {
+    "case": "a one-day study",
+    "why": "The shortest thing that can still be a study; the boundary is worth admitting explicitly.",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff",
+      "title": "Single day",
+      "modules": {
+        "proximity": {}
+      },
+      "schedule": {
+        "starts_at": "2026-09-07T00:00:00Z",
+        "days": 1
+      }
+    }
   }
 ]

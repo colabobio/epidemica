@@ -1,0 +1,77 @@
+{
+  "bundle_version": "1.0",
+  "study_id": "e9160a7e-0007-4a11-8b22-c3d4e5f60007",
+  "title": "Epigame: seven days",
+  "description": "A seven-day game about how an infection moves through a group. Your phone records a random code for each nearby participant and how close they were, nothing else. It does not record where you are. Some of the people in the game are simulated, so that a small group still produces an outbreak worth playing; the information screen explains which parts are real.",
+  "join_code": "EPIGAME-7",
+  "modules": {
+    "proximity": {
+      "on_device": {
+        "max_episode_seconds": 900,
+        "max_gap_seconds": 600,
+        "sample_credit_seconds": 90,
+        "dropout_threshold_seconds": 75,
+        "include_rssi": true,
+        "include_min_distance": true,
+        "include_pair_key": true,
+        "include_device_class": true
+      },
+      "upload": {
+        "min_duration_seconds": 60,
+        "min_sample_count": 3
+      }
+    }
+  },
+  "sync": {
+    "min_interval_seconds": 900
+  },
+  "health": {
+    "enabled": true,
+    "interval_seconds": 3600
+  },
+  "schedule": {
+    "starts_at": "2026-09-07T06:00:00Z",
+    "days": 7
+  },
+  "twin": {
+    "engine": "starsim",
+    "state_uri": "https://schemas.epidemica.info/state/epigame/1.0.0.json",
+    "tick_interval_seconds": 86400,
+    "population": 60,
+    "pars": {
+      "diseases": {
+        "type": "sir",
+        "beta": 0.35,
+        "dur_inf_days": 5,
+        "dur_inf_std_days": 1.5
+      },
+      "virtual": {
+        "contacts_per_day": 6,
+        "band_seconds": {
+          "immediate": 300,
+          "close": 900,
+          "medium": 600,
+          "far": 0
+        }
+      },
+      "protection": {
+        "efficacy": 1.0,
+        "blocks_transmission": true
+      }
+    }
+  },
+  "rules": {
+    "engine": "epigame",
+    "pars": {
+      "healthy_points": 2,
+      "infected_points": 0,
+      "protection_cost": 1,
+      "contact_points": 5,
+      "contact_min_seconds": 600,
+      "contact_cooldown_days": 1,
+      "contact_points_while_infected": false,
+      "protection_window_seconds": 86400,
+      "carry_over_days": 3
+    }
+  }
+}

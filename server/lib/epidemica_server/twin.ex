@@ -29,6 +29,7 @@ defmodule EpidemicaServer.Twin do
   def run_tick(study_id, day, opts \\ []) do
     with {:ok, study} <- fetch_study(study_id),
          {:ok, twin} <- twin_block(study),
+         :ok <- ensure_in_schedule(study, day),
          :ok <- ensure_not_run(study_id, day) do
       {period_start, period_end} = period(study, twin, day, opts)
       received_before = Keyword.get(opts, :received_before, DateTime.utc_now())
@@ -108,9 +109,23 @@ defmodule EpidemicaServer.Twin do
     end
   end
 
+  # A study ends. Running past its last day would keep an epidemic going after participants had been
+  # shown a final score, and running before day one would score a game nobody had started.
+  defp ensure_in_schedule(study, day) do
+    days = Studies.scheduled_days(study)
+
+    cond do
+      day < 1 -> {:error, :before_study_start}
+      days != nil and day > days -> {:error, :after_study_end}
+      true -> :ok
+    end
+  end
+
+  # Anchored on the declared start, not on when the study happened to be registered: re-registering
+  # a bundle must not move a boundary that participants' days are numbered from.
   defp period(study, twin, day, opts) do
     interval = Map.get(twin, "tick_interval_seconds", @default_interval)
-    anchor = Keyword.get(opts, :anchor, study.inserted_at)
+    anchor = Keyword.get(opts, :anchor) || Studies.starts_at(study) || study.inserted_at
     start = DateTime.add(anchor, (day - 1) * interval, :second)
     {start, DateTime.add(start, interval, :second)}
   end
