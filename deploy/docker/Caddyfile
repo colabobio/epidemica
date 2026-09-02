@@ -1,0 +1,7 @@
+# Automatic HTTPS from Let's Encrypt. Point PHX_HOST at a real DNS name that resolves to this host
+# before starting, or certificate issuance fails and the server is reachable only over plain HTTP —
+# which the phones will refuse.
+{$PHX_HOST} {
+	encode gzip
+	reverse_proxy server:4000
+}

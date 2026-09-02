@@ -13,10 +13,10 @@
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=../common.sh
-source "$here/../common.sh"
+# shellcheck source=../../common.sh
+source "$here/../../common.sh"
 
-repo="$(cd "$here/../.." && pwd)"
+repo="$(cd "$here/../../.." && pwd)"
 bundle="${BUNDLE:-$repo/studies/epigame7/bundle.json}"
 
 if [[ -n "${TODAY:-}" ]]; then

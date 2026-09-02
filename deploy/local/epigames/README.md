@@ -8,7 +8,7 @@ TODAY=1 deploy/epigames/up.sh
 ```
 
 That starts PostgreSQL, migrates, checks the Starsim environment, registers
-[`studies/epigame7`](../../studies/epigame7) starting at the top of the current hour, prints a join
+[`studies/epigame7`](../../../studies/epigame7) starting at the top of the current hour, prints a join
 code, and serves on this machine's LAN address. Then:
 
 ```sh

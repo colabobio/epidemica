@@ -20,6 +20,21 @@ if System.get_env("PHX_SERVER") do
   config :epidemica_server, EpidemicaServerWeb.Endpoint, server: true
 end
 
+# The twin shells out to Python, and in a release the models directory is nowhere near where it
+# sits in the repository. Naming the interpreter explicitly also keeps `uv` off the tick path, so a
+# tick cannot fail because a dependency resolver decided to check the network.
+twin =
+  [
+    models_dir: System.get_env("MODELS_DIR"),
+    command: System.get_env("TWIN_COMMAND"),
+    args: System.get_env("TWIN_ARGS") |> then(&(&1 && String.split(&1)))
+  ]
+  |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+
+if twin != [] do
+  config :epidemica_server, :twin, twin
+end
+
 if config_env() == :prod do
   database_url =
     System.get_env("DATABASE_URL") ||

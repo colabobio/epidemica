@@ -1,0 +1,56 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: epidemica
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: epidemica_server
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U epidemica"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  server:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    image: epidemica-server:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: ecto://epidemica:${POSTGRES_PASSWORD}@db/epidemica_server
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE:?set SECRET_KEY_BASE in .env}
+      # The absolute URL handed to devices inside protocol_url. Wrong here and enrolment succeeds
+      # while the bundle fetch fails, with nothing logged server-side.
+      PHX_HOST: ${PHX_HOST:?set PHX_HOST in .env}
+      PORT: 4000
+    expose:
+      - "4000"
+
+  # Terminates TLS and obtains a certificate automatically. The server speaks plain HTTP behind it;
+  # phones will not talk to anything else, because both platforms block cleartext by default.
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - server
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      PHX_HOST: ${PHX_HOST}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+      - caddyconfig:/config
+
+volumes:
+  pgdata:
+  caddydata:
+  caddyconfig:

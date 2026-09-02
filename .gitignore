@@ -21,3 +21,7 @@ packages/*/pubspec.lock
 # here: it pins Herald's exact revision, which is the SPM equivalent of a lockfile.
 .build/
 .swiftpm/
+
+# Deployment secrets. The .env.example templates are tracked; a filled-in copy never is.
+.env
+!.env.example

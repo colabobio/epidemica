@@ -8,7 +8,7 @@ deploy/contactlog/up.sh
 ```
 
 That starts PostgreSQL if it is not already running, migrates, registers
-[`studies/contactlog`](../../studies/contactlog), prints a join code, and serves on this machine's
+[`studies/contactlog`](../../../studies/contactlog), prints a join code, and serves on this machine's
 LAN address. Then, in another terminal:
 
 ```sh

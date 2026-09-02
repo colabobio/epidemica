@@ -57,5 +57,5 @@ alternative pays an infectious player to seek company, which is the opposite of 
 
 ## Running it
 
-See [`deploy/epigames`](../../deploy/epigames). The start date committed here is a placeholder;
+See [`deploy/local/epigames`](../../deploy/local/epigames). The start date committed here is a placeholder;
 `START=` or `TODAY=1` sets a real one at registration time.
