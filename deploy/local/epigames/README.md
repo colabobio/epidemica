@@ -4,7 +4,7 @@ The seven-day game: phones in a room for a week, a simulated population making u
 a score that a participant can check.
 
 ```sh
-TODAY=1 deploy/epigames/up.sh
+TODAY=1 deploy/local/epigames/up.sh
 ```
 
 That starts PostgreSQL, migrates, checks the Starsim environment, registers
@@ -29,8 +29,8 @@ the configuration it received is the one the server meant. Rather than edit the 
 before every run, set the start on the command line:
 
 ```sh
-START=2026-09-07T06:00:00Z deploy/epigames/up.sh   # a specific instant
-TODAY=1                    deploy/epigames/up.sh   # the top of the current hour
+START=2026-09-07T06:00:00Z deploy/local/epigames/up.sh   # a specific instant
+TODAY=1                    deploy/local/epigames/up.sh   # the top of the current hour
 ```
 
 Either writes a dated copy of the bundle and registers that, so the bytes served and the hash

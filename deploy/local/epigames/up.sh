@@ -7,8 +7,8 @@
 # there is no day 8. START= overrides it, which is how you run the game today instead of on the
 # date committed to the repository.
 #
-#   START=2026-09-07T06:00:00Z deploy/epigames/up.sh
-#   TODAY=1 deploy/epigames/up.sh     # start at the top of the current hour
+#   START=2026-09-07T06:00:00Z deploy/local/epigames/up.sh
+#   TODAY=1 deploy/local/epigames/up.sh     # start at the top of the current hour
 
 set -euo pipefail
 
