@@ -290,8 +290,8 @@ Identity, enrollment, token storage, outbox, sync, clock. Harvest the background
 from `th-app`'s `survey_data_sync_service.dart`; the Android 14/15 foreground-service and headless
 isolate landmines are already defused there.
 
-- [ ] Pseudonym and `device_id` generated once, persisted, and stable across restarts
-- [ ] Tokens held in platform secure storage, never in shared preferences
+- [x] Pseudonym and `device_id` generated once, persisted, and stable across restarts
+- [x] Tokens held in platform secure storage, never in shared preferences
 - [x] Outbox is SQLite in WAL mode and is **writable from a background isolate** while the main
       isolate holds a connection
 - [x] `seq` is allocated inside the same transaction as the row insert; concurrent writes from two
@@ -302,7 +302,7 @@ isolate landmines are already defused there.
 - [x] `clock_offset_ms` is recorded, and is `null` rather than `0` when no reference was available
 - [x] `rejected` observations move to a local dead-letter store and are surfaced, never silently
       deleted
-- [ ] **Enrollment checks the bundle against the module registry** and fails when the bundle names a
+- [x] **Enrollment checks the bundle against the module registry** and fails when the bundle names a
       module this binary does not embed. Silently enrolling into a study the app cannot service is
       the worst available failure: it looks successful and is only discovered at analysis, by which
       time the collection window has passed
@@ -333,6 +333,22 @@ the `AUTOINCREMENT` point were confirmed by seeding the defect and watching the 
 from the clock that orders them all, and the ingest response already carries it. The server
 timestamp is attributed to the midpoint of the exchange, so a slow field-site round trip does not
 masquerade as drift.
+
+**Identity lives in SQLite; only tokens go to secure storage.** The pseudonym and `device_id` are
+not secrets — the pseudonym is broadcast over Bluetooth — and the background isolate needs them to
+build envelopes. Secure storage is a plugin, and plugin access from a service isolate is precisely
+what fails intermittently on Android. Both are v4 UUIDs from `Random.secure()`: in a study that
+holds no other participant identifier, a guessable pseudonym *is* the failure of the privacy model.
+
+**The satisfiability check is necessarily post-enrollment.** `POST /enrollments` returns
+`protocol_url`, so the bundle cannot be fetched until the device has already enrolled. A study whose
+modules this binary lacks therefore leaves an enrollment record on the server that will never
+produce data. The client refuses to activate and stores nothing, which is the best available
+outcome, but closing the gap needs a way to withdraw — see §8.
+
+**The bundle is verified against `protocol_hash` before it is trusted**, over the served bytes
+rather than a re-encoding. That hash is stamped on every observation, so accepting a mismatch would
+label a study's whole dataset with a protocol version it was not collected under.
 
 
 ### W4 — `epidemica_server`
