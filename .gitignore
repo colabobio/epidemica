@@ -3,8 +3,15 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .DS_Store
-uv.lock
 server/_build/
 server/deps/
 server/priv/static/assets/
 *.ez
+
+# Lockfiles are committed in every language. A published dataset has to stay re-derivable
+# years later, and estimator_version only pins our own code.
+#   uv.lock, mix.lock, pubspec.lock -> tracked
+# Per-package Dart lockfiles are noise: the workspace root holds the one resolution.
+.dart_tool/
+build/
+packages/*/pubspec.lock

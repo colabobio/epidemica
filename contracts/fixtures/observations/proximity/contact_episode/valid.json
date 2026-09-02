@@ -3,20 +3,32 @@
     "case": "typical episode with contact across several distance bands",
     "instance": {
       "peer": "c9e2f1a0-6b3d-4c88-9a71-2f3e4d5c6b7a",
-      "pair_key": "3f5a9c1e7b2d4860a1c3e5f7b9d0e2f4a6c8b0d2e4f6a8c0b2d4e6f8a0c2e4f6",
+      "pair_key": "6e941a8a038aff5a6f68eb18b7910bb21c71e8df35c95df51e7e791bbbefe162",
       "started_at": "2026-08-11T14:03:22.481Z",
       "ended_at": "2026-08-11T14:10:22.481Z",
-      "band_seconds": { "immediate": 60, "close": 240, "medium": 120, "far": 0 },
-      "band_edges_m": [1.0, 2.0, 5.0],
+      "band_seconds": {
+        "immediate": 60,
+        "close": 240,
+        "medium": 120,
+        "far": 0
+      },
+      "band_edges_m": [
+        1.0,
+        2.0,
+        5.0
+      ],
       "min_distance_m": 0.5,
       "sample_count": 14,
       "gap_count": 1,
-      "rssi": { "median": -62.4, "min": -48, "max": -91 },
+      "rssi": {
+        "median": -75.5,
+        "min": -85,
+        "max": -60
+      },
       "observer_device_class": "ios",
       "peer_device_class": "android",
       "estimator": "coarse_distance",
-      "estimator_version": "2.0.0",
-      "truncated": false
+      "estimator_version": "2.0.0"
     }
   },
   {
@@ -25,8 +37,17 @@
       "peer": "c9e2f1a0-6b3d-4c88-9a71-2f3e4d5c6b7a",
       "started_at": "2026-08-11T14:03:22Z",
       "ended_at": "2026-08-11T14:04:22Z",
-      "band_seconds": { "immediate": 0, "close": 0, "medium": 60, "far": 0 },
-      "band_edges_m": [1.0, 2.0, 5.0],
+      "band_seconds": {
+        "immediate": 0,
+        "close": 0,
+        "medium": 60,
+        "far": 0
+      },
+      "band_edges_m": [
+        1.0,
+        2.0,
+        5.0
+      ],
       "sample_count": 2,
       "estimator": "coarse_distance",
       "estimator_version": "2.0.0"
@@ -36,11 +57,29 @@
     "case": "truncated at the app's maximum episode length",
     "instance": {
       "peer": "c9e2f1a0-6b3d-4c88-9a71-2f3e4d5c6b7a",
+      "pair_key": "6e941a8a038aff5a6f68eb18b7910bb21c71e8df35c95df51e7e791bbbefe162",
       "started_at": "2026-08-11T14:00:00Z",
       "ended_at": "2026-08-11T14:15:00Z",
-      "band_seconds": { "immediate": 300, "close": 600, "medium": 0, "far": 0 },
-      "band_edges_m": [1.0, 2.0, 5.0],
+      "band_seconds": {
+        "immediate": 300,
+        "close": 600,
+        "medium": 0,
+        "far": 0
+      },
+      "band_edges_m": [
+        1.0,
+        2.0,
+        5.0
+      ],
+      "min_distance_m": 0.5,
       "sample_count": 30,
+      "rssi": {
+        "median": -60,
+        "min": -60,
+        "max": -50
+      },
+      "observer_device_class": "ios",
+      "peer_device_class": "ios",
       "estimator": "coarse_distance",
       "estimator_version": "2.0.0",
       "truncated": true
@@ -52,8 +91,73 @@
       "peer": "c9e2f1a0-6b3d-4c88-9a71-2f3e4d5c6b7a",
       "started_at": "2026-08-11T14:03:22Z",
       "ended_at": "2026-08-11T14:05:22Z",
-      "band_seconds": { "immediate": 0, "close": 120, "medium": 0, "far": 0 },
-      "band_edges_m": [1.0, 2.0, 5.0],
+      "band_seconds": {
+        "immediate": 0,
+        "close": 120,
+        "medium": 0,
+        "far": 0
+      },
+      "band_edges_m": [
+        1.0,
+        2.0,
+        5.0
+      ],
+      "sample_count": 4,
+      "observer_device_class": "ios",
+      "peer_device_class": null,
+      "estimator": "coarse_distance",
+      "estimator_version": "2.0.0"
+    }
+  },
+  {
+    "case": "dropout long enough that observation time is lost",
+    "instance": {
+      "peer": "c9e2f1a0-6b3d-4c88-9a71-2f3e4d5c6b7a",
+      "pair_key": "6e941a8a038aff5a6f68eb18b7910bb21c71e8df35c95df51e7e791bbbefe162",
+      "started_at": "2026-08-11T09:00:00Z",
+      "ended_at": "2026-08-11T09:07:00Z",
+      "band_seconds": {
+        "immediate": 0,
+        "close": 210,
+        "medium": 0,
+        "far": 0
+      },
+      "band_edges_m": [
+        1.0,
+        2.0,
+        5.0
+      ],
+      "min_distance_m": 1.5,
+      "sample_count": 6,
+      "gap_count": 1,
+      "rssi": {
+        "median": -60,
+        "min": -60,
+        "max": -60
+      },
+      "observer_device_class": "android",
+      "peer_device_class": "ios",
+      "estimator": "coarse_distance",
+      "estimator_version": "2.0.0"
+    }
+  },
+  {
+    "case": "optional estimator detail sent as explicit null rather than omitted",
+    "instance": {
+      "peer": "c9e2f1a0-6b3d-4c88-9a71-2f3e4d5c6b7a",
+      "started_at": "2026-08-11T14:03:22Z",
+      "ended_at": "2026-08-11T14:05:22Z",
+      "band_seconds": {
+        "immediate": 0,
+        "close": 120,
+        "medium": 0,
+        "far": 0
+      },
+      "band_edges_m": [
+        1.0,
+        2.0,
+        5.0
+      ],
       "min_distance_m": null,
       "sample_count": 4,
       "peer_device_class": null,

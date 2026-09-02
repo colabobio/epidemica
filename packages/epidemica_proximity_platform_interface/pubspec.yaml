@@ -1,0 +1,22 @@
+name: epidemica_proximity_platform_interface
+description: >-
+  The Dart-to-native boundary for the Epidemica proximity module. Defines the detection
+  record that platform implementations emit and the interface they implement.
+version: 0.1.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.9.0
+  flutter: ">=3.29.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  meta: ^1.16.0
+  plugin_platform_interface: ^2.1.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0

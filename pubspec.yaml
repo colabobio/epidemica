@@ -1,0 +1,11 @@
+# Root of the Dart pub workspace. Not a publishable package: it exists so that every
+# Dart package in the monorepo resolves against one lockfile and one .dart_tool.
+name: epidemica_workspace
+publish_to: none
+
+environment:
+  sdk: ^3.9.0
+
+workspace:
+  - packages/epidemica_proximity_platform_interface
+  - packages/epidemica_proximity

@@ -142,22 +142,28 @@ is the unit that an app embeds at build time, declares platform requirements, ow
 contract, and is activated by the protocol bundle; the aggregator has none of those properties
 independently, and no bundle would ever enable it separately from proximity sensing.
 
-W2 therefore creates the first two of the four proximity packages. `packages/` does not exist yet,
-so this is also where the Dart workspace begins — a `melos.yaml` at the repository root, per
-ADR-0001.
+W2 therefore creates the first two of the four proximity packages. `packages/` did not exist yet, so
+this is also where the Dart workspace begins. **Native pub workspaces, not melos**: Dart 3.12 has
+workspace support in the SDK, giving one lockfile and one `.dart_tool` with no tool to install.
+Melos can be layered on later if cross-package scripting is needed.
 
 ```
-melos.yaml                                        Dart workspace, created here
+pubspec.yaml                                      workspace root, no code
 packages/
   epidemica_proximity_platform_interface/         tiny: the Dart↔native boundary
+    lib/src/device_class.dart
     lib/src/proximity_detection.dart              the record the aggregator consumes
     lib/src/proximity_platform.dart               abstract class W1 implements
   epidemica_proximity/                            the module
     lib/epidemica_proximity.dart                  public API
     lib/src/episode_aggregator.dart               ← W2's substance
+    lib/src/distance_estimator.dart               median + Kalman + threshold table
     lib/src/distance_bands.dart
+    lib/src/aggregator_config.dart                the bundle's on_device / upload blocks
+    lib/src/contact_episode.dart                  the payload
     lib/src/open_episode_store.dart               in-flight state across restarts
-    test/episode_aggregator_test.dart             ← runs in CI, no device
+    lib/src/pair_key.dart
+    test/                                         ← 34 tests, no device
   epidemica_proximity_android/                    W1
   epidemica_proximity_ios/                        W1
 ```
@@ -165,31 +171,68 @@ packages/
 Defining `ProximityDetection` in the platform interface now, rather than in the module, means W1 has
 no types to move when it arrives. The interface package is a few dozen lines.
 
-**The aggregator is a plain class**: detections in, episodes out. A thin adapter in
-`epidemica_proximity` wires it to `epidemica_core.record()`. Keeping the two separate is what makes
+**Distance estimation moved from native to Dart.** Epigames banded RSSI in Swift and Kotlin. Here
+the native layer reports `(peer, rssi, timestamp, device class)` and nothing else, and the median,
+Kalman and threshold stages are a Dart port carrying the same constants — recorded as
+`estimator: coarse_distance`, `estimator_version: 2.0.0`. This shifts work from W1 to W2, which is
+the right direction: it is the step where the measurement is actually made, and in Dart it runs in
+CI instead of on a pair of phones. It also means W1 has one fewer thing to get right twice.
+
+**The aggregator is a plain class**: detections in, episodes out, no clock and no I/O. A thin
+adapter wires it to `epidemica_core.record()` when W3 lands. Keeping the two separate is what makes
 the banding logic testable without a database, a mock, or a device.
+
+**Three time thresholds, because turning instants into durations is where this can go wrong.**
+
+| Threshold | Default | Decides |
+| --- | --- | --- |
+| `sample_credit_seconds` | 90 | The most observation time one sighting may vouch for |
+| `dropout_threshold_seconds` | 75 | A longer silence is counted in `gap_count`, lost time or not |
+| `max_gap_seconds` | 600 | A longer silence ends the encounter instead of bridging it |
+| `max_episode_seconds` | 900 | Longer encounters are cut here and marked `truncated` |
+
+`sample_credit` is the one that matters. A sighting is evidence about an instant; crediting a
+ten-minute silence as ten minutes of proximity would manufacture exactly the sustained-contact
+signal a transmission study is looking for. Separating it from `dropout_threshold` also lets the
+payload distinguish *a dropout happened* from *time was lost*, which are different reliability
+facts.
 
 **In-flight episodes are persisted.** iOS relaunches the app through BLE state restoration and
 Android kills background processes freely, so process death mid-encounter is normal rather than
 exceptional. Holding open windows only in memory would lose them — and the loss would not be random:
 it falls preferentially on *long* encounters, skewing precisely the contact-duration distribution
-the Oxford study exists to measure. Open episodes are written alongside the outbox and, on restart,
-either resumed or closed out with `truncated: true`.
+the Oxford study exists to measure. `OpenEpisodeStore` is the interface; the SQLite implementation
+comes with W3, which owns the database.
 
-- [ ] Runs entirely in CI over synthetic detection streams, with no BLE and no devices
-- [ ] Every emitted payload validates against `contact_episode/1.0.0.json`
-- [ ] Each instance in `contracts/fixtures/.../contact_episode/valid.json` is reproducible from a
+**The fixtures are now generated from aggregator runs.** `contact_episode/valid.json` was
+hand-written, which meant it described payloads the module might never emit — and one case had its
+`rssi.min` above its `rssi.max`. It is now a golden file produced by real runs and still validated
+against the schema by the Python and Elixir suites, so "everything this module emits is valid" is a
+checked statement rather than a hope. One hand-written case is kept for a shape the aggregator
+cannot produce but the schema must keep accepting: optional estimator detail sent as explicit null.
+
+- [x] Runs entirely in CI over synthetic detection streams, with no BLE and no devices
+- [x] Every emitted payload validates against `contact_episode/1.0.0.json`
+- [x] Each instance in `contracts/fixtures/.../contact_episode/valid.json` is reproducible from a
       corresponding synthetic detection stream
-- [ ] A continuous 40-minute encounter yields ≥ 3 episodes, all but the last with `truncated: true`
-- [ ] A 5-minute dropout mid-encounter yields `gap_count ≥ 1` and `observed_seconds < wall_seconds`
-- [ ] **Band seconds never sum to more than the wall-clock duration** — the aggregator must not
+- [x] A continuous 40-minute encounter yields ≥ 3 episodes, all but the last with `truncated: true`
+- [x] A 5-minute dropout mid-encounter yields `gap_count ≥ 1` and `observed_seconds < wall_seconds`
+- [x] **Band seconds never sum to more than the wall-clock duration** — the aggregator must not
       invent observation time it did not have
-- [ ] Identical detection stream produces byte-identical episodes
-- [ ] An encounter interrupted by process death is recovered from the open-episode store, not lost,
-      and is marked `truncated` if it could not be resumed
-- [ ] Aggregator behaviour is driven by the bundle's `proximity.on_device` and `proximity.upload`
+- [x] Identical detection stream produces byte-identical episodes
+- [x] An encounter interrupted by process death is recovered from the open-episode store, not lost
+- [x] Aggregator behaviour is driven by the bundle's `proximity.on_device` and `proximity.upload`
       blocks — the same binary, given different minimisation settings, produces different episodes
       without a rebuild
+
+Verified by seeding a defect: removing the `sample_credit` cap — the one change that makes the
+aggregator invent observation time — fails three independent tests, including the invariant and the
+generated fixture.
+
+Deferred to W1, where a real radio makes them answerable: whether an episode that could not be
+resumed after process death should be re-opened or closed out as `truncated`, and whether 90 s of
+sample credit is right for Herald's actual detection cadence on each platform.
+
 
 ### W3 — `epidemica_core`
 

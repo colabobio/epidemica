@@ -1,0 +1,25 @@
+name: epidemica_proximity
+description: >-
+  Bluetooth proximity module for Epidemica. Reduces a stream of peer sightings into
+  contact episodes — time spent in each distance band — and applies the study bundle's
+  minimisation rules before the episodes reach the outbox.
+version: 0.1.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.9.0
+  flutter: ">=3.29.0"
+
+dependencies:
+  crypto: ^3.0.6
+  epidemica_proximity_platform_interface:
+    path: ../epidemica_proximity_platform_interface
+  flutter:
+    sdk: flutter
+  meta: ^1.16.0
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
