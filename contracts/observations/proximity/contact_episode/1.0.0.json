@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.epidemica.info/observations/proximity/contact_episode/1.0.0.json",
+  "title": "Contact episode",
+  "description": "A period of sustained Bluetooth proximity between the observing participant and one peer, aggregated on-device. Carried as the `payload` of an Epidemica observation envelope. Raw RSSI samples are NOT uploaded by default: the on-device estimator reduces them to time-in-distance-band, which is both the epidemiologically meaningful quantity and a large reduction in volume and re-identification risk.",
+  "type": "object",
+  "required": ["peer", "started_at", "ended_at", "band_seconds", "band_edges_m", "estimator", "estimator_version", "sample_count"],
+  "additionalProperties": false,
+  "properties": {
+    "peer": {
+      "type": "string",
+      "description": "Pseudonym of the other participant. Never a device address or PII."
+    },
+    "pair_key": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "SHA-256 of the two pseudonyms sorted lexicographically and joined with a NUL byte. Lets the server reconcile the two independent recordings of the same encounter without knowing which participant is which."
+    },
+    "started_at": { "type": "string", "format": "date-time" },
+    "ended_at":   { "type": "string", "format": "date-time" },
+    "band_seconds": {
+      "type": "object",
+      "description": "Seconds of the episode spent in each distance band. This, not a mean distance, is the primary measurement: infectious dose accumulates as duration x f(distance), so a 2-minute immediate contact plus 8 minutes far is epidemiologically unlike 10 minutes at medium range, yet both average the same.",
+      "required": ["immediate", "close", "medium", "far"],
+      "additionalProperties": false,
+      "properties": {
+        "immediate": { "type": "number", "minimum": 0 },
+        "close":     { "type": "number", "minimum": 0 },
+        "medium":    { "type": "number", "minimum": 0 },
+        "far":       { "type": "number", "minimum": 0 }
+      }
+    },
+    "band_edges_m": {
+      "type": "array",
+      "description": "Upper edges in metres of the first three bands; `far` is unbounded. Recorded inline so the observation stays self-describing if the estimator's banding changes, which is what makes datasets poolable across app versions and studies.",
+      "items": { "type": "number", "exclusiveMinimum": 0 },
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "min_distance_m": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "description": "Closest estimated approach during the episode."
+    },
+    "sample_count": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Number of RSSI samples underlying the estimate. Low counts over long episodes indicate a sparse, less reliable episode."
+    },
+    "gap_count": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Number of detection dropouts bridged when merging detections into this episode. Essential for judging reliability: an episode assembled across many gaps is weaker evidence than a continuously observed one."
+    },
+    "rssi": {
+      "type": ["object", "null"],
+      "description": "Optional summary retained for estimator calibration and for the Aim 2 network-fidelity work. Omitted in minimal-collection studies.",
+      "additionalProperties": false,
+      "properties": {
+        "median": { "type": "number" },
+        "min":    { "type": "number" },
+        "max":    { "type": "number" }
+      }
+    },
+    "observer_device_class": { "$ref": "#/$defs/deviceClass" },
+    "peer_device_class":     { "$ref": "#/$defs/deviceClass" },
+    "estimator": {
+      "type": "string",
+      "description": "Identifier of the on-device distance estimator, e.g. 'coarse_distance'."
+    },
+    "estimator_version": {
+      "type": "string",
+      "description": "Semantic version of the estimator. Together with band_edges_m this makes the measurement reproducible and re-derivable."
+    },
+    "truncated": {
+      "type": "boolean",
+      "default": false,
+      "description": "True when the episode was cut at the app's maximum episode length rather than because proximity ended. Apps SHOULD split long encounters (recommended maximum 900 s) so that replay into a simulation timestep needs little temporal apportionment."
+    }
+  },
+  "$defs": {
+    "deviceClass": {
+      "type": ["string", "null"],
+      "enum": ["ios", "android", null],
+      "description": "RSSI-to-distance mapping is device-dependent, so both sides' hardware class is required to interpret or re-derive the estimate."
+    }
+  }
+}

@@ -29,7 +29,7 @@ alternatives that were rejected. Its value is mostly to whoever inherits the cod
 | [0002](0002-observation-envelope.md) | Observation Envelope as the universal ingest contract | Proposed |
 | [0003](0003-single-backend-runtime.md) | Phoenix as the single backend runtime | Proposed |
 | [0009](0009-open-source-license.md) | Open-source license selection | **Accepted** — Apache-2.0 |
-| [0012](0012-starsim-as-canonical-transmission-model.md) | Starsim as the canonical transmission model | **Proposed — pending spike** |
+| [0012](0012-starsim-as-canonical-transmission-model.md) | Starsim as the canonical transmission model | **Accepted** — Spike A passed |
 
 ## Planned, not yet drafted
 
