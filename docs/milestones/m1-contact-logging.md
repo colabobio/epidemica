@@ -111,9 +111,10 @@ Two consequences for how `apps/template` is built:
 
 ### W1 — `epidemica_proximity` (federated plugin)
 
-Lift the Herald integration out of `epigames-app` and into a real plugin: `_platform_interface`,
-`_android`, `_ios`. Swift and Kotlin move across substantially unchanged. The BLE payload is reduced
-to identity only — no `epi`, `clin`, `mod`, `strain`, `ps/pi/pr`. The plugin exposes a stream of
+Lift the Herald integration out of `epigames-app` into the platform packages created alongside W2:
+`epidemica_proximity_android` and `epidemica_proximity_ios`, against the platform interface W2
+defines. Swift and Kotlin move across substantially unchanged. The BLE payload is reduced to identity
+only — no `epi`, `clin`, `mod`, `strain`, `ps/pi/pr`. The plugin exposes a stream of
 `ProximityDetection` records (`peer`, `rssi`, `observed_at`, `peer_device_class`).
 
 - [ ] A bare example app builds and runs on both platforms with no monorepo path assumptions
@@ -132,9 +133,48 @@ to identity only — no `epi`, `clin`, `mod`, `strain`, `ps/pi/pr`. The plugin e
 
 ### W2 — Episode aggregator
 
-Pure Dart. Turns a detection stream into `contact_episode` payloads: sliding window per peer, band
-assignment by device class, gap bridging, episode capping. **This does not exist today** — Epigames
-keeps only a `Map<String,int>` of unique peers in SharedPreferences — so it is new code, not a port.
+Turns a detection stream into `contact_episode` payloads: sliding window per peer, band assignment
+by device class, gap bridging, episode capping. **This does not exist today** — Epigames keeps only
+a `Map<String,int>` of unique peers in SharedPreferences — so it is new code, not a port.
+
+**Packaging.** The aggregator is *part of* `epidemica_proximity`, not a module of its own. A module
+is the unit that an app embeds at build time, declares platform requirements, owns a payload
+contract, and is activated by the protocol bundle; the aggregator has none of those properties
+independently, and no bundle would ever enable it separately from proximity sensing.
+
+W2 therefore creates the first two of the four proximity packages. `packages/` does not exist yet,
+so this is also where the Dart workspace begins — a `melos.yaml` at the repository root, per
+ADR-0001.
+
+```
+melos.yaml                                        Dart workspace, created here
+packages/
+  epidemica_proximity_platform_interface/         tiny: the Dart↔native boundary
+    lib/src/proximity_detection.dart              the record the aggregator consumes
+    lib/src/proximity_platform.dart               abstract class W1 implements
+  epidemica_proximity/                            the module
+    lib/epidemica_proximity.dart                  public API
+    lib/src/episode_aggregator.dart               ← W2's substance
+    lib/src/distance_bands.dart
+    lib/src/open_episode_store.dart               in-flight state across restarts
+    test/episode_aggregator_test.dart             ← runs in CI, no device
+  epidemica_proximity_android/                    W1
+  epidemica_proximity_ios/                        W1
+```
+
+Defining `ProximityDetection` in the platform interface now, rather than in the module, means W1 has
+no types to move when it arrives. The interface package is a few dozen lines.
+
+**The aggregator is a plain class**: detections in, episodes out. A thin adapter in
+`epidemica_proximity` wires it to `epidemica_core.record()`. Keeping the two separate is what makes
+the banding logic testable without a database, a mock, or a device.
+
+**In-flight episodes are persisted.** iOS relaunches the app through BLE state restoration and
+Android kills background processes freely, so process death mid-encounter is normal rather than
+exceptional. Holding open windows only in memory would lose them — and the loss would not be random:
+it falls preferentially on *long* encounters, skewing precisely the contact-duration distribution
+the Oxford study exists to measure. Open episodes are written alongside the outbox and, on restart,
+either resumed or closed out with `truncated: true`.
 
 - [ ] Runs entirely in CI over synthetic detection streams, with no BLE and no devices
 - [ ] Every emitted payload validates against `contact_episode/1.0.0.json`
@@ -145,6 +185,11 @@ keeps only a `Map<String,int>` of unique peers in SharedPreferences — so it is
 - [ ] **Band seconds never sum to more than the wall-clock duration** — the aggregator must not
       invent observation time it did not have
 - [ ] Identical detection stream produces byte-identical episodes
+- [ ] An encounter interrupted by process death is recovered from the open-episode store, not lost,
+      and is marked `truncated` if it could not be resumed
+- [ ] Aggregator behaviour is driven by the bundle's `proximity.on_device` and `proximity.upload`
+      blocks — the same binary, given different minimisation settings, produces different episodes
+      without a rebuild
 
 ### W3 — `epidemica_core`
 
