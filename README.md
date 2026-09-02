@@ -61,9 +61,9 @@ Explanations of how the platform works, as opposed to why decisions were made:
 
 All of it is exercised by the fixture-driven suite in [`analysis/`](analysis/README.md).
 
-> The ingest spec assumes two decisions whose ADRs are not yet written: **ADR-0004** (REST for
-> ingest, GraphQL for query/admin) and **ADR-0005** (participant tokens replacing shared API keys).
-> The spec is the de facto record until those are drafted.
+> The ingest spec still assumes one decision whose ADR is not yet written: **ADR-0005** (participant
+> tokens replacing shared API keys). The spec sketches a bearer-token scheme but deliberately leaves
+> token lifetime and rotation policy open; it is the de facto record until that ADR is drafted.
 
 ## License
 
