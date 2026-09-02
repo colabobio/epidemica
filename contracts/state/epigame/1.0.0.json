@@ -18,9 +18,12 @@
       "description": "Which day of the game the last tick covered. Zero before the first tick has run."
     },
     "days_total": {
-      "type": "integer",
+      "type": [
+        "integer",
+        "null"
+      ],
       "minimum": 1,
-      "description": "How long the game lasts, so the app can show progress without reading the bundle again."
+      "description": "How long the game lasts, so the app can show progress without reading the bundle again. Null for a study that declares no schedule and therefore has no last day. Required but nullable rather than optional: 'this game does not end' is an answer the app has to render, and an absent field would be indistinguishable from a server that forgot."
     },
     "epi_state": {
       "enum": [

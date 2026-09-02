@@ -21,24 +21,29 @@ defmodule EpidemicaServer.EpigameTest do
   # -- fixtures ----------------------------------------------------------------------------------
 
   defp study(opts \\ []) do
-    source =
-      Jason.encode!(%{
-        "bundle_version" => "1.0",
-        "study_id" => Ecto.UUID.generate(),
-        "title" => "Epigame test",
-        "modules" => %{"proximity" => %{}},
-        "twin" => %{
-          "engine" => "starsim",
-          "state_uri" => "https://schemas.epidemica.info/state/epigame/1.0.0.json",
-          "population" => Keyword.get(opts, :population, 4)
-        },
-        "rules" => %{
-          "engine" => "epigame",
-          "pars" => Keyword.get(opts, :pars, %{})
-        }
-      })
+    protocol = %{
+      "bundle_version" => "1.0",
+      "study_id" => Ecto.UUID.generate(),
+      "title" => "Epigame test",
+      "modules" => %{"proximity" => %{}},
+      "twin" => %{
+        "engine" => "starsim",
+        "state_uri" => "https://schemas.epidemica.info/state/epigame/1.0.0.json",
+        "population" => Keyword.get(opts, :population, 4)
+      },
+      "rules" => %{
+        "engine" => "epigame",
+        "pars" => Keyword.get(opts, :pars, %{})
+      }
+    }
 
-    {:ok, study} = Studies.create_study_from_bundle("epigame", source)
+    protocol =
+      case Keyword.get(opts, :schedule, :none) do
+        :none -> protocol
+        schedule -> Map.put(protocol, "schedule", schedule)
+      end
+
+    {:ok, study} = Studies.create_study_from_bundle("epigame", Jason.encode!(protocol))
     study
   end
 
@@ -448,6 +453,53 @@ defmodule EpidemicaServer.EpigameTest do
     {:ok, _} = settle(s, 1)
 
     assert Epigame.balance(s.id, "alice-0001") == 7
+  end
+
+  # -- how long the game lasts ---------------------------------------------------------------------
+
+  describe "days_total" do
+    test "a scheduled study publishes its length" do
+      s = study(schedule: %{"starts_at" => "2026-09-02T00:00:00Z", "days" => 7})
+      participant(s, "alice-0001")
+      sensing(s, "alice-0001", 1)
+
+      tick(s, 1)
+      {:ok, _} = settle(s, 1)
+
+      {:ok, doc} = ParticipantState.fetch(s.id, "alice-0001")
+      assert doc.state["days_total"] == 7
+    end
+
+    test "an open-ended study says so rather than inventing a length" do
+      s = study()
+      participant(s, "alice-0001")
+      sensing(s, "alice-0001", 1)
+
+      tick(s, 1)
+      {:ok, _} = settle(s, 1)
+
+      {:ok, doc} = ParticipantState.fetch(s.id, "alice-0001")
+
+      # Reporting the current day as the total would tell a player on day one that the game had
+      # ended, and again on every day after that.
+      assert doc.state["days_total"] == nil
+      assert doc.state["day"] == 1
+    end
+
+    test "an open-ended study never starts reporting a length as it goes on" do
+      s = study()
+      participant(s, "alice-0001")
+      for day <- 1..3, do: sensing(s, "alice-0001", day)
+
+      for day <- 1..3 do
+        tick(s, day)
+        {:ok, _} = settle(s, day)
+      end
+
+      {:ok, doc} = ParticipantState.fetch(s.id, "alice-0001")
+      assert doc.state["days_total"] == nil
+      assert doc.state["day"] == 3
+    end
   end
 
   # -- the simulation has to know about the choice -------------------------------------------------

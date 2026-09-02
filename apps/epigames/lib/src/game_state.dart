@@ -28,7 +28,7 @@ class GameState {
         points: 0,
         epiState: 'unknown',
         day: 0,
-        daysTotal: 0,
+        daysTotal: null,
         totalCases: 0,
         population: 0,
         protectionSource: null,
@@ -45,7 +45,7 @@ class GameState {
       points: state['points'] as int? ?? 0,
       epiState: state['epi_state'] as String? ?? 'unknown',
       day: state['day'] as int? ?? 0,
-      daysTotal: state['days_total'] as int? ?? 0,
+      daysTotal: state['days_total'] as int?,
       totalCases: state['total_cases'] as int? ?? 0,
       population: state['population'] as int? ?? 0,
       protectionSource: state['protection_source'] as String?,
@@ -60,7 +60,10 @@ class GameState {
   final int points;
   final String epiState;
   final int day;
-  final int daysTotal;
+
+  /// How many days the game lasts, or null for a study that declares no schedule and has no last
+  /// day. Null is a real answer here, not a missing one.
+  final int? daysTotal;
   final int totalCases;
   final int population;
   final String? protectionSource;
@@ -75,8 +78,9 @@ class GameState {
   /// Whether the last day has been settled.
   ///
   /// Read from the document rather than from the device's clock: the game is over when the server
-  /// says the final day has been scored, not when a phone thinks the week is up.
-  bool get finished => hasState && daysTotal > 0 && day >= daysTotal;
+  /// says the final day has been scored, not when a phone thinks the week is up. A study with no
+  /// last day never finishes, and must never be shown a final score.
+  bool get finished => hasState && daysTotal != null && day >= daysTotal!;
 
   /// The whole screen is this colour. One glance has to answer "how am I doing".
   Color get colour => switch (epiState) {
@@ -95,9 +99,11 @@ class GameState {
     _ => 'Waiting for your first update',
   };
 
-  String get dayLabel => hasState
-      ? (finished ? 'Finished · $daysTotal days' : 'Day $day of $daysTotal')
-      : 'Not started';
+  String get dayLabel {
+    if (!hasState) return 'Not started';
+    if (finished) return 'Finished · $daysTotal days';
+    return daysTotal == null ? 'Day $day' : 'Day $day of $daysTotal';
+  }
   /// How old the computation is, said plainly.
   String get freshness {
     if (asOf == null) return '';

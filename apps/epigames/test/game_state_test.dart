@@ -183,13 +183,25 @@ void main() {
     });
 
     test('a study with no declared length never reports finished', () {
-      final game = GameState.from({...healthy, 'days_total': 0}.let(document));
+      // An open-ended study has no last day. Inferring one from the current day would show a
+      // player GAME OVER on their first morning, every morning.
+      final game = GameState.from(document({...healthy, 'days_total': null}));
 
       expect(game.finished, isFalse);
+      expect(game.dayLabel, 'Day 3');
+    });
+
+    test('an open-ended study still shows progress, just without a total', () {
+      final game = GameState.from(document({...healthy, 'day': 40, 'days_total': null}));
+
+      expect(game.finished, isFalse);
+      expect(game.dayLabel, 'Day 40');
+    });
+
+    test('a missing total is treated as open-ended rather than as day zero', () {
+      final state = Map<String, Object?>.from(healthy)..remove('days_total');
+
+      expect(GameState.from(document(state)).finished, isFalse);
     });
   });
-}
-
-extension<T> on T {
-  R let<R>(R Function(T) f) => f(this);
 }

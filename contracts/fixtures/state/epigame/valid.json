@@ -200,5 +200,17 @@
       "points": 0,
       "settlement": null
     }
+  },
+  {
+    "case": "an open-ended study, which has no last day",
+    "why": "A study with no schedule runs until it is stopped. Reporting the current day as the total would tell a player on day one that the game had ended.",
+    "instance": {
+      "day": 12,
+      "days_total": null,
+      "epi_state": "susceptible",
+      "points": 30,
+      "total_cases": 8,
+      "population": 60
+    }
   }
 ]

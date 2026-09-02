@@ -161,5 +161,15 @@
         ]
       }
     }
+  },
+  {
+    "case": "a game said to last zero days",
+    "why": "Null means open-ended; zero would mean a game that ended before it began, which nothing can render.",
+    "instance": {
+      "day": 1,
+      "days_total": 0,
+      "epi_state": "susceptible",
+      "points": 2
+    }
   }
 ]

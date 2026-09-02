@@ -332,8 +332,9 @@ defmodule EpidemicaServer.Epigame do
   defp publish(study_id, subject, day, settlement, tick, study, shown, chosen, observed) do
     state = %{
       "day" => day,
-      # How long the game lasts is a property of the study's schedule, not of its economics.
-      "days_total" => Studies.scheduled_days(study) || day,
+      # Null when the study declares no schedule. Reporting the current day as the total would
+      # tell a player on day one that the game had ended.
+      "days_total" => Studies.scheduled_days(study),
       "epi_state" => current_state(tick, subject, shown),
       "points" => settlement.closing,
       "protection_source" => protection_source(subject, chosen, observed),
