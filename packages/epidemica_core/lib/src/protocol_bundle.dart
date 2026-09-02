@@ -71,4 +71,22 @@ class ProtocolBundle {
     final seconds = ((raw['sync'] as Map?)?['min_interval_seconds'] as num?)?.toInt();
     return seconds == null ? null : Duration(seconds: seconds);
   }
+
+  Map<String, Object?> get _health =>
+      (raw['health'] as Map?)?.cast<String, Object?>() ?? const {};
+
+  /// Whether devices report when their modules were actually collecting.
+  ///
+  /// On unless the study says otherwise: a dataset that cannot tell "met nobody" from "was not
+  /// listening" is defective whether or not anyone notices, and the cost is one observation per
+  /// module per interval.
+  bool get healthReportingEnabled => _health['enabled'] as bool? ?? true;
+
+  Duration get healthInterval {
+    final seconds = (_health['interval_seconds'] as num?)?.toInt();
+    return seconds == null ? const Duration(hours: 1) : Duration(seconds: seconds);
+  }
+
+  /// The server-side model this study runs, if any. Absent for studies that only collect.
+  Map<String, Object?>? get twin => (raw['twin'] as Map?)?.cast<String, Object?>();
 }

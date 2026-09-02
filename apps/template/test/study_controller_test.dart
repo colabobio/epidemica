@@ -33,11 +33,13 @@ const _studyId = 'c0badf00-1111-4222-8333-444455556666';
 String bundleJson({
   required Map<String, Object?> modules,
   String title = 'Contact logging pilot',
+  Map<String, Object?>? health,
 }) => jsonEncode({
   'bundle_version': '1.0',
   'study_id': _studyId,
   'title': title,
   'modules': modules,
+  'health': ?health,
 });
 
 void main() {
@@ -289,6 +291,32 @@ void main() {
 
       expect(db.db.select('SELECT * FROM outbox'), isEmpty);
       expect(db.db.select('SELECT * FROM dead_letter'), isEmpty);
+    });
+  });
+
+  group('a study gets only what its bundle asks for', () {
+    test('coverage reporting can be switched off entirely', () async {
+      final module = _FakeModule('proximity');
+      final controller = binaryWith([module], serverServing(
+        bundleJson(modules: {'proximity': {}}, health: {'enabled': false}),
+      ));
+
+      await controller.join('JOIN-1234');
+      await Future<void>.delayed(Duration.zero);
+
+      // A Tier 1 study that has no use for coverage must not be made to pay for it.
+      expect(db.db.select("SELECT * FROM outbox WHERE schema_uri LIKE '%module_status%'"), isEmpty);
+    });
+
+    test('a study with no twin never has state computed for it', () async {
+      final controller = binaryWith([_FakeModule('proximity')], serverServing(
+        bundleJson(modules: {'proximity': {}}),
+      ));
+
+      await controller.join('JOIN-1234');
+
+      // Absent, not disabled: nothing on either side is asked to opt out of a simulation.
+      expect(controller.enrollment!.bundle.twin, isNull);
     });
   });
 }

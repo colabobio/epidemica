@@ -54,6 +54,51 @@
           "description": "Lower bound between sync attempts. A floor rather than a schedule: the operating system decides when background work actually runs, and the exactly-once guarantees do not depend on it being punctual."
         }
       }
+    },
+    "health": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Whether devices report when their modules were actually collecting. On by default, because a study that cannot tell 'this participant met nobody' from 'we were not listening' has a defective dataset whether or not it notices. A study with no use for coverage can switch it off and save the observations.",
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "interval_seconds": {
+          "type": "integer",
+          "minimum": 60,
+          "description": "How often a device closes a coverage window. Shorter windows locate a gap more precisely and cost one observation per module per interval."
+        }
+      }
+    },
+    "twin": {
+      "type": "object",
+      "required": ["engine", "state_uri"],
+      "additionalProperties": false,
+      "description": "A model the server runs against this study's data, whose output reaches participants through the state channel. Absent for studies that only collect: a study without this block is never simulated and never has participant state computed for it.",
+      "properties": {
+        "engine": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{1,31}$",
+          "description": "Which runtime evaluates the model, e.g. `starsim`. A server that does not implement it must refuse the study rather than silently run nothing."
+        },
+        "state_uri": {
+          "type": "string",
+          "pattern": "^https?://",
+          "description": "Contract governing the state documents this model produces. What ties a twin to the state channel without either knowing about the other."
+        },
+        "tick_interval_seconds": {
+          "type": "integer",
+          "minimum": 60,
+          "description": "How often the model advances. Each tick is immutable once run, so this also sets how long a participant waits to learn what happened."
+        },
+        "population": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Total simulated population, enrolled participants included. Where it exceeds enrolment the remainder are virtual participants, whose presence the study must disclose."
+        },
+        "pars": {
+          "type": "object",
+          "description": "Engine-specific parameters, opaque to the platform. Interpreted only by the named engine."
+        }
+      }
     }
   }
 }

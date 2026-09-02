@@ -158,11 +158,29 @@ second `CBCentralManager`.
 
 ### W3 — Contact reconciliation
 
-- [ ] A daily reconciled network per study: pair, union-of-intervals duration, band seconds, and
+- [x] A reconciled network per study period: pair, union-of-intervals duration, band seconds, and
       whether both sides reported
-- [ ] Deterministic — the same observations always produce the same network
-- [ ] Rebuildable from observations, like every other projection
-- [ ] Late-arriving observations enter the projection but never a tick that has already run
+- [x] Deterministic — the same observations always produce the same network, whichever device
+      uploaded first, and ties are broken by a stated rule rather than by map ordering
+- [x] Computed from observations, so it is rebuildable like every other projection
+- [x] Late-arriving observations enter the record but never a network already computed, via a
+      `received_before` cutoff the tick supplies
+
+**Contact happened when either side saw it.** Intervals are unioned, never summed or intersected.
+Summing double-counts the period both devices observed — twelve minutes plus an overlapping seven
+becomes nineteen — and intersecting discards real contact every time one phone was asleep. Both
+mistakes are invisible downstream: one inflates every transmission weight, the other quietly
+deletes pairs.
+
+**Distance comes from the better-observed side, unmodified.** The union says how long contact
+lasted; the side that watched more of it says how close. Scaling that side's distribution up to the
+unioned duration was considered and rejected: it would assert distance information for a period no
+device measured. `band_seconds` may therefore sum to less than `seconds`, which is not a defect but
+the honest statement that we know contact occurred for longer than we know how close it was — and
+it makes `sum(band_seconds) <= seconds` hold by construction rather than by arithmetic.
+
+**One-sided reports are kept and flagged.** A study that later wants to be strict can filter on
+`both_reported`; a study that discarded them cannot get them back.
 
 ### W4 — The twin runtime
 

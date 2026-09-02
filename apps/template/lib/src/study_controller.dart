@@ -134,11 +134,13 @@ class StudyController extends ChangeNotifier {
     }
     _state = _running.isEmpty ? StudyState.enrolled : StudyState.collecting;
 
-    if (_running.isNotEmpty) {
+    if (_running.isNotEmpty && enrollment.bundle.healthReportingEnabled) {
       // Coverage has to be stated positively: a study that infers exposure from an absence of
-      // contacts cannot otherwise tell "met nobody" from "was not listening".
+      // contacts cannot otherwise tell "met nobody" from "was not listening". Declared in the
+      // bundle, so a study that has no use for it pays nothing.
       _health = ModuleHealthReporter(
         modules: [for (final m in modules) if (_running.contains(m.id)) m],
+        interval: enrollment.bundle.healthInterval,
         recorderFor: (moduleId) => recorderFor(
           outbox: _outbox,
           enrollment: enrollment,

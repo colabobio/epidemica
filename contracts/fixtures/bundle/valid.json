@@ -7,8 +7,12 @@
       "title": "Contact logging pilot",
       "modules": {
         "proximity": {
-          "on_device": { "max_episode_seconds": 900 },
-          "upload": { "min_duration_seconds": 60 }
+          "on_device": {
+            "max_episode_seconds": 900
+          },
+          "upload": {
+            "min_duration_seconds": 60
+          }
         }
       }
     }
@@ -22,10 +26,18 @@
       "description": "Collects proximity and periodic questionnaires.",
       "join_code": "CONTACT-2026",
       "modules": {
-        "proximity": { "on_device": { "include_rssi": false } },
-        "instruments": { "schedule": "daily" }
+        "proximity": {
+          "on_device": {
+            "include_rssi": false
+          }
+        },
+        "instruments": {
+          "schedule": "daily"
+        }
       },
-      "sync": { "min_interval_seconds": 900 }
+      "sync": {
+        "min_interval_seconds": 900
+      }
     }
   },
   {
@@ -34,7 +46,54 @@
       "bundle_version": "1.0",
       "study_id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
       "title": "Defaults only",
-      "modules": { "proximity": {} }
+      "modules": {
+        "proximity": {}
+      }
+    }
+  },
+  {
+    "case": "a study that runs a server-side model and reports coverage more finely",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "c0badf00-1111-4222-8333-444455556666",
+      "title": "Epigame seven-day pilot",
+      "modules": {
+        "proximity": {},
+        "epigame": {
+          "protection_hours": 24
+        }
+      },
+      "health": {
+        "enabled": true,
+        "interval_seconds": 900
+      },
+      "twin": {
+        "engine": "starsim",
+        "state_uri": "https://schemas.epidemica.info/state/epigame/1.0.0.json",
+        "tick_interval_seconds": 86400,
+        "population": 50,
+        "pars": {
+          "diseases": {
+            "type": "sir",
+            "beta": 0.05,
+            "dur_inf": 7
+          }
+        }
+      }
+    }
+  },
+  {
+    "case": "a study that switches coverage reporting off",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+      "title": "Minimal collection",
+      "modules": {
+        "proximity": {}
+      },
+      "health": {
+        "enabled": false
+      }
     }
   }
 ]
