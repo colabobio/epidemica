@@ -1,0 +1,101 @@
+{
+  "version": "0.2.0",
+  "inputs": [
+    {
+      "id": "serverUrl",
+      "type": "promptString",
+      "description": "Server URL, including the trailing /v1/. Use your LAN address for a real device — a phone cannot reach localhost.",
+      "default": "http://10.0.2.2:4000/v1/"
+    }
+  ],
+  "configurations": [
+    {
+      "name": "template: emulator",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "cwd": "${workspaceFolder}/apps/template",
+      "toolArgs": ["--dart-define=EPIDEMICA_SERVER=http://10.0.2.2:4000/v1/"]
+    },
+    {
+      "name": "template: device",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "cwd": "${workspaceFolder}/apps/template",
+      "toolArgs": ["--dart-define=EPIDEMICA_SERVER=${input:serverUrl}"]
+    },
+    {
+      "name": "epigames: emulator",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "cwd": "${workspaceFolder}/apps/epigames",
+      "toolArgs": ["--dart-define=EPIDEMICA_SERVER=http://10.0.2.2:4000/v1/"]
+    },
+    {
+      "name": "epigames: device",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "cwd": "${workspaceFolder}/apps/epigames",
+      "toolArgs": ["--dart-define=EPIDEMICA_SERVER=${input:serverUrl}"]
+    },
+    {
+      "name": "server: phx.server",
+      "type": "mix_task",
+      "request": "launch",
+      "task": "phx.server",
+      "projectDir": "${workspaceFolder}/server"
+    },
+    {
+      "name": "server: mix test",
+      "type": "mix_task",
+      "request": "launch",
+      "task": "test",
+      "taskArgs": ["--trace"],
+      "startApps": true,
+      "projectDir": "${workspaceFolder}/server",
+      "requireFiles": ["test/**/test_helper.exs", "test/**/*_test.exs"]
+    },
+    {
+      "name": "server: mix test (current file)",
+      "type": "mix_task",
+      "request": "launch",
+      "task": "test",
+      "taskArgs": ["${relativeFile}", "--trace"],
+      "startApps": true,
+      "projectDir": "${workspaceFolder}/server",
+      "requireFiles": ["test/**/test_helper.exs", "test/**/*_test.exs"]
+    },
+    {
+      "name": "models: pytest",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["-q"],
+      "cwd": "${workspaceFolder}/models",
+      "python": "${workspaceFolder}/models/.venv/bin/python",
+      "console": "integratedTerminal",
+      "justMyCode": false
+    },
+    {
+      "name": "analysis: pytest",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["-q"],
+      "cwd": "${workspaceFolder}/analysis",
+      "python": "${workspaceFolder}/analysis/.venv/bin/python",
+      "console": "integratedTerminal",
+      "justMyCode": false
+    }
+  ],
+  "compounds": [
+    {
+      "name": "server + template",
+      "configurations": ["server: phx.server", "template: emulator"],
+      "stopAll": true
+    }
+  ]
+}

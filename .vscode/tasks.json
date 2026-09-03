@@ -1,0 +1,88 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "study: contactlog (local)",
+      "type": "shell",
+      "command": "deploy/local/contactlog/up.sh",
+      "options": { "cwd": "${workspaceFolder}" },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "panel": "dedicated" }
+    },
+    {
+      "label": "study: epigames (local, starts now)",
+      "type": "shell",
+      "command": "TODAY=1 deploy/local/epigames/up.sh",
+      "options": { "cwd": "${workspaceFolder}" },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "panel": "dedicated" }
+    },
+    {
+      "label": "test: everything",
+      "dependsOrder": "sequence",
+      "dependsOn": ["test: dart", "test: server", "test: models", "test: analysis"],
+      "problemMatcher": []
+    },
+    {
+      "label": "test: dart",
+      "type": "shell",
+      "command": "flutter analyze packages apps && flutter test",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "test: server",
+      "type": "shell",
+      "command": "mix format && mix compile --warnings-as-errors && mix test",
+      "options": { "cwd": "${workspaceFolder}/server" },
+      "problemMatcher": []
+    },
+    {
+      "label": "test: models",
+      "type": "shell",
+      "command": "uv run pytest -q",
+      "options": { "cwd": "${workspaceFolder}/models" },
+      "problemMatcher": []
+    },
+    {
+      "label": "test: analysis",
+      "type": "shell",
+      "command": "uv run pytest -q",
+      "options": { "cwd": "${workspaceFolder}/analysis" },
+      "problemMatcher": []
+    },
+    {
+      "label": "test: swift wire codec",
+      "type": "shell",
+      "command": "swift test",
+      "options": {
+        "cwd": "${workspaceFolder}/packages/epidemica_proximity_ios/ios/epidemica_proximity_ios/wire"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "test: kotlin wire codec",
+      "type": "shell",
+      "command": "./gradlew :epidemica_proximity_android:testDebugUnitTest",
+      "options": { "cwd": "${workspaceFolder}/packages/epidemica_proximity/example/android" },
+      "problemMatcher": []
+    },
+    {
+      "label": "android: proximity logs",
+      "type": "shell",
+      "command": "adb logcat -v time -s EpidemicaProximity:* AndroidRuntime:E",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "panel": "dedicated" }
+    },
+    {
+      "label": "db: psql",
+      "type": "shell",
+      "command": "psql epidemica_server_dev",
+      "problemMatcher": [],
+      "presentation": { "panel": "dedicated" }
+    }
+  ]
+}

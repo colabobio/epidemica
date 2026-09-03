@@ -1,0 +1,11 @@
+{
+  "recommendations": [
+    "Dart-Code.flutter",
+    "Dart-Code.dart-code",
+    "JakeBecker.elixir-ls",
+    "ms-python.python",
+    "ms-python.debugpy",
+    "fwcd.kotlin",
+    "sswg.swift-lang"
+  ]
+}
