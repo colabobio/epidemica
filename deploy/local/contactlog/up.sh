@@ -9,7 +9,7 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$here/../../common.sh"
 
 repo="$(cd "$here/../../.." && pwd)"
-bundle="${BUNDLE:-$repo/studies/contactlog/bundle.json}"
+bundle="$(epidemica_bundle "${BUNDLE:-$repo/studies/contactlog/bundle.json}")"
 
 lan_ip="$(epidemica_lan_ip)"
 export EPIDEMICA_HOST="$lan_ip"

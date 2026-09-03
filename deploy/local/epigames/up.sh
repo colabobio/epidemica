@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
-# Brings up a local Epidemica study server, registers the seven-day Epigame, and runs the daily
-# ticks that make it a game rather than a data collection.
+# Brings up a local Epidemica study server and registers an Epigame study. It does not tick: days
+# are advanced by hand with `mix epidemica.tick`, which is deliberate while nothing schedules them.
 #
 # Unlike contactlog, this study has a schedule: day 1 begins at the instant the bundle names, and
 # there is no day 8. START= overrides it, which is how you run the game today instead of on the
@@ -9,6 +9,12 @@
 #
 #   START=2026-09-07T06:00:00Z deploy/local/epigames/up.sh
 #   TODAY=1 deploy/local/epigames/up.sh     # start at the top of the current hour
+#
+# BUNDLE= registers a different study. The compressed one turns a seven-day game into seven
+# five-minute rounds, which is what makes manual debugging possible at all:
+#
+#   START="$(date -u -v+10M +%Y-%m-%dT%H:%M:%SZ)" \
+#     BUNDLE=studies/epigame-debug/bundle.json deploy/local/epigames/up.sh
 
 set -euo pipefail
 
@@ -17,7 +23,7 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$here/../../common.sh"
 
 repo="$(cd "$here/../../.." && pwd)"
-bundle="${BUNDLE:-$repo/studies/epigame7/bundle.json}"
+bundle="$(epidemica_bundle "${BUNDLE:-$repo/studies/epigame7/bundle.json}")"
 
 if [[ -n "${TODAY:-}" ]]; then
   START="$(date -u +%Y-%m-%dT%H:00:00Z)"

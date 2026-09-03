@@ -34,6 +34,23 @@ epidemica_postgres() {
   fi
 }
 
+# Turns a bundle path into an absolute one, checking it exists.
+#
+# Must be called before anything changes directory. BUNDLE= is typed relative to wherever the
+# operator ran the script from, but seeding happens from the server directory, so a relative path
+# would be resolved against the wrong place and fail somewhere far from the cause.
+epidemica_bundle() {
+  local bundle="$1"
+
+  if [[ ! -f "$bundle" ]]; then
+    echo "No bundle at '$bundle'." >&2
+    echo "BUNDLE= is relative to the directory you ran this from: $PWD" >&2
+    return 1
+  fi
+
+  printf '%s/%s\n' "$(cd "$(dirname "$bundle")" && pwd)" "$(basename "$bundle")"
+}
+
 epidemica_migrate() {
   echo "==> Dependencies"
   mix deps.get >/dev/null
