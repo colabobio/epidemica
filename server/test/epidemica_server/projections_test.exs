@@ -49,25 +49,43 @@ defmodule EpidemicaServer.ProjectionsTest do
     result
   end
 
-  test "projects validated contact episodes" do
+  test "ingesting an episode projects it, without anyone asking" do
     result = ingest_episodes()
     assert result.accepted > 0
 
-    assert Projections.project_contacts() == result.accepted
+    # An empty `contacts` is indistinguishable from a study where nobody met anyone. Leaving the
+    # projection for a reader to remember to run makes that silence the default answer.
+    assert Projections.count_contacts() == result.accepted
+  end
+
+  test "a later projection finds nothing left to do" do
+    result = ingest_episodes()
+
+    assert Projections.project_contacts() == 0
     assert Projections.count_contacts() == result.accepted
   end
 
   test "is idempotent: projecting twice does not duplicate" do
     ingest_episodes()
 
-    first = Projections.project_contacts()
+    first = Projections.count_contacts()
     assert Projections.project_contacts() == 0
     assert Projections.count_contacts() == first
   end
 
+  test "only considers episodes it has not already projected" do
+    ingest_episodes()
+
+    # The projection used to rebuild every episode in the study on each call and lean on the unique
+    # index to throw the work away, which grows without bound over a study's life.
+    orphan = Repo.one(from c in "contacts", select: c.observation_id, limit: 1)
+    Repo.delete_all(from c in "contacts", where: c.observation_id == ^orphan)
+
+    assert Projections.project_contacts() == 1
+  end
+
   test "a rebuild reproduces the projection exactly" do
     ingest_episodes()
-    Projections.project_contacts()
 
     before = snapshot()
     assert before != []

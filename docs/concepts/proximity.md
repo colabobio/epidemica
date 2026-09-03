@@ -245,7 +245,8 @@ guarantee that a recorded observation is delivered exactly once or visibly parke
 can outrun a server upgrade, and discarding data because the server is behind would be an unrecoverable
 loss. Quarantined rows are reported back in the ingest response.
 
-**`contacts`** — a *projection*, derived from `observations` by `Projections.project_contacts/1`:
+**`contacts`** — a *projection*, derived from `observations` and built by `Projections.project_contacts/2`
+as each batch is ingested:
 
 | column | derivation |
 |---|---|
@@ -256,12 +257,17 @@ loss. Quarantined rows are reported back in the ingest response.
 | `observed_seconds` | **sum of `band_seconds`** — the credited time, which is ≤ `duration_s` |
 | `sample_count`, `gap_count` | quality signals |
 
-> **This table is empty until something projects into it.** The twin does so before every tick, but a
-> collection-only study like `contactlog` has nothing that would. If observations exist and `contacts`
-> is empty, that is expected, not data loss:
-> ```sh
-> cd server && mix run -e 'IO.inspect(EpidemicaServer.Projections.project_contacts())'
-> ```
+Only **validated** observations are projected. One quarantined pending a schema this build does not
+have yet has no reliable shape, so it is skipped and picked up by a later run once the schema
+arrives — which is why the projection queries for unprojected rows rather than trusting a watermark.
+
+Nothing writes to a projection except this module, and dropping and rebuilding one must reproduce it
+exactly. That property is what keeps the observation store the single source of truth rather than one
+copy among several:
+
+```sh
+cd server && mix run -e 'IO.inspect(EpidemicaServer.Projections.rebuild_contacts())'
+```
 
 **Reconciliation** then turns two one-sided views into one pair. Alice saw Bob for 12 minutes, Bob saw
 Alice for 19; the truth is the *union* of the intervals, not the sum and not either alone. That is
@@ -281,7 +287,7 @@ Alice for 19; the truth is the *union* of the intervals, not the sum and not eit
 | Episodes exist, none uploaded | 6 | `upload.min_duration_seconds` / `min_sample_count` filtering them |
 | Pending count climbing on device | 7 | Upload failing — wrong server URL, or unreachable |
 | `observations` has rows, `validated: false` | 7 | Payload does not match the contract; `validation_detail` says why |
-| `observations` populated, `contacts` empty | 7 | The projection has not been run |
+| `observations` populated, `contacts` empty | 7 | Episodes are quarantined (`validated: false`), or they are health reports rather than contact episodes |
 | `observed_seconds` < `duration_s` | 5 | Expected. The `sample_credit` cap; not a bug |
 | `gap_count` high | 5 | Sightings sparser than `dropout_threshold`; weak signal or a busy radio |
 

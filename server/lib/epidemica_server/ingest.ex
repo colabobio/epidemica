@@ -17,7 +17,7 @@ defmodule EpidemicaServer.Ingest do
 
   import Ecto.Query
 
-  alias EpidemicaServer.{Contracts, Repo}
+  alias EpidemicaServer.{Contracts, Projections, Repo}
   alias EpidemicaServer.Ingest.Observation
 
   @max_batch 1000
@@ -45,7 +45,12 @@ defmodule EpidemicaServer.Ingest do
       classified = Enum.with_index(envelopes) |> Enum.map(&classify(&1, auth, received_at))
 
       {storable, rejected} = Enum.split_with(classified, &(&1.status != :rejected))
-      inserted = insert(storable)
+      {inserted, ids} = insert(storable)
+
+      # The derived tables are built here rather than left for a reader to remember. An empty
+      # `contacts` is indistinguishable from a study where nobody met anyone, so a projection that
+      # only runs when something happens to ask for it is a silent wrong answer.
+      Projections.project_contacts(auth.study_id, only: ids)
 
       {:ok, build_result(classified, storable, rejected, inserted, received_at)}
     end
@@ -226,7 +231,7 @@ defmodule EpidemicaServer.Ingest do
 
   # `on_conflict: :nothing` makes a retry a no-op; the returned keys tell us which rows were new,
   # and everything else in the batch was therefore already held.
-  defp insert([]), do: MapSet.new()
+  defp insert([]), do: {MapSet.new(), []}
 
   defp insert(storable) do
     rows = Enum.map(storable, & &1.row)
@@ -235,10 +240,10 @@ defmodule EpidemicaServer.Ingest do
       Repo.insert_all(Observation, rows,
         on_conflict: :nothing,
         conflict_target: [:device_id, :seq],
-        returning: [:seq]
+        returning: [:id, :seq]
       )
 
-    MapSet.new(returned, & &1.seq)
+    {MapSet.new(returned, & &1.seq), Enum.map(returned, & &1.id)}
   end
 
   defp build_result(classified, storable, rejected, inserted, received_at) do

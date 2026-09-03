@@ -19,10 +19,16 @@ defmodule EpidemicaServer.Projections do
   @contact_episode "https://schemas.epidemica.info/observations/proximity/contact_episode/1.0.0.json"
   @bands ~w(immediate close medium far)
 
-  @doc "Project any not-yet-projected contact episodes. Safe to run repeatedly."
-  def project_contacts(study_id \\ nil) do
+  @doc """
+  Project any not-yet-projected contact episodes. Safe to run repeatedly.
+
+  Pass `only: [observation_id]` to project just what has arrived. Without it every unprojected
+  episode in the study is considered, which is what makes a missed batch self-healing.
+  """
+  def project_contacts(study_id \\ nil, opts \\ []) do
     rows =
-      contact_source_query(study_id)
+      study_id
+      |> contact_source_query(Keyword.get(opts, :only))
       |> Repo.all()
       |> Enum.map(&contact_row/1)
       |> Enum.reject(&is_nil/1)
@@ -60,10 +66,16 @@ defmodule EpidemicaServer.Projections do
     Repo.one(query)
   end
 
-  defp contact_source_query(study_id) do
+  defp contact_source_query(study_id, only) do
     query =
       from o in Observation,
-        where: o.validated == true and o.schema_uri == @contact_episode,
+        # Anti-join rather than relying on the unique index to discard the work: without it every
+        # call rebuilds every episode the study has ever produced, which grows without bound.
+        left_join: c in "contacts",
+        on: c.observation_id == o.id,
+        where:
+          is_nil(c.observation_id) and o.validated == true and
+            o.schema_uri == @contact_episode,
         select: %{
           id: o.id,
           study_id: o.study_id,
@@ -71,7 +83,8 @@ defmodule EpidemicaServer.Projections do
           payload: o.payload
         }
 
-    if study_id, do: where(query, [o], o.study_id == ^study_id), else: query
+    query = if study_id, do: where(query, [o], o.study_id == ^study_id), else: query
+    if only, do: where(query, [o], o.id in ^only), else: query
   end
 
   defp contact_row(%{payload: payload} = obs) when is_map(payload) do
