@@ -18,6 +18,13 @@ flutter run --dart-define=EPIDEMICA_SERVER=http://<your-lan-ip>:4000/v1/
 
 `up.sh` prints the exact command with the address filled in.
 
+
+If want to restart the server from scratch, clearing the database, you can do:
+
+```sh
+cd server && mix ecto.reset && cd .. && deploy/local/epigames/up.sh
+```
+
 ## The one thing that catches people out
 
 Phones cannot reach `localhost`. The server hands the app an absolute `protocol_url` pointing at
