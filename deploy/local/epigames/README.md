@@ -100,6 +100,46 @@ protected and their day is not scored. They are not charged the protection point
 the rule that keeps a phone in a drawer from being read as somebody who met nobody, and the app
 says so on its information screen.
 
+## Querying the database
+
+It can be done from the command line
+
+```sh
+psql epidemica_server_dev
+```
+
+Once one is in, the following commands are useful:
+
+```sql
+\dt              list tables
+\d observations  describe a table
+\x               toggle expanded output — essential for jsonb payloads
+\q               quit
+```
+
+A few queries worth having:
+
+```sql
+-- who's enrolled
+SELECT p.subject, d.platform, p.enrolled_at
+FROM participants p JOIN devices d ON d.participant_id = p.id
+ORDER BY p.enrolled_at;
+
+-- what's arriving
+SELECT module, subject, count(*), max(observed_at) FROM observations
+GROUP BY module, subject;
+
+-- one episode in full (\x first)
+SELECT subject, payload FROM observations
+WHERE module = 'proximity' ORDER BY observed_at DESC LIMIT 1;
+
+-- who saw whom, once episodes exist
+SELECT subject, peer, round(sum(duration_s)) AS seconds, count(*) AS episodes
+FROM contacts GROUP BY subject, peer ORDER BY seconds DESC;
+```
+
+ If you prefer a GUI, point [TablePlus](https://tableplus.com) or [DBeaver](https://dbeaver.io/) at localhost:5432, database epidemica_server_dev, user andres, no password.
+
 ## Stopping
 
 `Ctrl-C` twice stops the server. PostgreSQL keeps running as a background service:

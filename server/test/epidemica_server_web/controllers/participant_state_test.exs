@@ -31,6 +31,15 @@ defmodule EpidemicaServerWeb.ParticipantStateTest do
   defp authed(conn, %{access_token: token}),
     do: put_req_header(conn, "authorization", "Bearer #{token}")
 
+  # The state is validated against its contract on the way out, so a test varying one field still
+  # has to supply a document the study would actually publish.
+  defp state(overrides) do
+    Map.merge(
+      %{"day" => 4, "days_total" => 7, "epi_state" => "susceptible", "points" => 0},
+      overrides
+    )
+  end
+
   defp put_state(ctx, state, as_of \\ ~U[2026-09-04 03:00:00.000000Z]) do
     ParticipantState.put(ctx.study.id, ctx.enrolled.subject, @state_uri, state, as_of)
   end
@@ -86,9 +95,9 @@ defmodule EpidemicaServerWeb.ParticipantStateTest do
   end
 
   test "the revision moves forward on every write", ctx do
-    {:ok, first} = put_state(ctx, %{"points" => 1})
-    {:ok, second} = put_state(ctx, %{"points" => 2})
-    {:ok, third} = put_state(ctx, %{"points" => 3})
+    {:ok, first} = put_state(ctx, state(%{"points" => 1}))
+    {:ok, second} = put_state(ctx, state(%{"points" => 2}))
+    {:ok, third} = put_state(ctx, state(%{"points" => 3}))
 
     assert first.revision == 1
     assert second.revision == 2
@@ -96,7 +105,7 @@ defmodule EpidemicaServerWeb.ParticipantStateTest do
 
     body = json_response(get(authed(ctx.conn, ctx.enrolled), "/v1/participants/me/state"), 200)
     assert body["revision"] == 3
-    assert body["state"] == %{"points" => 3}
+    assert body["state"] == state(%{"points" => 3})
   end
 
   test "concurrent writers cannot land on the same revision", ctx do
@@ -108,7 +117,7 @@ defmodule EpidemicaServerWeb.ParticipantStateTest do
       for n <- 1..10 do
         Task.async(fn ->
           Ecto.Adapters.SQL.Sandbox.allow(EpidemicaServer.Repo, parent, self())
-          {:ok, doc} = put_state(ctx, %{"points" => n})
+          {:ok, doc} = put_state(ctx, state(%{"points" => n}))
           doc.revision
         end)
       end
@@ -130,7 +139,7 @@ defmodule EpidemicaServerWeb.ParticipantStateTest do
         "platform" => "ios"
       })
 
-    {:ok, _} = put_state(ctx, %{"points" => 11})
+    {:ok, _} = put_state(ctx, state(%{"points" => 11}))
 
     # There is no way to name another participant, so the outsider simply has no state of their own.
     conn = get(authed(ctx.conn, outsider), "/v1/participants/me/state")
@@ -141,6 +150,29 @@ defmodule EpidemicaServerWeb.ParticipantStateTest do
     assert json_response(get(ctx.conn, "/v1/participants/me/state"), 401)
   end
 
+  test "state is validated against its contract before it is stored", ctx do
+    # A client cannot catch this for us: `state` is opaque to core, and a study renderer reading a
+    # missing field leniently shows a default, which on screen is indistinguishable from a computed
+    # answer. Caught once here rather than by every client at once.
+    assert {:error, {:invalid_state, _}} = put_state(ctx, %{"day" => 4})
+
+    assert {:error, :not_found} = ParticipantState.fetch(ctx.study.id, ctx.enrolled.subject)
+  end
+
+  test "a state shape this build has never seen passes through", ctx do
+    # Refusing an unknown `state_uri` would make the channel useless to exactly the studies it
+    # exists for, and mirrors how an unknown `schema_uri` is quarantined rather than rejected.
+    assert {:ok, doc} =
+             ParticipantState.put(
+               ctx.study.id,
+               ctx.enrolled.subject,
+               "https://schemas.example.org/state/something_else/1.0.0.json",
+               %{"anything" => true}
+             )
+
+    assert doc.state == %{"anything" => true}
+  end
+
   test "writing state for someone who is not enrolled fails rather than creating them", ctx do
     assert {:error, :no_such_participant} =
              ParticipantState.put(ctx.study.id, "not-a-participant", @state_uri, %{})
@@ -148,7 +180,7 @@ defmodule EpidemicaServerWeb.ParticipantStateTest do
 
   test "as_of records when the computation ran, not when it was served", ctx do
     computed_at = ~U[2026-09-01 03:00:00.000000Z]
-    {:ok, _} = put_state(ctx, %{"points" => 2}, computed_at)
+    {:ok, _} = put_state(ctx, state(%{"points" => 2}), computed_at)
 
     body = json_response(get(authed(ctx.conn, ctx.enrolled), "/v1/participants/me/state"), 200)
 

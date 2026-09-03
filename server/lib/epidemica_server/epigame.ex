@@ -346,8 +346,17 @@ defmodule EpidemicaServer.Epigame do
     state_uri = "https://schemas.epidemica.info/state/epigame/1.0.0.json"
 
     case ParticipantState.put(study_id, subject, state_uri, state) do
-      {:ok, _} -> :ok
-      {:error, :no_such_participant} -> :ok
+      {:ok, _} ->
+        :ok
+
+      {:error, :no_such_participant} ->
+        :ok
+
+      # Settling a day and failing to tell the participant is worse than not settling it. Rolling
+      # back means the next run retries and fails the same way, which is the right noise for a bug
+      # in what the study publishes.
+      {:error, {:invalid_state, error}} ->
+        Repo.rollback({:invalid_state, subject, error})
     end
   end
 
