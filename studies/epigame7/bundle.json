@@ -30,7 +30,7 @@
     "interval_seconds": 3600
   },
   "schedule": {
-    "starts_at": "2026-09-07T06:00:00Z",
+    "starts_at": "2026-09-03T06:00:00Z",
     "days": 7
   },
   "twin": {

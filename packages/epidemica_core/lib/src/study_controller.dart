@@ -14,20 +14,21 @@ enum StudyState { notEnrolled, enrolled, collecting, refused }
 /// says which of them a study uses and how, and nothing here knows what `contactlog` is.
 class StudyController extends ChangeNotifier {
   StudyController({
-    required this.baseUri,
+    required Uri baseUri,
     required this.modules,
     required EpidemicaDatabase db,
     required SecretStore secrets,
     required this.platform,
     http.Client? httpClient,
-  }) : _db = db,
+  }) : baseUri = _asDirectory(baseUri),
+       _db = db,
        _http = httpClient ?? http.Client() {
     _identity = Identity(_db);
     _outbox = Outbox(_db);
     _clock = DeviceClock(_db);
-    _tokens = TokenStore(baseUri: baseUri, secrets: secrets, httpClient: _http);
+    _tokens = TokenStore(baseUri: this.baseUri, secrets: secrets, httpClient: _http);
     _enrollments = EnrollmentService(
-      baseUri: baseUri,
+      baseUri: this.baseUri,
       db: _db,
       identity: _identity,
       tokens: _tokens,
@@ -40,12 +41,21 @@ class StudyController extends ChangeNotifier {
     _sync = SyncService(
       outbox: _outbox,
       clock: _clock,
-      client: IngestClient(baseUri: baseUri, tokens: _tokens, httpClient: _http),
+      client: IngestClient(baseUri: this.baseUri, tokens: _tokens, httpClient: _http),
     );
-    _states = StateChannel(baseUri: baseUri, db: _db, tokens: _tokens, httpClient: _http);
+    _states = StateChannel(baseUri: this.baseUri, db: _db, tokens: _tokens, httpClient: _http);
   }
 
+  /// Always ends in a slash.
+  ///
+  /// Every endpoint is built with [Uri.resolve], which treats a base without a trailing slash as
+  /// naming a file and replaces the last segment: `.../v1` + `enrollments` gives `.../enrollments`,
+  /// silently dropping the API prefix. The server then has no route, returns 404, and the client
+  /// reports it as an unknown join code — a configuration mistake wearing a data mistake's clothes.
   final Uri baseUri;
+
+  static Uri _asDirectory(Uri uri) =>
+      uri.path.endsWith('/') ? uri : uri.replace(path: '${uri.path}/');
   final List<EmbeddedModule> modules;
   final String platform;
 

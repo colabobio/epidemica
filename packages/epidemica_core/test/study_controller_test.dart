@@ -102,6 +102,57 @@ void main() {
         httpClient: client,
       );
 
+  group('the server address', () {
+    test('a base URL without a trailing slash still reaches the API', () {
+      // Uri.resolve treats a base without a trailing slash as naming a file and replaces the last
+      // segment, so `.../v1` + `enrollments` silently becomes `.../enrollments`. The server has no
+      // route there, returns 404, and the client reports "no open study matches that code" — a
+      // configuration mistake wearing a data mistake's clothes.
+      final controller = StudyController(
+        baseUri: Uri.parse('https://example.test/v1'),
+        modules: const [],
+        db: db,
+        secrets: secrets,
+        platform: 'android',
+      );
+
+      expect(
+        controller.baseUri.resolve('enrollments').toString(),
+        'https://example.test/v1/enrollments',
+      );
+      controller.dispose();
+    });
+
+    test('a base URL that already ends in a slash is left alone', () {
+      final controller = StudyController(
+        baseUri: Uri.parse('https://example.test/v1/'),
+        modules: const [],
+        db: db,
+        secrets: secrets,
+        platform: 'android',
+      );
+
+      expect(controller.baseUri.toString(), 'https://example.test/v1/');
+      controller.dispose();
+    });
+
+    test('a bare host gets a usable base', () {
+      final controller = StudyController(
+        baseUri: Uri.parse('https://example.test'),
+        modules: const [],
+        db: db,
+        secrets: secrets,
+        platform: 'android',
+      );
+
+      expect(
+        controller.baseUri.resolve('enrollments').toString(),
+        'https://example.test/enrollments',
+      );
+      controller.dispose();
+    });
+  });
+
   group('the same binary, different bundles', () {
     test('activates only the modules the study names', () async {
       final proximity = _FakeModule('proximity');
