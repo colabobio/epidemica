@@ -527,9 +527,26 @@ and **nothing reads it**. The epigames app polls every 60 s regardless. A study 
 gets no such floor.
 
 **There is no background sync.** The only caller of `sync()` is the poll timer in
-[`app.dart:67`](../../apps/epigames/lib/src/app.dart#L67) plus pull-to-refresh. Both stop when the
-app is not running. Episodes continue to be *collected* by the platform sensor, but nothing leaves
-the device until the participant next opens the app.
+[`app.dart:51`](../../apps/epigames/lib/src/app.dart#L51) plus pull-to-refresh. Both stop when the
+app is not foregrounded. Sensing continues — Android runs a foreground service, iOS has BLE
+background modes, and both buffer detections natively — but nothing leaves the device.
+
+For a collection-only study that is merely a delay, because the outbox is durable. **For a study
+with a twin it is a correctness bug**, because a tick freezes the record at `received_before` and is
+immutable: a participant whose phone slept through the night has no coverage on record when the
+tick runs, so they are treated as protected, excluded from transmission, and scored `not_sensing` —
+permanently. See [`tasks/backlog/0006`](../../tasks/backlog/0006-no-background-sync.md).
+
+**Coverage can be over-claimed across a suspension.** `ModuleHealthReporter`'s windows abut by
+construction, so if the isolate is suspended and later resumed *in the same process*, the next
+report emits a single window covering the whole gap with the status observed at that moment. The
+module's guarantee — "a period with no report is uncovered" — holds when the app is killed and
+fails when it is merely suspended. See
+[`tasks/backlog/0007`](../../tasks/backlog/0007-coverage-over-claims-after-a-suspension.md).
+
+**In-progress episodes do not survive termination.** `OpenEpisodeStore` exists and documents the
+problem — *"that loss would not be random: it falls preferentially on the longest encounters"* — but
+`ProximityModule` constructs its `EpisodeAggregator` without one, so the interface is unused.
 
 **The bundle's `study_id` is not the study id.** The server generates its own and never reads the
 bundle's — see [`tasks/backlog/0005`](../../tasks/backlog/0005-bundle-study-id-is-not-the-study-id.md).
