@@ -217,8 +217,7 @@ defmodule EpidemicaServer.Epigame do
   # Their own settlements are untouched; the credit lands here instead.
   defp award_carry_over(study_id, day, study, pars, chosen) do
     lookback = Map.get(pars, "carry_over_days", 3)
-    twin = Map.get(study.protocol, "twin", %{})
-    interval = Map.get(twin, "tick_interval_seconds", 86_400)
+    interval = Studies.tick_interval(study)
 
     Enum.reduce(max(day - lookback, 1)..(day - 1)//1, %{}, fn earlier, acc ->
       case Repo.get_by(Tick, study_id: study_id, day: earlier) do

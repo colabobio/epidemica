@@ -106,6 +106,64 @@ defmodule EpidemicaServer.ScheduleTest do
     end
   end
 
+  describe "a study whose day is not a day" do
+    defp short_study(seconds) do
+      protocol = %{
+        "bundle_version" => "1.0",
+        "study_id" => Ecto.UUID.generate(),
+        "title" => "Short",
+        "modules" => %{"proximity" => %{}},
+        "schedule" => %{"starts_at" => "2026-09-07T06:00:00Z", "days" => 7},
+        "twin" => %{
+          "engine" => "starsim",
+          "state_uri" => "https://schemas.epidemica.info/state/epigame/1.0.0.json",
+          "population" => 3,
+          "tick_interval_seconds" => seconds
+        }
+      }
+
+      {:ok, study} = Studies.create_study_from_bundle("short", Jason.encode!(protocol))
+      study
+    end
+
+    test "the interval comes from the bundle" do
+      assert Studies.tick_interval(short_study(300)) == 300
+    end
+
+    test "a study that declares no interval is measured in days" do
+      assert Studies.tick_interval(seven_days()) == 86_400
+    end
+
+    test "days are counted in the study's own unit" do
+      s = short_study(300)
+
+      # The tick period and the current day have to agree, or a scheduler runs a day the simulation
+      # is not on. Assuming 86_400 here would report day 1 for the whole run.
+      assert Studies.day_at(s, @starts_at) == 1
+      assert Studies.day_at(s, DateTime.add(@starts_at, 299, :second)) == 1
+      assert Studies.day_at(s, DateTime.add(@starts_at, 300, :second)) == 2
+      assert Studies.day_at(s, DateTime.add(@starts_at, 1800, :second)) == 7
+    end
+
+    test "the study ends after its own last day, not after seven calendar days" do
+      s = short_study(300)
+
+      assert Studies.day_at(s, DateTime.add(@starts_at, 7 * 300, :second)) == nil
+      refute Studies.running?(s, DateTime.add(@starts_at, 7 * 300, :second))
+      assert Studies.running?(s, DateTime.add(@starts_at, 600, :second))
+    end
+
+    test "the tick period matches the declared interval" do
+      s = short_study(300)
+      Repo.insert!(%Participant{study_id: s.id, subject: "alice-0001", enrolled_at: @starts_at})
+
+      {:ok, tick} = Twin.run_tick(s.id, 2, allow_incomplete: true, runner: stub())
+
+      assert same_instant?(tick.period_start, DateTime.add(@starts_at, 300, :second))
+      assert same_instant?(tick.period_end, DateTime.add(@starts_at, 600, :second))
+    end
+  end
+
   describe "ticking within the schedule" do
     test "day one covers the declared start" do
       s = seven_days()

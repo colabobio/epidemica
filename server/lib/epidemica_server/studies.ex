@@ -6,6 +6,8 @@ defmodule EpidemicaServer.Studies do
   alias EpidemicaServer.Repo
   alias EpidemicaServer.Studies.{JoinCode, Study}
 
+  @default_interval 86_400
+
   def create_study(attrs) do
     %Study{} |> Study.changeset(attrs) |> Repo.insert()
   end
@@ -66,6 +68,19 @@ defmodule EpidemicaServer.Studies do
 
   def scheduled_days(_study), do: nil
 
+  @doc """
+  How long one study-day lasts, in seconds.
+
+  Every caller that divides time into days has to agree with `Twin.period/4`, or a study with a
+  short tick computes one day here and simulates a different one there. Defined once so there is
+  only one default to get wrong.
+  """
+  def tick_interval(%Study{protocol: %{"twin" => %{"tick_interval_seconds" => seconds}}})
+      when is_integer(seconds) and seconds > 0,
+      do: seconds
+
+  def tick_interval(_study), do: @default_interval
+
   @doc "Whether `at` falls inside the study's run. Always true for a study that declares no schedule."
   def running?(%Study{} = study, at \\ DateTime.utc_now()) do
     starts_at(study) == nil or day_at(study, at) != nil
@@ -76,8 +91,12 @@ defmodule EpidemicaServer.Studies do
 
   The caller that schedules ticks needs this to be a total function over time, because "the study
   has not started" and "the study is over" are both ordinary states rather than errors.
+
+  `interval` defaults to the study's own, so a short-tick study is not silently measured in days.
   """
-  def day_at(%Study{} = study, at \\ DateTime.utc_now(), interval \\ 86_400) do
+  def day_at(%Study{} = study, at \\ DateTime.utc_now(), interval \\ nil) do
+    interval = interval || tick_interval(study)
+
     with start when start != nil <- starts_at(study),
          elapsed when elapsed >= 0 <- DateTime.diff(at, start, :second) do
       day = div(elapsed, interval) + 1

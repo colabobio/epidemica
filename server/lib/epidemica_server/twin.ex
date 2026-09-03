@@ -16,7 +16,6 @@ defmodule EpidemicaServer.Twin do
   alias EpidemicaServer.Enrollment.Participant
   alias EpidemicaServer.Twin.{Agent, Runner, Tick}
 
-  @default_interval 86_400
   @default_coverage_threshold 0.5
   @proximity_module "proximity"
 
@@ -137,8 +136,8 @@ defmodule EpidemicaServer.Twin do
     end
   end
 
-  defp period(study, twin, day, opts) do
-    interval = Map.get(twin, "tick_interval_seconds", @default_interval)
+  defp period(study, _twin, day, opts) do
+    interval = Studies.tick_interval(study)
     anchor = Keyword.get(opts, :anchor) || Studies.starts_at(study) || study.inserted_at
     start = DateTime.add(anchor, (day - 1) * interval, :second)
     {start, DateTime.add(start, interval, :second)}

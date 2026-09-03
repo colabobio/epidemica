@@ -547,10 +547,13 @@ story for "we ticked the wrong thing".
 
 ## Reading order for the code
 
-1. [`packages/epidemica_proximity/lib/src/episode_aggregator.dart`](../../packages/epidemica_proximity/lib/src/episode_aggregator.dart) — detections to episodes
-2. [`server/lib/epidemica_server/reconciliation.ex`](../../server/lib/epidemica_server/reconciliation.ex) — two sides to one edge
+1. [`packages/epidemica_proximity/lib/src/episode_aggregator.dart`](../../packages/epidemica_proximity/lib/src/episode_aggregator.dart) — detections to episodes2. [`server/lib/epidemica_server/reconciliation.ex`](../../server/lib/epidemica_server/reconciliation.ex) — two sides to one edge
 3. [`server/lib/epidemica_server/twin.ex`](../../server/lib/epidemica_server/twin.ex) — orchestration and immutability
 4. [`models/src/starsim_epidemica/twin.py`](../../models/src/starsim_epidemica/twin.py) — one simulated day
 5. [`server/lib/epidemica_server/epigame/rules.ex`](../../server/lib/epidemica_server/epigame/rules.ex) — the whole scoring function, pure
 6. [`server/lib/epidemica_server/epigame.ex`](../../server/lib/epidemica_server/epigame.ex) — settlement, carry-over, publishing
 7. [`apps/epigames/lib/src/game_state.dart`](../../apps/epigames/lib/src/game_state.dart) — the state document as a screen
+
+To watch all of it happen in half an hour rather than a week, see
+[`studies/epigame-debug`](../../studies/epigame-debug), which compresses the seven days into
+five-minute rounds and comes with a step-by-step debugging guide.
