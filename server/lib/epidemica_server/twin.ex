@@ -34,22 +34,24 @@ defmodule EpidemicaServer.Twin do
       {period_start, period_end} = period(study, twin, day, opts)
       received_before = Keyword.get(opts, :received_before, DateTime.utc_now())
 
-      agents = reconcile_roster(study_id, twin, day)
-      inputs = build_inputs(study, twin, day, agents, period_start, period_end, received_before)
+      with :ok <- ensure_elapsed(period_end, received_before, opts) do
+        agents = reconcile_roster(study_id, twin, day)
+        inputs = build_inputs(study, twin, day, agents, period_start, period_end, received_before)
 
-      # The engine runs outside any transaction: a subprocess that takes seconds should not hold a
-      # database connection, and if it fails there is nothing to roll back because nothing has been
-      # written.
-      case runner(opts).(inputs) do
-        {:ok, outputs} ->
-          apply_tick(study_id, day, inputs, outputs, agents, %{
-            period_start: period_start,
-            period_end: period_end,
-            received_before: received_before
-          })
+        # The engine runs outside any transaction: a subprocess that takes seconds should not hold
+        # a database connection, and if it fails there is nothing to roll back because nothing has
+        # been written.
+        case runner(opts).(inputs) do
+          {:ok, outputs} ->
+            apply_tick(study_id, day, inputs, outputs, agents, %{
+              period_start: period_start,
+              period_end: period_end,
+              received_before: received_before
+            })
 
-        {:error, reason} ->
-          {:error, reason}
+          {:error, reason} ->
+            {:error, reason}
+        end
       end
     end
   end
@@ -123,6 +125,18 @@ defmodule EpidemicaServer.Twin do
 
   # Anchored on the declared start, not on when the study happened to be registered: re-registering
   # a bundle must not move a boundary that participants' days are numbered from.
+  # A day is only decidable once it is over. Ticking one still in progress -- or, worse, still in the
+  # future -- settles it on a network that has not happened yet, and because a tick is immutable
+  # that wrong answer is permanent. `allow_incomplete: true` is for tests and demonstrations, where
+  # nobody is waiting a real day.
+  defp ensure_elapsed(period_end, received_before, opts) do
+    cond do
+      Keyword.get(opts, :allow_incomplete, false) -> :ok
+      DateTime.compare(period_end, received_before) != :gt -> :ok
+      true -> {:error, :day_not_finished}
+    end
+  end
+
   defp period(study, twin, day, opts) do
     interval = Map.get(twin, "tick_interval_seconds", @default_interval)
     anchor = Keyword.get(opts, :anchor) || Studies.starts_at(study) || study.inserted_at

@@ -142,7 +142,11 @@ defmodule EpidemicaServer.EpigameTest do
 
   defp tick(study, day, infect \\ []) do
     {:ok, _} =
-      Twin.run_tick(study.id, day, anchor: @day_start, runner: twin_runner(infect))
+      Twin.run_tick(study.id, day,
+        anchor: @day_start,
+        allow_incomplete: true,
+        runner: twin_runner(infect)
+      )
   end
 
   defp settle(study, day), do: Epigame.settle_day(study.id, day)

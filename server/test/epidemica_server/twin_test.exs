@@ -113,7 +113,11 @@ defmodule EpidemicaServer.TwinTest do
   end
 
   defp run(study, day \\ 1, opts \\ []) do
-    Twin.run_tick(study.id, day, Keyword.merge([anchor: @day_start, runner: stub()], opts))
+    Twin.run_tick(
+      study.id,
+      day,
+      Keyword.merge([anchor: @day_start, allow_incomplete: true, runner: stub()], opts)
+    )
   end
 
   # -- which studies are simulated at all -------------------------------------------------------
@@ -132,11 +136,13 @@ defmodule EpidemicaServer.TwinTest do
 
       # A study that only collects must not quietly acquire a model, and its participants must
       # never be handed simulated state they did not consent to.
-      assert {:error, :not_a_twin_study} = Twin.run_tick(plain.id, 1, runner: stub())
+      assert {:error, :not_a_twin_study} =
+               Twin.run_tick(plain.id, 1, allow_incomplete: true, runner: stub())
     end
 
     test "an unknown study is refused rather than created" do
-      assert {:error, :not_found} = Twin.run_tick(Ecto.UUID.generate(), 1, runner: stub())
+      assert {:error, :not_found} =
+               Twin.run_tick(Ecto.UUID.generate(), 1, allow_incomplete: true, runner: stub())
     end
   end
 

@@ -119,7 +119,8 @@ defmodule EpidemicaServer.TwinEngineTest do
     )
   end
 
-  defp run(study, day), do: Twin.run_tick(study.id, day, anchor: @day_start)
+  defp run(study, day),
+    do: Twin.run_tick(study.id, day, anchor: @day_start, allow_incomplete: true)
 
   test "a measured contact with an infected participant can transmit, and says why" do
     s = study(%{"pars" => %{"diseases" => %{"beta" => 0.99}}, "population" => 2})

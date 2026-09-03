@@ -77,7 +77,8 @@ defmodule EpidemicaServer.SeedingTest do
     end
   end
 
-  defp tick(study, day \\ 1), do: Twin.run_tick(study.id, day, runner: stub())
+  defp tick(study, day \\ 1),
+    do: Twin.run_tick(study.id, day, allow_incomplete: true, runner: stub())
 
   defp infected(study), do: Enum.filter(Twin.agents(study.id), &(&1.state == "infected"))
 

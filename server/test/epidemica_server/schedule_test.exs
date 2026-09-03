@@ -111,10 +111,34 @@ defmodule EpidemicaServer.ScheduleTest do
       s = seven_days()
       Repo.insert!(%Participant{study_id: s.id, subject: "alice-0001", enrolled_at: @starts_at})
 
-      {:ok, tick} = Twin.run_tick(s.id, 1, runner: stub())
+      {:ok, tick} = Twin.run_tick(s.id, 1, allow_incomplete: true, runner: stub())
 
       assert same_instant?(tick.period_start, @starts_at)
       assert same_instant?(tick.period_end, DateTime.add(@starts_at, 86_400, :second))
+    end
+
+    test "a day that has not finished yet is refused" do
+      s = seven_days()
+      Repo.insert!(%Participant{study_id: s.id, subject: "alice-0001", enrolled_at: @starts_at})
+
+      # The schedule starts in the future, so day 1 has not happened. Ticking it would settle a day
+      # on a network that does not exist yet, and a tick is immutable — the wrong answer would be
+      # permanent.
+      assert {:error, :day_not_finished} = Twin.run_tick(s.id, 1, runner: stub())
+    end
+
+    test "a demonstration can tick an unfinished day on purpose" do
+      s = seven_days()
+      Repo.insert!(%Participant{study_id: s.id, subject: "alice-0001", enrolled_at: @starts_at})
+
+      assert {:ok, _} = Twin.run_tick(s.id, 1, allow_incomplete: true, runner: stub())
+    end
+
+    test "a day that has elapsed runs without asking" do
+      s = study(%{"starts_at" => "2020-01-01T00:00:00Z", "days" => 7})
+      Repo.insert!(%Participant{study_id: s.id, subject: "alice-0001", enrolled_at: @starts_at})
+
+      assert {:ok, _} = Twin.run_tick(s.id, 1, runner: stub())
     end
 
     test "a day past the end of the study is refused" do
@@ -123,20 +147,22 @@ defmodule EpidemicaServer.ScheduleTest do
 
       # A game that keeps ticking after the final score has been shown would revise a result
       # participants had already been given.
-      assert {:error, :after_study_end} = Twin.run_tick(s.id, 8, runner: stub())
+      assert {:error, :after_study_end} =
+               Twin.run_tick(s.id, 8, allow_incomplete: true, runner: stub())
     end
 
     test "day zero is refused" do
       s = seven_days()
 
-      assert {:error, :before_study_start} = Twin.run_tick(s.id, 0, runner: stub())
+      assert {:error, :before_study_start} =
+               Twin.run_tick(s.id, 0, allow_incomplete: true, runner: stub())
     end
 
     test "the last day still runs" do
       s = seven_days()
       Repo.insert!(%Participant{study_id: s.id, subject: "alice-0001", enrolled_at: @starts_at})
 
-      assert {:ok, _} = Twin.run_tick(s.id, 7, runner: stub())
+      assert {:ok, _} = Twin.run_tick(s.id, 7, allow_incomplete: true, runner: stub())
     end
 
     test "a study with no schedule still ticks, anchored on registration" do
@@ -145,7 +171,7 @@ defmodule EpidemicaServer.ScheduleTest do
 
       # Collection-only studies have no days to number, so falling back is the honest behaviour
       # rather than refusing to run at all.
-      assert {:ok, tick} = Twin.run_tick(s.id, 1, runner: stub())
+      assert {:ok, tick} = Twin.run_tick(s.id, 1, allow_incomplete: true, runner: stub())
       assert same_instant?(tick.period_start, s.inserted_at)
     end
   end
