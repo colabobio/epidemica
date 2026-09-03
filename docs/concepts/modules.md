@@ -171,6 +171,89 @@ to withdraw, which the ingest contract does not yet have.
   find it before writing the aggregation.
 - **Fail silently.** A module that cannot do its job should say so loudly enough to stop enrolment.
 
+## What the server needs from a new module
+
+A module's payload is an opaque blob to almost everything: the outbox, the sync service and the
+`observations` table all carry it without interpreting it. So the honest answer to "does a new module
+mean server work?" is **a little, and less than you would expect** — but it is not zero, and the part
+that is not zero fails quietly if skipped.
+
+Three separate stages, with three different answers.
+
+### Storing it — no server change
+
+`observations` has a `payload` column of type `jsonb`. A module the server has never heard of can
+enrol, upload, and have every observation stored, indexed by `(device_id, seq)` and attributed to a
+participant. Nothing needs to be added for that.
+
+### Validating it — three lines, and skipping them is silent
+
+The server validates payloads against compiled JSON Schemas, and the map of what it can validate is
+explicit:
+
+```elixir
+@payload_validators %{
+  (@base <> "proximity/contact_episode/1.0.0.json") => :validate_contact_episode,
+  (@base <> "location/location_fix/1.0.0.json") => :validate_location_fix,
+  ...
+}
+```
+
+An unrecognised `schema_uri` is **quarantined**, not rejected: the observation is stored with
+`validated: false` and `validation_reason: :unknown_payload_schema`, and the client is told it was
+quarantined rather than accepted. Nothing is lost, but nothing downstream will touch it either,
+because every projection reads only validated rows.
+
+Adding a module's contract to the server is three lines in
+`server/lib/epidemica_server/contracts.ex`:
+
+```elixir
+@external_resource "../contracts/observations/<module>/<name>/1.0.0.json"
+
+Exonerate.function_from_file(:def, :validate_<name>,
+  "../contracts/observations/<module>/<name>/1.0.0.json")
+
+# ...and an entry in @payload_validators
+```
+
+The schema is compiled into the binary at build time, which is why this is a deploy rather than a
+configuration change.
+
+> **Today, adding the schema later does not rescue data already quarantined.** Nothing re-validates
+> stored observations, so a study that ran before the server knew its contract keeps rows that are
+> permanently `validated: false`. Add the contract *before* the study collects anything. Filed as
+> [`tasks/backlog/0003`](../../tasks/backlog/0003-revalidate-quarantined-observations.md).
+
+### Projecting it — usually not needed at all
+
+**A projection is not part of getting a module working.** The observation store is the source of
+truth; a projection is a derived read model, built only where something needs typed, indexed access
+to a payload's insides.
+
+Exactly one exists — `contacts`, from `contact_episode` — and it exists because the twin and
+reconciliation query contact structure on every tick. `location_fix` and `survey_response` are fully
+validated and have no projection at all, which is the normal case rather than an omission.
+
+Before writing one, check whether you actually need it. Postgres queries `jsonb` directly:
+
+```sql
+SELECT payload->>'peer', (payload#>>'{band_seconds,immediate}')::float
+FROM observations
+WHERE schema_uri = 'https://schemas.epidemica.info/observations/proximity/contact_episode/1.0.0.json'
+  AND validated;
+```
+
+and the analysis path in `analysis/` reads observations directly, so exports and offline work need
+nothing added server-side.
+
+Write a projection when, and only when, the **server itself** has to answer a question about the
+payload repeatedly and cheaply — a simulation tick, a scoring rule, a live dashboard. If the answer
+is only ever needed by a human or a notebook, the query above is the whole solution.
+
+If you do write one, two properties are required rather than optional: it must read only
+`validated: true` rows, and dropping and rebuilding it must reproduce it exactly. That second
+property is what keeps `observations` the single source of truth rather than one copy among several.
+
 ## Adding a module
 
 Roughly in order, because each step constrains the next:
@@ -185,6 +268,10 @@ Roughly in order, because each step constrains the next:
 4. **Add the platform interface and implementations** if native access is needed. Keep the native
    surface as small as the radio requires.
 5. **Document platform requirements verbatim** and implement `missingPlatformRequirements()`.
-6. **Wire an adapter** in `apps/template` and add the module to the app's module list.
+6. **Register the contract with the server** — three lines in `contracts.ex`. Do this before any
+   study collects, or that study's observations stay quarantined for ever.
+7. **Wire an adapter** in `apps/template` and add the module to the app's module list.
+8. **Write a projection only if the server needs one.** Most modules do not.
 
 Steps 1–3 need no device, and in the proximity module they were the majority of the work.
+
