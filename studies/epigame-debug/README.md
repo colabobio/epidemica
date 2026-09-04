@@ -297,7 +297,66 @@ To change a *parameter*, edit the bundle and re-seed. That creates a **new study
 (the hash changes), so the phones must re-join and collected data does not carry over. Plan
 parameter sweeps accordingly: change one thing, then collect again.
 
-## 8. When it all works
+## 8. Look at the network the model actually saw
+
+A settled run answers *what* happened; the network says *why*. This is also the quickest way to
+notice that something is wrong — an isolated participant, an epidemic that never reaches anyone
+real, a day with no edges at all.
+
+**Export the ticks.** These are the edges the tick was run against, read back from
+`twin_ticks.inputs`, not a fresh query of the observation store. A picture built from anything else
+would show a study that never happened.
+
+```sh
+cd server
+mix epidemica.export_network --study $STUDY --out ../analysis/netviz/network.json
+```
+
+**Add the simulated mixing.** The engine draws virtual contacts inside each tick from its seed and
+does not store them, so the export has only the measured ones. This rebuilds them by calling the
+same function the tick called, with the same seed:
+
+```sh
+cd ../models
+uv run python -m starsim_epidemica.netviz ../analysis/netviz/network.json
+```
+
+Expect the second number to dwarf the first — a seven-round debug study exports around 15 measured
+edges and 2 300 virtual ones. **Skip this step and the epidemic appears to spread with nothing
+touching anybody**, because at these settings the simulated population supplies most of a real
+participant's exposure.
+
+**Open it.**
+
+```sh
+cd ../analysis/netviz && python3 -m http.server 8000
+```
+
+Then visit `http://localhost:8000`. Opening `index.html` straight from disk also works — the
+browser refuses to read a sibling file, so use the file picker it offers instead.
+
+### Reading it
+
+Participants sit in the middle with the first four characters of their pseudonym; the simulated
+population rings them, drawn smaller and shaded back so their state stays readable without being
+mistaken for a measurement. Colours match the app: green healthy, red infected, blue recovered. A
+**gold ring** marks someone infected on that day, which is the thing to follow as you scrub.
+
+Bold indigo lines are measured contacts, thickness by dose weight. Faint grey lines are simulated
+contacts, and by default only those *reaching a participant* are drawn — the exposure the study
+cannot see but the model acted on. **show every simulated contact** reveals all of them, which is a
+hairball, but it is the honest picture of how much of the network is modelled rather than observed.
+
+Things worth checking on a good run:
+
+- Participants who were together should share a bold line on the rounds they were together.
+- A participant turning red should have an infectious neighbour on the round before.
+- The ring should turn red faster than the centre. If it does not, `virtual.contacts_per_day` or
+  `beta` is too low for the game to work.
+- A round with **0 contacts shown** and no measured edges is the signature of the episode-length
+  interaction described above, not of a phone that failed.
+
+## 9. When it all works
 
 Run `epigame7` unchanged for a real multi-day test. What the compressed run cannot tell you is
 whether the app survives being backgrounded overnight, whether iOS keeps sensing for 24 hours, and

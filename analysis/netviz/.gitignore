@@ -1,0 +1,3 @@
+# Exported study data is local to a run, never committed: it carries participant pseudonyms and
+# describes one particular study rather than the tool.
+network.json

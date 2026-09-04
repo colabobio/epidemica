@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Epidemica — twin contact network</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+  :root {
+    --susceptible: #1b7f3b;
+    --infected: #a5231f;
+    --recovered: #1b4f8f;
+    --dead: #111827;
+    --measured: #4f46e5;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  header {
+    padding: 12px 20px;
+    border-bottom: 1px solid #1e293b;
+    display: flex;
+    align-items: baseline;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+  h1 { font-size: 16px; font-weight: 600; margin: 0; }
+  .muted { color: #94a3b8; }
+  .stat b { font-variant-numeric: tabular-nums; }
+  main { flex: 1; position: relative; min-height: 0; }
+  #viz { width: 100%; height: 100%; }
+  footer {
+    padding: 10px 20px;
+    border-top: 1px solid #1e293b;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  button {
+    font: inherit;
+    background: #1e293b;
+    color: #e2e8f0;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    padding: 5px 14px;
+    cursor: pointer;
+  }
+  button:hover { background: #334155; }
+  input[type=range] { flex: 1; min-width: 160px; accent-color: #4f46e5; }
+  label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+  .key { display: flex; align-items: center; gap: 5px; }
+  .dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+  #loader {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: #0f172a;
+  }
+  #loader div { max-width: 520px; text-align: center; }
+  #loader code {
+    display: block; background: #1e293b; padding: 10px 14px; border-radius: 6px;
+    margin: 12px 0; font-size: 12px; text-align: left; white-space: pre-wrap;
+  }
+  .node text { pointer-events: none; font-size: 9px; fill: #f8fafc; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1 id="title">Twin contact network</h1>
+  <span class="stat muted">Day <b id="day">–</b> of <b id="days">–</b></span>
+  <span class="stat muted"><b id="cases">–</b> infected of <b id="population">–</b></span>
+  <span class="stat muted"><b id="new">–</b> new that day</span>
+  <span class="stat muted"><b id="edgecount">–</b> contacts shown</span>
+</header>
+
+<main>
+  <div id="viz"></div>
+  <div id="loader">
+    <div>
+      <p><strong>No network loaded.</strong></p>
+      <p class="muted">Export one from a completed study:</p>
+      <code>cd server
+mix epidemica.export_network --study &lt;id&gt; --out network.json
+cd ../models
+uv run python -m starsim_epidemica.netviz ../analysis/netviz/network.json</code>
+      <p class="muted">Then serve this folder, or pick the file:</p>
+      <p><input type="file" id="file" accept="application/json,.json"></p>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <button id="play">Play</button>
+  <input type="range" id="scrub" min="0" max="0" value="0" step="1">
+  <label><input type="checkbox" id="all-virtual"> show every simulated contact</label>
+  <span class="legend">
+    <span class="key"><i class="dot" style="background:var(--susceptible)"></i>healthy</span>
+    <span class="key"><i class="dot" style="background:var(--infected)"></i>infected</span>
+    <span class="key"><i class="dot" style="background:var(--recovered)"></i>recovered</span>
+    <span class="key"><i class="dot" style="background:#94a3b8;opacity:.45"></i>simulated</span>
+  </span>
+</footer>
+
+<script>
+const COLOUR = {
+  susceptible: 'var(--susceptible)',
+  infected: 'var(--infected)',
+  recovered: 'var(--recovered)',
+  dead: 'var(--dead)',
+};
+
+const el = (id) => document.getElementById(id);
+const viz = el('viz');
+
+let data = null;
+let nodes = [];
+let byIndex = new Map();
+let simulation = null;
+let dayIndex = 0;
+let playing = false;
+let timer = null;
+
+const svg = d3.select('#viz').append('svg').attr('width', '100%').attr('height', '100%');
+const root = svg.append('g');
+const linkLayer = root.append('g');
+const nodeLayer = root.append('g');
+
+svg.call(d3.zoom().scaleExtent([0.3, 6]).on('zoom', (e) => root.attr('transform', e.transform)));
+
+function load(document_) {
+  data = document_;
+
+  el('loader').style.display = 'none';
+  el('title').textContent = data.study.name || 'Twin contact network';
+  el('days').textContent = data.days.length;
+  el('population').textContent = data.agents.length;
+
+  // Positions are assigned once and reused for every day. Re-laying out per day would make the
+  // same participant jump around the screen and turn a spreading epidemic into visual noise.
+  const { width, height } = viz.getBoundingClientRect();
+  const centre = [width / 2, height / 2];
+  const inner = Math.min(width, height) * 0.14;
+  const outer = Math.min(width, height) * 0.40;
+
+  const virtualCount = data.agents.filter((a) => a.virtual).length;
+  const realCount = data.agents.length - virtualCount;
+  let seenVirtual = 0;
+  let seenReal = 0;
+
+  nodes = data.agents.map((a) => {
+    // Seeded on the ring rather than at random, so the picture is legible from the first frame
+    // instead of unfolding out of a knot.
+    const i = a.virtual ? seenVirtual++ : seenReal++;
+    const of = a.virtual ? virtualCount : Math.max(realCount, 1);
+    const angle = (i / of) * 2 * Math.PI;
+    const r = a.virtual ? outer : inner;
+
+    return {
+      index: a.index,
+      virtual: a.virtual,
+      subject: a.subject,
+      label: a.virtual ? '' : (a.subject || '').slice(0, 4),
+      x: centre[0] + r * Math.cos(angle),
+      y: centre[1] + r * Math.sin(angle),
+    };
+  });
+  byIndex = new Map(nodes.map((n) => [n.index, n]));
+
+  simulation = d3.forceSimulation(nodes)
+    .force('charge', d3.forceManyBody().strength(-30))
+    .force('collide', d3.forceCollide((d) => (d.virtual ? 9 : 18)))
+    // Real participants sit in the middle and the simulated population rings them, so the picture
+    // says what the study actually is: a handful of measured people inside a modelled crowd.
+    .force('radial', d3.forceRadial((d) => (d.virtual ? outer : inner), centre[0], centre[1]).strength(0.9))
+    .force('link', d3.forceLink([]).id((d) => d.index).distance(70).strength(0.02))
+    .on('tick', ticked);
+
+  // Settled before the first paint. Letting it converge on screen looks like a bug.
+  simulation.tick(120);
+
+  const node = nodeLayer.selectAll('g').data(nodes, (d) => d.index).join('g').attr('class', 'node');
+  node.append('circle')
+    .attr('r', (d) => (d.virtual ? 6 : 13))
+    .attr('stroke', '#0f172a')
+    .attr('stroke-width', 1);
+  node.filter((d) => !d.virtual).append('text')
+    .attr('text-anchor', 'middle').attr('dy', 26).text((d) => d.label);
+  node.append('title').text((d) => (d.virtual ? `simulated #${d.index}` : `participant ${d.subject}`));
+
+  el('scrub').max = data.days.length - 1;
+  show(0);
+}
+
+function show(i) {
+  dayIndex = Math.max(0, Math.min(i, data.days.length - 1));
+  const day = data.days[dayIndex];
+  const state = new Map(day.agents.map((a) => [a.index, a]));
+
+  el('day').textContent = day.day;
+  el('cases').textContent = day.total_cases;
+  el('new').textContent = day.newly_infected;
+  el('scrub').value = dayIndex;
+
+  const showAll = el('all-virtual').checked;
+  const real = new Set(nodes.filter((n) => !n.virtual).map((n) => n.index));
+
+  const edges = day.edges
+    .filter((e) => byIndex.has(e.a) && byIndex.has(e.b))
+    // Every simulated contact at once is a hairball that buries the measured network, and none of
+    // them leaves a participant's infection with no visible cause. The ones that reach a
+    // participant are the exposure the study cannot see but the model acted on.
+    .filter((e) => showAll || e.kind === 'measured' || real.has(e.a) || real.has(e.b))
+    .map((e) => ({
+      source: byIndex.get(e.a),
+      target: byIndex.get(e.b),
+      kind: e.kind,
+      weight: e.weight || 0,
+    }));
+
+  el('edgecount').textContent = edges.length;
+
+  linkLayer.selectAll('line')
+    .data(edges, (d) => `${d.kind}:${d.source.index}-${d.target.index}`)
+    .join('line')
+    .attr('stroke', (d) => (d.kind === 'measured' ? 'var(--measured)' : '#64748b'))
+    // Virtual contacts outnumber measured ones many times over, so they are drawn faintly: at
+    // equal weight they would bury the thing the study actually recorded.
+    .attr('stroke-opacity', (d) => (d.kind === 'measured' ? 0.85 : 0.12))
+    .attr('stroke-width', (d) => (d.kind === 'measured' ? 1 + 3 * d.weight : 0.7));
+
+  nodeLayer.selectAll('g.node').select('circle')
+    .attr('fill', (d) => COLOUR[state.get(d.index)?.state] || '#475569')
+    // Simulated participants are shaded back rather than recoloured, so their state stays readable
+    // while it is never mistaken for a measurement.
+    .attr('fill-opacity', (d) => (d.virtual ? 0.45 : 1))
+    .attr('stroke', (d) => (state.get(d.index)?.newly_infected ? '#fbbf24' : '#0f172a'))
+    .attr('stroke-width', (d) => (state.get(d.index)?.newly_infected ? 2.5 : 1));
+
+  simulation.force('link').links(edges);
+  simulation.alpha(0.25).restart();
+}
+
+function ticked() {
+  linkLayer.selectAll('line')
+    .attr('x1', (d) => d.source.x).attr('y1', (d) => d.source.y)
+    .attr('x2', (d) => d.target.x).attr('y2', (d) => d.target.y);
+  nodeLayer.selectAll('g.node').attr('transform', (d) => `translate(${d.x},${d.y})`);
+}
+
+el('play').addEventListener('click', () => {
+  playing = !playing;
+  el('play').textContent = playing ? 'Pause' : 'Play';
+  clearInterval(timer);
+  if (playing) {
+    timer = setInterval(() => {
+      if (dayIndex >= data.days.length - 1) show(0);
+      else show(dayIndex + 1);
+    }, 1600);
+  }
+});
+
+el('scrub').addEventListener('input', (e) => show(+e.target.value));
+el('all-virtual').addEventListener('change', () => show(dayIndex));
+
+el('file').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (file) load(JSON.parse(await file.text()));
+});
+
+window.addEventListener('resize', () => {
+  if (simulation) show(dayIndex);
+});
+
+// Works when the folder is served; falls back to the file picker when opened straight from disk,
+// where the browser refuses to read a sibling file.
+fetch('network.json')
+  .then((r) => (r.ok ? r.json() : Promise.reject()))
+  .then(load)
+  .catch(() => {});
+</script>
+</body>
+</html>
