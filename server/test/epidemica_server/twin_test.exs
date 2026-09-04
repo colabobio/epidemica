@@ -375,9 +375,10 @@ defmodule EpidemicaServer.TwinTest do
       {:ok, tick} = run(s)
 
       # A phone in a drawer reports nothing. Reading that as "met nobody" would let the model
-      # invent an absence of exposure and understate transmission.
+      # invent an absence of exposure and understate transmission. Protected outright rather than
+      # proportionally: no part of the day can be attested.
       alice = Enum.find(tick.inputs["agents"], &(&1["subject"] == "alice-0001"))
-      assert alice["protected"] == true
+      assert alice["protection"] == 1.0
     end
 
     test "a participant who was sensing is exposed normally" do
@@ -388,7 +389,7 @@ defmodule EpidemicaServer.TwinTest do
       {:ok, tick} = run(s)
 
       alice = Enum.find(tick.inputs["agents"], &(&1["subject"] == "alice-0001"))
-      assert alice["protected"] == false
+      assert alice["protection"] == 0.0
     end
 
     test "virtual participants are never protected by missing coverage" do
@@ -399,7 +400,7 @@ defmodule EpidemicaServer.TwinTest do
 
       virtual = Enum.filter(tick.inputs["agents"], & &1["virtual"])
       assert virtual != []
-      assert Enum.all?(virtual, &(&1["protected"] == false))
+      assert Enum.all?(virtual, &(&1["protection"] == 0.0))
     end
   end
 

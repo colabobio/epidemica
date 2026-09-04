@@ -221,14 +221,30 @@ def _seed_missing_prognoses(disease, agents, sim: ss.Sim, day: int) -> None:
 def _apply_protection(disease, agents, sim: ss.Sim, efficacy: float, blocks_transmission: bool) -> None:
     uids = sim.people.auids
     for agent in agents:
-        if not agent.get("protected"):
+        level = _protection_level(agent)
+        if level <= 0.0:
             continue
         uid = uids[int(agent["index"])]
-        disease.rel_sus[uid] = 1.0 - efficacy
+        # Scaled by how much of the day the protection actually covered. Protecting at the last
+        # minute would otherwise confer immunity against contacts that had already happened.
+        reduction = efficacy * level
+        disease.rel_sus[uid] = 1.0 - reduction
         if blocks_transmission:
             # Protection is partly altruistic: a protected participant who is already infected
             # does not pass it on either.
-            disease.rel_trans[uid] = 1.0 - efficacy
+            disease.rel_trans[uid] = 1.0 - reduction
+
+
+def _protection_level(agent: Mapping[str, Any]) -> float:
+    """How much of the day an agent was protected for, as a fraction.
+
+    Ticks written before protection was fractional carry a boolean instead, which says the same
+    thing at the extremes. Reading both is what keeps a stored tick re-runnable, and a tick that
+    cannot be re-run cannot be verified.
+    """
+    if "protection" in agent:
+        return min(1.0, max(0.0, float(agent["protection"] or 0.0)))
+    return 1.0 if agent.get("protected") else 0.0
 
 
 def _read_states(

@@ -306,7 +306,7 @@ defmodule EpidemicaServer.Twin do
     slot_to_index = active |> Enum.with_index() |> Map.new(fn {a, i} -> {a.slot, i} end)
     subject_to_index = index_by_subject(active, slot_to_index)
 
-    protected = protected_subjects(study, active, period_start, period_end, twin)
+    protection = protection_levels(study, active, period_start, period_end, twin)
 
     %{
       "study_id" => study_id,
@@ -322,7 +322,7 @@ defmodule EpidemicaServer.Twin do
             "subject" => agent.subject,
             "virtual" => agent.virtual,
             "state" => agent.state,
-            "protected" => agent.subject != nil and MapSet.member?(protected, agent.subject),
+            "protection" => Map.get(protection, agent.subject, 0.0),
             "infected_on_day" => agent.infected_on_day,
             "recovers_on_day" => agent.recovers_on_day,
             "dies_on_day" => agent.dies_on_day
@@ -373,21 +373,39 @@ defmodule EpidemicaServer.Twin do
   # Two independent sources. The platform infers protection from missing coverage — a phone in a
   # drawer must not be read as a participant who met nobody — and the study's rules contribute
   # whatever protection a participant chose. Neither can see the other's case.
-  defp protected_subjects(study, active, from, to, twin) do
+  #
+  # A participant the study could not hear from is protected outright rather than proportionally:
+  # no part of their day can be attested, so letting the model transmit through any of it would be
+  # a claim the data does not support. A chosen protection is different — it is known exactly, to
+  # the second, and applies for as much of the day as it actually covered.
+  defp protection_levels(study, active, from, to, twin) do
     subjects = active |> Enum.map(& &1.subject) |> Enum.reject(&is_nil/1)
     threshold = Map.get(twin, "coverage_threshold", @default_coverage_threshold)
 
     unobserved =
       Health.insufficiently_observed(study.id, @proximity_module, from, to, threshold, subjects)
+      |> MapSet.new()
 
-    MapSet.union(MapSet.new(unobserved), chosen_protection(study, from, to))
+    chosen = chosen_protection_levels(study, from, to)
+
+    Map.new(subjects, fn subject ->
+      if MapSet.member?(unobserved, subject) do
+        {subject, 1.0}
+      else
+        {subject, Map.get(chosen, subject, 0.0)}
+      end
+    end)
   end
 
-  defp chosen_protection(%{protocol: %{"rules" => %{"engine" => "epigame"}}} = study, from, to) do
-    EpidemicaServer.Epigame.chosen_protection(study.id, from, to)
+  defp chosen_protection_levels(
+         %{protocol: %{"rules" => %{"engine" => "epigame"}}} = study,
+         from,
+         to
+       ) do
+    EpidemicaServer.Epigame.protection_fractions(study.id, from, to)
   end
 
-  defp chosen_protection(_study, _from, _to), do: MapSet.new()
+  defp chosen_protection_levels(_study, _from, _to), do: %{}
 
   defp protection_pars(twin) do
     pars = Map.get(twin, "pars", %{})

@@ -15,14 +15,31 @@ import pytest
 from starsim_epidemica.twin import edge_weight, tick
 
 
-def agent(index, state="susceptible", *, subject=None, virtual=False, protected=False, **clocks):
+def agent(
+    index,
+    state="susceptible",
+    *,
+    subject=None,
+    virtual=False,
+    protected=None,
+    protection=None,
+    **clocks,
+):
+    """One agent.
+
+    `protection` is the fraction of the day it was protected for; `protected` writes the older
+    boolean instead, so the compatibility path stays exercised rather than merely claimed.
+    """
     record = {
         "index": index,
         "subject": subject or (None if virtual else f"subject-{index:04d}"),
         "virtual": virtual,
         "state": state,
-        "protected": protected,
     }
+    if protected is not None:
+        record["protected"] = protected
+    else:
+        record["protection"] = 0.0 if protection is None else protection
     record.update(clocks)
     return record
 
@@ -161,6 +178,61 @@ class TestProtection:
 
         # Efficacy zero is protection in name only, and must behave exactly like no protection.
         assert tick(doc)["newly_infected"] > 0
+
+    def test_a_full_days_protection_is_the_same_as_the_old_flag(self):
+        def infected(protection_kwargs):
+            return tick(
+                document(
+                    [sick(0)] + [agent(i, **protection_kwargs) for i in range(1, 40)],
+                    [contact(0, i) for i in range(1, 40)],
+                    beta=0.99,
+                )
+            )["newly_infected"]
+
+        assert infected({"protection": 1.0}) == infected({"protected": True}) == 0
+
+    def test_a_tick_stored_before_protection_was_fractional_still_runs(self):
+        # A stored tick is re-run to verify it. If the engine stopped understanding the boolean,
+        # every tick written before this change would become unverifiable -- which is the same as
+        # not having stored it.
+        legacy = tick(
+            document(
+                [sick(0)] + [agent(i, protected=True) for i in range(1, 40)],
+                [contact(0, i) for i in range(1, 40)],
+                beta=0.99,
+            )
+        )
+
+        assert legacy["newly_infected"] == 0
+
+    def test_half_a_day_protects_less_than_a_whole_one(self):
+        def infected(level):
+            return tick(
+                document(
+                    [sick(0)] + [agent(i, protection=level) for i in range(1, 120)],
+                    [contact(0, i) for i in range(1, 120)],
+                    beta=0.5,
+                )
+            )["newly_infected"]
+
+        none, half, whole = infected(0.0), infected(0.5), infected(1.0)
+
+        # Protecting for part of a day has to land between the two, or a participant who protected
+        # at noon is either getting a whole day of immunity for free or nothing for their point.
+        assert whole == 0
+        assert 0 < half < none
+
+    def test_an_absent_level_is_no_protection(self):
+        result = tick(
+            document(
+                [sick(0)] + [{k: v for k, v in agent(i).items() if k != "protection"}
+                             for i in range(1, 40)],
+                [contact(0, i) for i in range(1, 40)],
+                beta=0.99,
+            )
+        )
+
+        assert result["newly_infected"] > 0
 
 
 class TestStateContinuity:
@@ -371,7 +443,7 @@ class TestChainedDays:
                 "subject": a["subject"],
                 "virtual": a["virtual"],
                 "state": a["state"],
-                "protected": a["index"] in protected,
+                "protection": 1.0 if a["index"] in protected else 0.0,
                 "infected_on_day": a["infected_on_day"],
                 "recovers_on_day": a["recovers_on_day"],
                 "dies_on_day": a["dies_on_day"],
@@ -384,7 +456,7 @@ class TestChainedDays:
         total = 0
         # Protection applies from the first day, not the second. Carrying it over only between
         # ticks would leave day one unshielded, which with a dense network is the whole epidemic.
-        agents = [{**a, "protected": a["index"] in protected} for a in agents]
+        agents = [{**a, "protection": 1.0 if a["index"] in protected else 0.0} for a in agents]
         for day in range(1, days + 1):
             result = tick(
                 document(agents, edges, day=day, seed=1000 + day, beta=beta, total_cases_before=total)

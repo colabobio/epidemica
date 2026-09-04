@@ -213,18 +213,71 @@ defmodule EpidemicaServer.Epigame do
   defp to_utc(%DateTime{} = dt), do: dt
   defp to_utc(%NaiveDateTime{} = naive), do: DateTime.from_naive!(naive, "Etc/UTC")
 
+  @doc """
+  How much of `[from, to)` each participant's chosen protection covered, as a fraction of it.
+
+  Protection applies from the moment it is taken, so protecting at noon protects half a day and
+  releasing an hour later protects a twenty-fourth of one. Treating any overlap as a whole day
+  would let a participant be exposed all day, protect at the last minute, and be modelled as immune
+  for contacts that had already happened.
+
+  Overlapping and repeated actions are unioned rather than summed: tapping protect twice cannot
+  claim more of a day than the day contains.
+  """
+  def protection_fractions(study_id, from, to) do
+    window = DateTime.diff(to, from, :microsecond)
+
+    if window <= 0 do
+      %{}
+    else
+      Repo.all(
+        from a in "game_actions",
+          where:
+            a.study_id == type(^study_id, :binary_id) and a.type == "protect" and
+              a.effective_from < ^to and a.effective_until > ^from,
+          select: {a.subject, a.effective_from, a.effective_until}
+      )
+      |> Enum.group_by(
+        fn {subject, _, _} -> subject end,
+        fn {_, starts, ends} -> {to_utc(starts), to_utc(ends)} end
+      )
+      |> Map.new(fn {subject, intervals} ->
+        {subject, covered_microseconds(intervals, from, to) / window}
+      end)
+    end
+  end
+
   @doc "Subjects who chose protection covering any part of `[from, to)`."
   def chosen_protection(study_id, from, to) do
-    Repo.all(
-      from a in "game_actions",
-        where:
-          a.study_id == type(^study_id, :binary_id) and a.type == "protect" and
-            a.effective_from < ^to and a.effective_until > ^from,
-        select: a.subject,
-        distinct: true
-    )
-    |> MapSet.new()
+    study_id |> protection_fractions(from, to) |> Map.keys() |> MapSet.new()
   end
+
+  defp covered_microseconds(intervals, from, to) do
+    intervals
+    |> Enum.map(fn {starts, ends} -> {later(starts, from), earlier(ends, to)} end)
+    |> Enum.filter(fn {starts, ends} -> DateTime.compare(starts, ends) == :lt end)
+    |> Enum.sort_by(fn {starts, _} -> DateTime.to_unix(starts, :microsecond) end)
+    |> Enum.reduce({0, nil}, fn {starts, ends}, {total, open} ->
+      case open do
+        nil ->
+          {total, {starts, ends}}
+
+        {open_start, open_end} ->
+          if DateTime.compare(starts, open_end) != :gt do
+            {total, {open_start, later(open_end, ends)}}
+          else
+            {total + DateTime.diff(open_end, open_start, :microsecond), {starts, ends}}
+          end
+      end
+    end)
+    |> then(fn
+      {total, nil} -> total
+      {total, {open_start, open_end}} -> total + DateTime.diff(open_end, open_start, :microsecond)
+    end)
+  end
+
+  defp later(a, b), do: if(DateTime.compare(a, b) == :gt, do: a, else: b)
+  defp earlier(a, b), do: if(DateTime.compare(a, b) == :lt, do: a, else: b)
 
   # -- contacts a participant has earned but not yet been paid for -------------------------------
 

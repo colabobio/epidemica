@@ -543,6 +543,126 @@ defmodule EpidemicaServer.EpigameTest do
     end
   end
 
+  describe "how much of a day protection covered" do
+    defp fraction(study, subject, day) do
+      {from, to} = day_window(day)
+      Map.get(Epigame.protection_fractions(study.id, from, to), subject, 0.0)
+    end
+
+    test "protection taken before the day and lasting past it covers all of it" do
+      s = study()
+      participant(s, "alice-0001")
+      {from, _} = day_window(1)
+
+      {:ok, _} =
+        Epigame.protect(
+          s.id,
+          "alice-0001",
+          DateTime.add(from, -3600, :second),
+          %{"protection_window_seconds" => 200_000}
+        )
+
+      assert fraction(s, "alice-0001", 1) == 1.0
+    end
+
+    test "protection taken at noon covers half the day" do
+      s = study()
+      participant(s, "alice-0001")
+      {from, _} = day_window(1)
+
+      {:ok, _} =
+        Epigame.protect(
+          s.id,
+          "alice-0001",
+          DateTime.add(from, 43_200, :second),
+          %{"protection_window_seconds" => 86_400}
+        )
+
+      # Protecting at the last minute would otherwise confer immunity against contacts that had
+      # already happened.
+      assert fraction(s, "alice-0001", 1) == 0.5
+    end
+
+    test "releasing early covers only the time it was on" do
+      s = study()
+      participant(s, "alice-0001")
+      {from, _} = day_window(1)
+
+      {:ok, _} =
+        Epigame.protect(s.id, "alice-0001", from, %{"protection_window_seconds" => 86_400})
+
+      :ok = Epigame.release(s.id, "alice-0001", DateTime.add(from, 21_600, :second))
+
+      # This is what makes release a real decision rather than a way of stopping a countdown.
+      assert fraction(s, "alice-0001", 1) == 0.25
+    end
+
+    test "two overlapping protections are unioned, not summed" do
+      s = study()
+      participant(s, "alice-0001")
+      {from, _} = day_window(1)
+      pars = %{"protection_window_seconds" => 43_200}
+
+      {:ok, _} = Epigame.protect(s.id, "alice-0001", from, pars)
+      {:ok, _} = Epigame.protect(s.id, "alice-0001", DateTime.add(from, 21_600, :second), pars)
+
+      # Tapping protect twice cannot claim more of a day than the day contains.
+      assert fraction(s, "alice-0001", 1) == 0.75
+    end
+
+    test "two separate protections both count" do
+      s = study()
+      participant(s, "alice-0001")
+      {from, _} = day_window(1)
+      pars = %{"protection_window_seconds" => 21_600}
+
+      {:ok, _} = Epigame.protect(s.id, "alice-0001", from, pars)
+      {:ok, _} = Epigame.protect(s.id, "alice-0001", DateTime.add(from, 43_200, :second), pars)
+
+      assert fraction(s, "alice-0001", 1) == 0.5
+    end
+
+    test "protection entirely outside the day covers none of it" do
+      s = study()
+      participant(s, "alice-0001")
+      {from, _} = day_window(1)
+
+      {:ok, _} =
+        Epigame.protect(s.id, "alice-0001", DateTime.add(from, -7200, :second), %{
+          "protection_window_seconds" => 3600
+        })
+
+      assert fraction(s, "alice-0001", 1) == 0.0
+    end
+
+    test "a participant who protected on a different day covers none of this one" do
+      s = study()
+      participant(s, "alice-0001")
+      {day_two, _} = day_window(2)
+
+      {:ok, _} = Epigame.protect(s.id, "alice-0001", day_two)
+
+      assert fraction(s, "alice-0001", 1) == 0.0
+      assert fraction(s, "alice-0001", 2) > 0.0
+    end
+
+    test "the subject set still matches the fractions" do
+      s = study()
+      participant(s, "alice-0001")
+      participant(s, "bob-0001")
+      {from, to} = day_window(1)
+
+      {:ok, _} = Epigame.protect(s.id, "alice-0001", from)
+
+      # Scoring is binary and transmission is not, so the two must be derived from one answer or a
+      # participant could be charged for protection the model never applied.
+      assert MapSet.equal?(
+               Epigame.chosen_protection(s.id, from, to),
+               MapSet.new(["alice-0001"])
+             )
+    end
+  end
+
   # -- immutability and publication ----------------------------------------------------------------
 
   test "a settled day is never settled twice" do
@@ -669,7 +789,7 @@ defmodule EpidemicaServer.EpigameTest do
       Repo.get_by!(EpidemicaServer.Twin.Tick, study_id: s.id, day: 1).inputs["agents"]
       |> Enum.find(&(&1["subject"] == "alice-0001"))
 
-    assert agent["protected"] == true
+    assert agent["protection"] == 1.0
   end
 
   test "protection released before the day begins does not protect" do

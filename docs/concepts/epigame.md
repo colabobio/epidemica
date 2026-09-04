@@ -257,8 +257,9 @@ nothing. Each draws `pars.virtual.contacts_per_day` partners from the *whole* po
 also the only route by which the wider epidemic reaches a participant. The draw uses a separate RNG
 stream seeded from the tick, so it is reproducible without perturbing Starsim's transmission draws.
 
-**Protection is applied as susceptibility and transmissibility.** `rel_sus = 1 - efficacy`, and if
-`blocks_transmission` then `rel_trans` too — protection is partly altruistic.
+**Protection is applied as susceptibility and transmissibility, in proportion.**
+`rel_sus = 1 - efficacy × level`, where `level` is the fraction of the day the participant was
+protected for, and `rel_trans` likewise if `blocks_transmission` — protection is partly altruistic.
 
 ### 2.5 What comes back
 
@@ -437,7 +438,7 @@ sequenceDiagram
   App->>App: refreshState()
   Note over DB: nothing else happens until the day is ticked
   Twin->>DB: chosen_protection(study, period)
-  Twin->>Twin: rel_sus = rel_trans = 0
+  Twin->>Twin: rel_sus = rel_trans = 1 - efficacy × fraction of day covered
   Score->>DB: chosen_protection(study, period)
   Score->>Score: −1 point, and no contact awards
 ```
@@ -449,10 +450,21 @@ so a participant who could name their own effective time could protect themselve
 protected all along?" is answerable from the record. `release` truncates `effective_until` to now
 and does not refund the day already charged for.
 
-**Any overlap with the tick period counts.** `chosen_protection/3` matches
-`effective_from < period_end AND effective_until > period_start` — protecting for five minutes at
-23:55 protects you for that whole day, in both the model and the ledger. Whether that is right is a
-game-design question the current rules answer generously.
+**Transmission is protected in proportion, scoring is not.** `Epigame.protection_fractions/3`
+unions a participant's protection intervals, clips them to the tick period, and divides — so
+protecting at noon gives 0.5 and releasing six hours in gives 0.25. The engine applies it as
+`rel_sus = 1 - efficacy × level` (and `rel_trans` when protection blocks transmission).
+
+The **cost** stays flat: one point for any day on which protection was taken, and no contact awards
+for that day. That combination is self-balancing without a special rule — protecting at 23:55 costs
+a full point and buys a fortieth of a day's immunity, so last-minute protection is punished by the
+arithmetic rather than by a policy. It also means `release` is a real decision rather than a way of
+stopping a countdown.
+
+Coverage-based protection is deliberately **not** proportional: a participant below the coverage
+threshold gets `1.0`. No part of their day can be attested, so letting the model transmit through
+any of it would be a claim the data cannot support. A chosen protection is different — it is known
+exactly, to the second.
 
 **A decision outside the study's run is refused, not recorded.** It would otherwise be charged for
 on a day that will never be settled.
