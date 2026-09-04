@@ -164,6 +164,56 @@ defmodule EpidemicaServer.ScheduleTest do
     end
   end
 
+  describe "catching up" do
+    test "runs from day one to the day in progress" do
+      s = study(%{"starts_at" => "2020-01-01T00:00:00Z", "days" => 7})
+      at = ~U[2020-01-03 12:00:00.000000Z]
+
+      assert {:ok, [1, 2, 3]} = Studies.days_to_catch_up(s, at)
+    end
+
+    test "a study that has ended can still be caught up" do
+      s = study(%{"starts_at" => "2020-01-01T00:00:00Z", "days" => 7})
+
+      # Every day is over and therefore decidable, and `--day <n>` would run each of them. Refusing
+      # here would leave a study nobody ticked in time permanently unsettled.
+      assert {:ok, [1, 2, 3, 4, 5, 6, 7]} = Studies.days_to_catch_up(s, ~U[2021-06-01 00:00:00Z])
+    end
+
+    test "the last day is included on the day it ends" do
+      s = study(%{"starts_at" => "2020-01-01T00:00:00Z", "days" => 7})
+      last = ~U[2020-01-07 23:59:59.000000Z]
+
+      assert {:ok, days} = Studies.days_to_catch_up(s, last)
+      assert List.last(days) == 7
+    end
+
+    test "a study that has not started has nothing to catch up" do
+      s = seven_days()
+
+      assert {:error, :not_started} = Studies.days_to_catch_up(s, @starts_at |> DateTime.add(-1))
+    end
+
+    test "a study with no schedule cannot be caught up" do
+      # There is no day one to count from, so the caller has to name the day it wants.
+      assert {:error, :no_schedule} = Studies.days_to_catch_up(study(nil))
+    end
+
+    test "an open-ended study counts on past its declared length, because it has none" do
+      s = study(%{"starts_at" => "2020-01-01T00:00:00Z", "days" => nil})
+
+      assert {:ok, days} = Studies.days_to_catch_up(s, ~U[2020-01-05 00:00:00Z])
+      assert days == [1, 2, 3, 4, 5]
+    end
+
+    test "a short-tick study counts in its own unit" do
+      s = short_study(300)
+
+      assert {:ok, [1, 2, 3]} =
+               Studies.days_to_catch_up(s, DateTime.add(@starts_at, 700, :second))
+    end
+  end
+
   describe "ticking within the schedule" do
     test "day one covers the declared start" do
       s = seven_days()

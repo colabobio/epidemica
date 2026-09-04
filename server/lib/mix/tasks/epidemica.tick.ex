@@ -45,9 +45,17 @@ defmodule Mix.Tasks.Epidemica.Tick do
   end
 
   defp catch_up_days(study) do
-    case Studies.day_at(study) do
-      nil -> Mix.raise("the study is not running right now: it has not started, or it has ended")
-      today -> Enum.to_list(1..today)
+    case Studies.days_to_catch_up(study) do
+      {:ok, days} ->
+        days
+
+      {:error, :no_schedule} ->
+        Mix.raise("--catch-up needs a schedule; use --day <n> for a study that declares none")
+
+      {:error, :not_started} ->
+        Mix.raise(
+          "the study has not started: day 1 begins at #{DateTime.to_iso8601(Studies.starts_at(study))}"
+        )
     end
   end
 

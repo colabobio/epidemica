@@ -49,8 +49,9 @@ defmodule Mix.Tasks.Epidemica.ResetStudy do
         study -> study
       end
 
-    if opts[:yes] or confirm(study) do
-      reset(study, study_id, opts[:clear_actions] == true)
+    # `or` demands a boolean on its left and OptionParser gives nil for an absent flag.
+    if Keyword.get(opts, :yes, false) or confirm(study) do
+      reset(study, study_id, Keyword.get(opts, :clear_actions, false))
     else
       Mix.shell().info("Nothing was changed.")
     end
@@ -77,8 +78,9 @@ defmodule Mix.Tasks.Epidemica.ResetStudy do
     """)
   end
 
+  # Defaults to no: a stray Enter should not delete scores participants have already been shown.
   defp confirm(study) do
-    Mix.shell().yes?("Delete all simulated and scored state for #{study.name}?")
+    Mix.shell().yes?("Delete all simulated and scored state for #{study.name}?", default: :no)
   end
 
   defp delete_from(table, study_id) do

@@ -131,6 +131,41 @@ defmodule EpidemicaServer.ResetStudyTest do
     Mix.Tasks.Epidemica.ResetStudy.run(["--study", study_id, "--yes"])
   end
 
+  # Answers the confirmation prompt, so the interactive path is exercised rather than skipped by
+  # always passing --yes.
+  defp reset_answering(study_id, answer) do
+    shell = Mix.shell()
+    Mix.shell(Mix.Shell.Process)
+    send(self(), {:mix_shell_input, :yes?, answer})
+
+    try do
+      Mix.Tasks.Epidemica.ResetStudy.run(["--study", study_id])
+    after
+      Mix.shell(shell)
+    end
+  end
+
+  describe "asking first" do
+    test "without --yes it asks, and clears when told to" do
+      study = study()
+      populate(study)
+
+      reset_answering(study.id, true)
+
+      assert count("twin_ticks", study.id) == 0
+    end
+
+    test "without --yes it changes nothing when refused" do
+      study = study()
+      populate(study)
+
+      reset_answering(study.id, false)
+
+      assert count("twin_ticks", study.id) == 1
+      assert count("game_ledger", study.id) == 2
+    end
+  end
+
   describe "resetting" do
     test "removes everything the study decided" do
       study = study()

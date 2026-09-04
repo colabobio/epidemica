@@ -109,6 +109,23 @@ defmodule EpidemicaServer.Studies do
   end
 
   @doc """
+  Every day from the first up to the one `at` falls in, or up to the last if the study has ended.
+
+  A finished study still has days worth deciding. Refusing once the last day has passed would leave
+  a study nobody ticked in time permanently unsettled, even though every one of its days is over and
+  therefore decidable — and `--day <n>` would still run them one at a time.
+  """
+  def days_to_catch_up(%Study{} = study, at \\ DateTime.utc_now()) do
+    start = starts_at(study)
+
+    cond do
+      start == nil -> {:error, :no_schedule}
+      DateTime.compare(at, start) == :lt -> {:error, :not_started}
+      true -> {:ok, Enum.to_list(1..(day_at(study, at) || scheduled_days(study)))}
+    end
+  end
+
+  @doc """
   Look up a join code, case-insensitively.
 
   Codes get read off posters and out of text messages, so requiring exact capitalisation would fail
