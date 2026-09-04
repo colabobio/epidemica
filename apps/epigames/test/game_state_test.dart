@@ -76,7 +76,6 @@ void main() {
       );
 
       expect(game.protected, isTrue);
-      expect(game.protectionForced, isFalse);
     });
 
     test('a chosen protection that has lapsed does not', () {
@@ -111,13 +110,13 @@ void main() {
       expect(game.protectedAt(until.add(const Duration(minutes: 1))), isFalse);
     });
 
-    test('protection from a phone that stopped sensing cannot be released', () {
+    test('a settled day protected by a silent phone is not a claim about now', () {
       final game = GameState.from(document({...healthy, 'protection_source': 'not_sensing'}));
 
-      // Offering a button that cannot work would be worse than offering none: the participant
-      // would believe they had turned something off.
-      expect(game.protected, isTrue);
-      expect(game.protectionForced, isTrue);
+      // `protection_source` says why the *settled* day was protected. Whether the phone is sensing
+      // at this moment is a question only the device can answer, and reading it from the document
+      // would leave a shield on screen long after Bluetooth came back on.
+      expect(game.protected, isFalse);
     });
 
     test('no protection source means unprotected', () {
@@ -176,24 +175,25 @@ void main() {
     test('a late contact is described as such', () {
       expect(
         GameState.describe(const SettlementLine('carried_over', 5, count: 1)),
-        contains('late'),
+        contains('earlier days'),
       );
     });
 
     test('one contact is singular and two are plural', () {
-      expect(GameState.describe(const SettlementLine('contacts', 5, count: 1)), '1 contact today');
-      expect(
-        GameState.describe(const SettlementLine('contacts', 10, count: 2)),
-        '2 contacts today',
-      );
+      expect(GameState.describe(const SettlementLine('contacts', 5, count: 1)), '1 contact');
+      expect(GameState.describe(const SettlementLine('contacts', 10, count: 2)), '2 contacts');
     });
 
     test('a late credit says the contacts came from earlier days', () {
-      // The two contact lines are scored differently and arrive for different reasons, so a
-      // participant reading the card has to be able to tell which is which.
+      // Every line describes the day named at the top of the card, so a line that does not is the
+      // one that has to say so. Nothing says "today": the card is always about a day that is over.
       expect(
         GameState.describe(const SettlementLine('carried_over', 30, count: 6)),
-        '6 contacts from earlier days, confirmed late',
+        '6 contacts from earlier days',
+      );
+      expect(
+        GameState.describe(const SettlementLine('contacts', 15, count: 3)),
+        isNot(contains('today')),
       );
     });
   });

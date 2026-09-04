@@ -91,14 +91,14 @@ class GameState {
   final Settlement? settlement;
   final DateTime? asOf;
 
-  /// Whether protection is in force right now, for any reason.
-  bool protectedAt(DateTime now) =>
-      protectionForced || (protectedUntil != null && protectedUntil!.isAfter(now));
+  /// Whether the participant's *chosen* protection is in force right now.
+  ///
+  /// Protection from a phone that stopped sensing is deliberately not folded in here: that is a
+  /// present-tense fact about the device, which only the device can answer, and reading it from a
+  /// settled document would leave a shield on screen long after Bluetooth came back on.
+  bool protectedAt(DateTime now) => protectedUntil != null && protectedUntil!.isAfter(now);
 
   bool get protected => protectedAt(DateTime.now().toUtc());
-
-  /// Protection the participant did not choose, and cannot release: their phone stopped sensing.
-  bool get protectionForced => protectionSource == 'not_sensing';
 
   /// Whether the last day has been settled.
   ///
@@ -142,14 +142,14 @@ class GameState {
     return 'updated ${age.inDays} days ago';
   }
 
+  // Every line describes the day named at the top of the card, so nothing here says "today".
   static String describe(SettlementLine line) => switch (line.reason) {
     'healthy' => 'Stayed healthy',
-    'infected' => 'Infected — no points today',
+    'infected' => 'Infected — no points',
     'protection' => 'Protection',
-    'not_sensing' => 'Your phone was not sensing, so today was not scored',
-    'contacts' => '${line.count} contact${line.count == 1 ? '' : 's'} today',
-    'carried_over' =>
-      '${line.count} contact${line.count == 1 ? '' : 's'} from earlier days, confirmed late',
+    'not_sensing' => 'Your phone was not sensing, so the day was not scored',
+    'contacts' => '${line.count} contact${line.count == 1 ? '' : 's'}',
+    'carried_over' => '${line.count} contact${line.count == 1 ? '' : 's'} from earlier days',
     _ => line.reason,
   };
 }

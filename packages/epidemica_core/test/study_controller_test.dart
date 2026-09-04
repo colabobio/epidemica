@@ -16,6 +16,10 @@ class _FakeModule implements EmbeddedModule {
   ModuleContext? startedWith;
   int stops = 0;
 
+  /// Changed by tests to simulate the radio being switched off mid-study.
+  ModuleStatus reported = const ModuleStatus(ModuleState.sensing);
+  Object? throws;
+
   @override
   Future<void> start(ModuleContext context) async => startedWith = context;
 
@@ -23,7 +27,10 @@ class _FakeModule implements EmbeddedModule {
   Future<void> stop() async => stops++;
 
   @override
-  Future<ModuleStatus> status() async => const ModuleStatus(ModuleState.sensing);
+  Future<ModuleStatus> status() async {
+    if (throws != null) throw throws!;
+    return reported;
+  }
 }
 
 const _bundleUrl = 'https://example.test/bundles/study.json';
@@ -57,50 +64,48 @@ void main() {
     dir.deleteSync(recursive: true);
   });
 
-  http.Client serverServing(String bundle, {int enrollStatus = 201}) =>
-      MockClient((request) async {
-        if (request.url.toString() == _bundleUrl) return http.Response(bundle, 200);
-        if (request.url.path.endsWith('/observations')) {
-          return http.Response(
-            jsonEncode({
-              'received': 0,
-              'accepted': 0,
-              'duplicate': 0,
-              'quarantined': 0,
-              'rejected': 0,
-              'exceptions': [],
-              'server_time': '2026-09-02T12:00:00Z',
-            }),
-            200,
-          );
-        }
-        if (enrollStatus != 201) return http.Response('{}', enrollStatus);
-        return http.Response(
-          jsonEncode({
-            'subject': Identity(db).subject,
-            'study_id': _studyId,
-            'protocol_hash': ProtocolBundle.hashOf(utf8.encode(bundle)),
-            'protocol_url': _bundleUrl,
-            'access_token': 'access-1',
-            'token_type': 'Bearer',
-            'expires_in': 3600,
-            'refresh_token': 'refresh-1',
-            'server_time': '2026-09-02T12:00:00Z',
-          }),
-          201,
-        );
-      });
+  http.Client serverServing(String bundle, {int enrollStatus = 201}) => MockClient((request) async {
+    if (request.url.toString() == _bundleUrl) return http.Response(bundle, 200);
+    if (request.url.path.endsWith('/observations')) {
+      return http.Response(
+        jsonEncode({
+          'received': 0,
+          'accepted': 0,
+          'duplicate': 0,
+          'quarantined': 0,
+          'rejected': 0,
+          'exceptions': [],
+          'server_time': '2026-09-02T12:00:00Z',
+        }),
+        200,
+      );
+    }
+    if (enrollStatus != 201) return http.Response('{}', enrollStatus);
+    return http.Response(
+      jsonEncode({
+        'subject': Identity(db).subject,
+        'study_id': _studyId,
+        'protocol_hash': ProtocolBundle.hashOf(utf8.encode(bundle)),
+        'protocol_url': _bundleUrl,
+        'access_token': 'access-1',
+        'token_type': 'Bearer',
+        'expires_in': 3600,
+        'refresh_token': 'refresh-1',
+        'server_time': '2026-09-02T12:00:00Z',
+      }),
+      201,
+    );
+  });
 
   /// One binary. The module set is fixed here, exactly as it is fixed at build time.
-  StudyController binaryWith(List<EmbeddedModule> modules, http.Client client) =>
-      StudyController(
-        baseUri: Uri.parse('https://example.test/v1/'),
-        modules: modules,
-        db: db,
-        secrets: secrets,
-        platform: 'android',
-        httpClient: client,
-      );
+  StudyController binaryWith(List<EmbeddedModule> modules, http.Client client) => StudyController(
+    baseUri: Uri.parse('https://example.test/v1/'),
+    modules: modules,
+    db: db,
+    secrets: secrets,
+    platform: 'android',
+    httpClient: client,
+  );
 
   group('the server address', () {
     test('a base URL without a trailing slash still reaches the API', () {
@@ -158,17 +163,24 @@ void main() {
       final proximity = _FakeModule('proximity');
       final instruments = _FakeModule('instruments');
 
-      await binaryWith([proximity, instruments], serverServing(
-        bundleJson(modules: {'proximity': {'on_device': {'max_episode_seconds': 600}}}),
-      )).join('JOIN-1234');
+      await binaryWith(
+        [proximity, instruments],
+        serverServing(
+          bundleJson(
+            modules: {
+              'proximity': {
+                'on_device': {'max_episode_seconds': 600},
+              },
+            },
+          ),
+        ),
+      ).join('JOIN-1234');
 
       expect(proximity.startedWith, isNotNull);
       expect(instruments.startedWith, isNull);
-      expect(
-        proximity.startedWith!.config,
-        {'on_device': {'max_episode_seconds': 600}},
-        reason: 'a module receives its own block, not the whole bundle',
-      );
+      expect(proximity.startedWith!.config, {
+        'on_device': {'max_episode_seconds': 600},
+      }, reason: 'a module receives its own block, not the whole bundle');
     });
 
     test('a different bundle collects a different module, with no rebuild', () async {
@@ -176,9 +188,16 @@ void main() {
       final instruments = _FakeModule('instruments');
 
       // Same module set, same construction, same binary.
-      await binaryWith([proximity, instruments], serverServing(
-        bundleJson(modules: {'instruments': {'schedule': 'daily'}}),
-      )).join('JOIN-5678');
+      await binaryWith(
+        [proximity, instruments],
+        serverServing(
+          bundleJson(
+            modules: {
+              'instruments': {'schedule': 'daily'},
+            },
+          ),
+        ),
+      ).join('JOIN-5678');
 
       expect(instruments.startedWith, isNotNull);
       expect(proximity.startedWith, isNull);
@@ -189,9 +208,10 @@ void main() {
       final proximity = _FakeModule('proximity');
       final instruments = _FakeModule('instruments');
 
-      final controller = binaryWith([proximity, instruments], serverServing(
-        bundleJson(modules: {'proximity': {}, 'instruments': {}}),
-      ));
+      final controller = binaryWith([
+        proximity,
+        instruments,
+      ], serverServing(bundleJson(modules: {'proximity': {}, 'instruments': {}})));
       await controller.join('JOIN-1234');
 
       expect(controller.runningModules, {'proximity', 'instruments'});
@@ -201,9 +221,9 @@ void main() {
 
   group('a study this binary cannot service', () {
     test('is refused with a message a participant can act on', () async {
-      final controller = binaryWith([_FakeModule('proximity')], serverServing(
-        bundleJson(modules: {'proximity': {}, 'biosensing': {}}),
-      ));
+      final controller = binaryWith([
+        _FakeModule('proximity'),
+      ], serverServing(bundleJson(modules: {'proximity': {}, 'biosensing': {}})));
 
       await controller.join('JOIN-1234');
 
@@ -214,9 +234,9 @@ void main() {
 
     test('leaves the participant enrolled in nothing at all', () async {
       final module = _FakeModule('proximity');
-      final controller = binaryWith([module], serverServing(
-        bundleJson(modules: {'biosensing': {}}),
-      ));
+      final controller = binaryWith([
+        module,
+      ], serverServing(bundleJson(modules: {'biosensing': {}})));
 
       await controller.join('JOIN-1234');
 
@@ -229,10 +249,9 @@ void main() {
     });
 
     test('an unknown code is not blamed on the participant twice', () async {
-      final controller = binaryWith(
-        [_FakeModule('proximity')],
-        serverServing(bundleJson(modules: {'proximity': {}}), enrollStatus: 404),
-      );
+      final controller = binaryWith([
+        _FakeModule('proximity'),
+      ], serverServing(bundleJson(modules: {'proximity': {}}), enrollStatus: 404));
 
       await controller.join('NOPE');
 
@@ -264,9 +283,9 @@ void main() {
 
     test('record a null clock offset until a server has been reached', () async {
       final module = _FakeModule('proximity');
-      final controller = binaryWith([module], serverServing(
-        bundleJson(modules: {'proximity': {}}),
-      ));
+      final controller = binaryWith([
+        module,
+      ], serverServing(bundleJson(modules: {'proximity': {}})));
       await controller.join('JOIN-1234');
 
       module.startedWith!.record(
@@ -325,9 +344,9 @@ void main() {
 
     test('queued observations are destroyed, not left to upload later', () async {
       final module = _FakeModule('proximity');
-      final controller = binaryWith([module], serverServing(
-        bundleJson(modules: {'proximity': {}}),
-      ));
+      final controller = binaryWith([
+        module,
+      ], serverServing(bundleJson(modules: {'proximity': {}})));
       await controller.join('JOIN-1234');
       for (var i = 0; i < 10; i++) {
         module.startedWith!.record(
@@ -347,9 +366,9 @@ void main() {
   group('a study gets only what its bundle asks for', () {
     test('coverage reporting can be switched off entirely', () async {
       final module = _FakeModule('proximity');
-      final controller = binaryWith([module], serverServing(
-        bundleJson(modules: {'proximity': {}}, health: {'enabled': false}),
-      ));
+      final controller = binaryWith([
+        module,
+      ], serverServing(bundleJson(modules: {'proximity': {}}, health: {'enabled': false})));
 
       await controller.join('JOIN-1234');
       await Future<void>.delayed(Duration.zero);
@@ -359,14 +378,94 @@ void main() {
     });
 
     test('a study with no twin never has state computed for it', () async {
-      final controller = binaryWith([_FakeModule('proximity')], serverServing(
-        bundleJson(modules: {'proximity': {}}),
-      ));
+      final controller = binaryWith([
+        _FakeModule('proximity'),
+      ], serverServing(bundleJson(modules: {'proximity': {}})));
 
       await controller.join('JOIN-1234');
 
       // Absent, not disabled: nothing on either side is asked to opt out of a simulation.
       expect(controller.enrollment!.bundle.twin, isNull);
+    });
+  });
+
+  group('what the modules are doing right now', () {
+    test('is empty until asked', () async {
+      final proximity = _FakeModule('proximity');
+      final controller = binaryWith([
+        proximity,
+      ], serverServing(bundleJson(modules: {'proximity': {}})));
+      await controller.join('JOIN-1234');
+
+      expect(controller.moduleStatus, isEmpty);
+    });
+
+    test('reports the radio going off without waiting for the server', () async {
+      final proximity = _FakeModule('proximity');
+      final controller = binaryWith([
+        proximity,
+      ], serverServing(bundleJson(modules: {'proximity': {}})));
+      await controller.join('JOIN-1234');
+
+      await controller.refreshModuleStatus();
+      expect(controller.moduleStatus['proximity']!.isSensing, isTrue);
+
+      // A participant who turns Bluetooth off should not have to wait for a tick to be told what
+      // their own phone is doing.
+      proximity.reported = const ModuleStatus(ModuleState.radioOff, detail: 'bluetooth');
+      await controller.refreshModuleStatus();
+
+      expect(controller.moduleStatus['proximity']!.isSensing, isFalse);
+      expect(controller.moduleStatus['proximity']!.detail, 'bluetooth');
+    });
+
+    test('notifies only when something changed', () async {
+      final proximity = _FakeModule('proximity');
+      final controller = binaryWith([
+        proximity,
+      ], serverServing(bundleJson(modules: {'proximity': {}})));
+      await controller.join('JOIN-1234');
+
+      await controller.refreshModuleStatus();
+
+      var notifications = 0;
+      controller.addListener(() => notifications++);
+
+      // Polled every few seconds, so an unchanged answer must not rebuild the screen.
+      await controller.refreshModuleStatus();
+      await controller.refreshModuleStatus();
+      expect(notifications, 0);
+
+      proximity.reported = const ModuleStatus(ModuleState.radioOff);
+      await controller.refreshModuleStatus();
+      expect(notifications, 1);
+    });
+
+    test('a module that cannot answer is not reported as sensing', () async {
+      final proximity = _FakeModule('proximity');
+      final controller = binaryWith([
+        proximity,
+      ], serverServing(bundleJson(modules: {'proximity': {}})));
+      await controller.join('JOIN-1234');
+
+      proximity.throws = StateError('channel gone');
+      await controller.refreshModuleStatus();
+
+      expect(controller.moduleStatus['proximity']!.isSensing, isFalse);
+    });
+
+    test('withdrawing forgets it', () async {
+      final proximity = _FakeModule('proximity');
+      final controller = binaryWith([
+        proximity,
+      ], serverServing(bundleJson(modules: {'proximity': {}})));
+      await controller.join('JOIN-1234');
+      await controller.refreshModuleStatus();
+      expect(controller.moduleStatus, isNotEmpty);
+
+      await controller.withdraw();
+
+      expect(controller.moduleStatus, isEmpty);
     });
   });
 }

@@ -40,6 +40,7 @@ class _Home extends StatefulWidget {
 class _HomeState extends State<_Home> {
   final TextEditingController _code = TextEditingController();
   Timer? _poll;
+  Timer? _sensing;
   bool _busy = false;
 
   @override
@@ -49,12 +50,20 @@ class _HomeState extends State<_Home> {
     // The game moves once a day, so polling is generous at a minute. What it protects against is a
     // participant staring at yesterday's screen because nothing prompted a refresh.
     _poll = Timer.periodic(const Duration(minutes: 1), (_) => _refresh());
+    // Whether the radio is on is a local question with a cheap answer, and turning Bluetooth off
+    // should change the screen while the participant is still looking at it.
+    _sensing = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => widget.controller.refreshModuleStatus(),
+    );
+    widget.controller.refreshModuleStatus();
     _refresh();
   }
 
   @override
   void dispose() {
     _poll?.cancel();
+    _sensing?.cancel();
     widget.controller.removeListener(_onChange);
     _code.dispose();
     super.dispose();
@@ -66,6 +75,7 @@ class _HomeState extends State<_Home> {
     if (widget.controller.state == StudyState.notEnrolled) return;
     await widget.controller.sync();
     await widget.controller.refreshState();
+    await widget.controller.refreshModuleStatus();
   }
 
   Future<void> _act(String action) async {
@@ -101,6 +111,9 @@ class _HomeState extends State<_Home> {
     return _GameScreen(
       game: game,
       busy: _busy,
+      // Unknown until the first poll answers, which is a moment after launch. Assuming the worst
+      // would flash a protection the participant does not have.
+      sensing: widget.controller.moduleStatus['proximity']?.isSensing ?? true,
       pending: widget.controller.pendingObservations,
       onProtect: () => _act(game.protected ? 'release' : 'protect'),
       onRefresh: _refresh,
@@ -196,6 +209,7 @@ class _GameScreen extends StatelessWidget {
   const _GameScreen({
     required this.game,
     required this.busy,
+    required this.sensing,
     required this.pending,
     required this.onProtect,
     required this.onRefresh,
@@ -204,6 +218,11 @@ class _GameScreen extends StatelessWidget {
 
   final GameState game;
   final bool busy;
+
+  /// Whether the phone is collecting right now, asked of the module rather than read from the last
+  /// settlement. The document says why a *past* day was protected; only the device knows the present.
+  final bool sensing;
+
   final int pending;
   final VoidCallback onProtect;
   final Future<void> Function() onRefresh;
@@ -212,6 +231,7 @@ class _GameScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final onColour = game.colour.computeLuminance() > 0.4 ? Colors.black : Colors.white;
+    final protectedNow = game.protected || !sensing;
 
     return Scaffold(
       backgroundColor: game.colour,
@@ -235,9 +255,9 @@ class _GameScreen extends StatelessWidget {
                           fontSize: 18,
                         ),
                       ),
-                    if (game.protected && !game.finished)
+                    if (protectedNow && !game.finished)
                       Icon(Icons.shield, size: 64, color: onColour.withValues(alpha: 0.9)),
-                    if (game.protected && !game.finished) const SizedBox(height: 8),
+                    if (protectedNow && !game.finished) const SizedBox(height: 8),
                     Text(
                       game.finished ? 'FINAL SCORE' : 'POINTS',
                       style: TextStyle(
@@ -275,9 +295,9 @@ class _GameScreen extends StatelessWidget {
               // live button on a finished game invites a participant to spend a point on nothing.
               if (game.hasState && !game.finished)
                 FilledButton.tonal(
-                  onPressed: busy || game.protectionForced ? null : onProtect,
+                  onPressed: busy || !sensing ? null : onProtect,
                   child: Text(
-                    game.protectionForced
+                    !sensing
                         ? 'Protected because your phone is not sensing'
                         : game.protected
                         ? 'Stop protecting'

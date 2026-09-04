@@ -4,7 +4,6 @@ import 'package:epidemica_core/epidemica_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
-
 /// What the participant is shown, and what the app is actually doing.
 enum StudyState { notEnrolled, enrolled, collecting, refused }
 
@@ -72,6 +71,7 @@ class StudyController extends ChangeNotifier {
 
   Enrollment? _enrollment;
   final Set<String> _running = {};
+  final Map<String, ModuleStatus> _moduleStatus = {};
   ModuleHealthReporter? _health;
   StudyState _state = StudyState.notEnrolled;
   String? _message;
@@ -94,6 +94,37 @@ class StudyController extends ChangeNotifier {
   ///
   /// Never synthesised: an invented "you are healthy" is indistinguishable from a measured one.
   ParticipantState? get participantState => _states.current(expectedSubject: _enrollment?.subject);
+
+  /// What each running module reports about itself right now.
+  ///
+  /// Local and immediate, unlike the state document. A phone knows its own radio is off without
+  /// asking anyone, and a participant who has just turned Bluetooth off should not have to wait
+  /// for a server computation to be told what their own phone is doing.
+  Map<String, ModuleStatus> get moduleStatus => Map.unmodifiable(_moduleStatus);
+
+  /// Asks every running module how it is doing. Notifies only when something changed, so this can
+  /// be polled often without rebuilding the screen on every tick of a timer.
+  Future<void> refreshModuleStatus() async {
+    var changed = false;
+
+    for (final module in modules) {
+      if (!_running.contains(module.id)) continue;
+
+      ModuleStatus status;
+      try {
+        status = await module.status();
+      } on Object catch (e) {
+        status = ModuleStatus(ModuleState.stopped, detail: '$e');
+      }
+
+      if (_moduleStatus[module.id]?.state != status.state) {
+        _moduleStatus[module.id] = status;
+        changed = true;
+      }
+    }
+
+    if (changed) notifyListeners();
+  }
 
   /// Asks the server for the current state. Swallows transport failure, because a stale document
   /// the participant can see is more use than an error they cannot act on.
@@ -198,14 +229,13 @@ class StudyController extends ChangeNotifier {
       // contacts cannot otherwise tell "met nobody" from "was not listening". Declared in the
       // bundle, so a study that has no use for it pays nothing.
       _health = ModuleHealthReporter(
-        modules: [for (final m in modules) if (_running.contains(m.id)) m],
+        modules: [
+          for (final m in modules)
+            if (_running.contains(m.id)) m,
+        ],
         interval: enrollment.bundle.healthInterval,
-        recorderFor: (moduleId) => recorderFor(
-          outbox: _outbox,
-          enrollment: enrollment,
-          clock: _clock,
-          module: moduleId,
-        ),
+        recorderFor: (moduleId) =>
+            recorderFor(outbox: _outbox, enrollment: enrollment, clock: _clock, module: moduleId),
       )..start();
     }
 
@@ -235,6 +265,7 @@ class StudyController extends ChangeNotifier {
       await module.stop();
     }
     _running.clear();
+    _moduleStatus.clear();
 
     await _tokens.clear();
     _states.clear();
