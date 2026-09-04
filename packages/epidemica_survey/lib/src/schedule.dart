@@ -20,6 +20,9 @@ class ScheduledInstrument {
 
   /// Where the definition is served, and the digest of the exact bytes expected there.
   ///
+  /// May be relative, in which case it resolves against the study server: definitions can be
+  /// hosted anywhere, and the common case is the server that already serves the bundle.
+  ///
   /// Verified like the protocol bundle: a definition that does not match is refused rather than
   /// presented, because questions a study did not author are not the study's questions.
   final Uri url;
@@ -48,17 +51,15 @@ class ScheduledInstrument {
 
     final id = raw['instrument_id'];
     final version = raw['version'];
-    final url = Uri.tryParse((raw['url'] as String?) ?? '');
     final digest = raw['sha256'];
     final offset = raw['offset_seconds'];
-    if (id is! String ||
-        version is! String ||
-        url == null ||
-        !url.hasScheme ||
-        digest is! String ||
-        offset is! num) {
+    if (id is! String || version is! String || digest is! String || offset is! num) {
       return null;
     }
+
+    // Defaults to the study server's own route, so the ordinary case needs no URL at all.
+    final url = Uri.tryParse((raw['url'] as String?) ?? 'instruments/$id/$version');
+    if (url == null) return null;
 
     return ScheduledInstrument(
       instrumentId: id,

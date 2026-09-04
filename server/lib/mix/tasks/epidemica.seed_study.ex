@@ -20,6 +20,7 @@ defmodule Mix.Tasks.Epidemica.SeedStudy do
 
   use Mix.Task
 
+  alias EpidemicaServer.Instruments
   alias EpidemicaServer.Repo
   alias EpidemicaServer.Studies
   alias EpidemicaServer.Studies.Study
@@ -61,6 +62,8 @@ defmodule Mix.Tasks.Epidemica.SeedStudy do
       {:error, _} -> Mix.shell().info("Join code #{code} already exists")
     end
 
+    register_instruments(study, path, decoded)
+
     Mix.shell().info("""
 
     Study:         #{study.name}
@@ -72,5 +75,67 @@ defmodule Mix.Tasks.Epidemica.SeedStudy do
 
       flutter run --dart-define=EPIDEMICA_SERVER=#{EpidemicaServerWeb.Endpoint.url()}/v1/
     """)
+  end
+
+  # Instrument definitions live beside the bundle rather than inside it, because a reworded
+  # question must not change the protocol hash and re-register the study.
+  defp register_instruments(study, bundle_path, decoded) do
+    dir = Path.join(Path.dirname(bundle_path), "instruments")
+
+    for file <- Path.wildcard(Path.join(dir, "*.json")) do
+      case Instruments.register(study.id, File.read!(file)) do
+        {:ok, instrument} ->
+          Mix.shell().info("Instrument: #{instrument.instrument_id}@#{instrument.version}")
+
+        {:error, {:version_already_registered, id, version}} ->
+          Mix.raise("""
+          #{id}@#{version} is already registered with different bytes.
+
+          Responses already collected name that version. Changing what it means would merge two
+          measurements into one. Give the edited instrument a new version instead.
+          """)
+
+        {:error, reason} ->
+          Mix.raise("#{file} is not an instrument definition: #{inspect(reason)}")
+      end
+    end
+
+    verify_declared(study, decoded)
+  end
+
+  # A digest the bundle got wrong would otherwise surface as a phone quietly refusing to show a
+  # survey, which is a long way from the file that is actually wrong.
+  defp verify_declared(study, decoded) do
+    registered = Map.new(Instruments.list(study.id), fn {id, v, digest} -> {{id, v}, digest} end)
+
+    declared =
+      decoded
+      |> get_in(["modules", "survey", "instruments"])
+      |> List.wrap()
+
+    for entry <- declared, is_map(entry) do
+      key = {entry["instrument_id"], entry["version"]}
+
+      case Map.fetch(registered, key) do
+        :error ->
+          Mix.raise(
+            "the bundle schedules #{elem(key, 0)}@#{elem(key, 1)}, " <>
+              "but no such definition was found beside it"
+          )
+
+        {:ok, digest} ->
+          if digest != entry["sha256"] do
+            Mix.raise("""
+            #{elem(key, 0)}@#{elem(key, 1)} does not match the digest the bundle pinned.
+
+              bundle:     #{entry["sha256"]}
+              definition: #{digest}
+
+            The device refuses a definition whose digest differs, so this would show up in the
+            field as a survey that never appears.
+            """)
+          end
+      end
+    end
   end
 end

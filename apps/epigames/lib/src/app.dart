@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:epidemica_core/epidemica_core.dart';
 import 'package:epidemica_proximity_module/epidemica_proximity_module.dart';
+import 'package:epidemica_survey/epidemica_survey.dart';
 import 'package:flutter/material.dart';
 
 import 'game_state.dart';
@@ -13,9 +14,10 @@ import 'info_screen.dart';
 /// participant: that is the twin's job, and duplicating any of it would give the player one answer
 /// and the study another.
 class EpigamesApp extends StatelessWidget {
-  const EpigamesApp({required this.controller, super.key});
+  const EpigamesApp({required this.controller, required this.survey, super.key});
 
   final StudyController controller;
+  final SurveyModule survey;
 
   @override
   Widget build(BuildContext context) {
@@ -23,15 +25,16 @@ class EpigamesApp extends StatelessWidget {
       title: 'Epigame',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(useMaterial3: true, fontFamily: 'Roboto'),
-      home: _Home(controller: controller),
+      home: _Home(controller: controller, survey: survey),
     );
   }
 }
 
 class _Home extends StatefulWidget {
-  const _Home({required this.controller});
+  const _Home({required this.controller, required this.survey});
 
   final StudyController controller;
+  final SurveyModule survey;
 
   @override
   State<_Home> createState() => _HomeState();
@@ -47,6 +50,7 @@ class _HomeState extends State<_Home> {
   void initState() {
     super.initState();
     widget.controller.addListener(_onChange);
+    widget.survey.addListener(_onChange);
     // The game moves once a day, so polling is generous at a minute. What it protects against is a
     // participant staring at yesterday's screen because nothing prompted a refresh.
     _poll = Timer.periodic(const Duration(minutes: 1), (_) => _refresh());
@@ -65,6 +69,7 @@ class _HomeState extends State<_Home> {
     _poll?.cancel();
     _sensing?.cancel();
     widget.controller.removeListener(_onChange);
+    widget.survey.removeListener(_onChange);
     _code.dispose();
     super.dispose();
   }
@@ -76,6 +81,26 @@ class _HomeState extends State<_Home> {
     await widget.controller.sync();
     await widget.controller.refreshState();
     await widget.controller.refreshModuleStatus();
+    await widget.survey.refresh();
+  }
+
+  Future<void> _takeSurvey() async {
+    final response = widget.survey.begin();
+    final instrument = widget.survey.pending;
+    if (response == null || instrument == null) return;
+
+    final answered = await Navigator.of(context).push<SurveyResponse>(
+      MaterialPageRoute(
+        builder: (_) => SurveyScreen(instrument: instrument, response: response),
+      ),
+    );
+
+    // Backing out records nothing and leaves the survey due: a participant who closed the screen
+    // has not answered, and saying they refused would invent a decision they did not make.
+    if (answered == null) return;
+
+    widget.survey.submit(answered);
+    await widget.controller.sync();
   }
 
   Future<void> _act(String action) async {
@@ -114,6 +139,8 @@ class _HomeState extends State<_Home> {
       // Unknown until the first poll answers, which is a moment after launch. Assuming the worst
       // would flash a protection the participant does not have.
       sensing: widget.controller.moduleStatus['proximity']?.isSensing ?? true,
+      survey: widget.survey.pending,
+      onSurvey: _takeSurvey,
       pending: widget.controller.pendingObservations,
       onProtect: () => _act(game.protected ? 'release' : 'protect'),
       onRefresh: _refresh,
@@ -210,6 +237,8 @@ class _GameScreen extends StatelessWidget {
     required this.game,
     required this.busy,
     required this.sensing,
+    required this.survey,
+    required this.onSurvey,
     required this.pending,
     required this.onProtect,
     required this.onRefresh,
@@ -222,6 +251,10 @@ class _GameScreen extends StatelessWidget {
   /// Whether the phone is collecting right now, asked of the module rather than read from the last
   /// settlement. The document says why a *past* day was protected; only the device knows the present.
   final bool sensing;
+
+  /// The instrument waiting to be answered, if one is due.
+  final Instrument? survey;
+  final Future<void> Function() onSurvey;
 
   final int pending;
   final VoidCallback onProtect;
@@ -242,6 +275,8 @@ class _GameScreen extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
             children: [
               _TopBar(game: game, onColour: onColour),
+              if (survey != null)
+                _SurveyCard(instrument: survey!, onOpen: onSurvey, onColour: onColour),
               const SizedBox(height: 48),
               Center(
                 child: Column(
@@ -434,6 +469,59 @@ class _Line extends StatelessWidget {
           Expanded(child: Text(label, style: style)),
           Text(signed && value >= 0 ? '+$value' : '$value', style: style),
         ],
+      ),
+    );
+  }
+}
+
+/// A survey that has come due, offered rather than forced.
+///
+/// It sits above the score instead of blocking it, because an instrument a participant cannot get
+/// past is abandoned along with everything after it, and a half-finished study app is worse than a
+/// late answer.
+class _SurveyCard extends StatelessWidget {
+  const _SurveyCard({required this.instrument, required this.onOpen, required this.onColour});
+
+  final Instrument instrument;
+  final Future<void> Function() onOpen;
+  final Color onColour;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Material(
+        color: onColour.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          onTap: onOpen,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Icon(Icons.assignment_outlined, color: onColour),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        instrument.title,
+                        style: TextStyle(color: onColour, fontWeight: FontWeight.w600),
+                      ),
+                      Text(
+                        '${instrument.items.length} questions',
+                        style: TextStyle(color: onColour.withValues(alpha: 0.75), fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right, color: onColour.withValues(alpha: 0.8)),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -32,6 +32,7 @@ defmodule EpidemicaServerWeb.Router do
     pipe_through [:api, :participant]
 
     get "/studies/:id/protocol", ProtocolController, :show
+    get "/instruments/:instrument_id/:version", InstrumentController, :show
     get "/participants/me/state", ParticipantStateController, :show
     post "/participants/me/actions", GameActionController, :create
     post "/observations", ObservationController, :create

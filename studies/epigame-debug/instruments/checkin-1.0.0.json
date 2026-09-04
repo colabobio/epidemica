@@ -1,0 +1,40 @@
+{
+  "instrument_version": "1.0",
+  "instrument_id": "checkin",
+  "version": "1.0.0",
+  "title": "A quick check-in",
+  "description": "Three questions about the last few minutes. There are no right answers.",
+  "language": "en",
+  "items": [
+    {
+      "item_id": "people_near",
+      "type": "single_choice",
+      "prompt": "Roughly how many other players have you been near since the game started?",
+      "required": true,
+      "options": [
+        { "value": 0, "label": "Nobody" },
+        { "value": 1, "label": "One" },
+        { "value": 2, "label": "Two or three" },
+        { "value": 4, "label": "Four or more" }
+      ]
+    },
+    {
+      "item_id": "why_protect",
+      "type": "multi_choice",
+      "prompt": "What would make you spend a point on protection?",
+      "help": "Choose as many as you like.",
+      "options": [
+        { "value": "feel_at_risk", "label": "Feeling at risk" },
+        { "value": "others_infected", "label": "Seeing others infected" },
+        { "value": "many_contacts", "label": "Having been near a lot of people" },
+        { "value": "nothing", "label": "Nothing — I would rather keep the points" }
+      ]
+    },
+    {
+      "item_id": "understanding",
+      "type": "likert",
+      "prompt": "How well do you feel you understand how the infection is spreading in this game?",
+      "scale": { "min": 1, "max": 5, "min_label": "not at all", "max_label": "very well" }
+    }
+  ]
+}

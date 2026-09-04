@@ -94,10 +94,7 @@ class _Section extends StatelessWidget {
           Text(title, style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           for (final paragraph in paragraphs)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Text(paragraph),
-            ),
+            Padding(padding: const EdgeInsets.only(bottom: 8), child: Text(paragraph)),
         ],
       ),
     );

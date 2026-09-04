@@ -39,6 +39,7 @@ class ModuleContext {
     required this.subject,
     required this.record,
     required this.store,
+    this.studyStartsAt,
   });
 
   /// This module's block from the bundle.
@@ -48,6 +49,13 @@ class ModuleContext {
 
   /// This participant's pseudonym.
   final String subject;
+
+  /// When the study opens, or null if it declares no schedule.
+  ///
+  /// A study-level fact, like [studyId], rather than another module's configuration: anything a
+  /// module times has to be timed against the same instant the server uses, or the two will
+  /// disagree about when something was due.
+  final DateTime? studyStartsAt;
 
   /// Appends an observation to the outbox. Returns its sequence number.
   final ObservationRecorder record;

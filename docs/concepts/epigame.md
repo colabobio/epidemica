@@ -6,6 +6,7 @@ journey.
 This is the Tier 2 reference: one study app, one server-side twin, one scoring engine. It assumes
 [modules](modules.md), [the observation envelope](observation-envelope.md),
 [proximity](proximity.md) and [the state channel](state-channel.md), and joins them up.
+Scheduled instruments have their own reference in [surveys](surveys.md).
 
 ## The pieces
 
@@ -15,6 +16,7 @@ flowchart TB
     BLE["Herald BLE<br/>detections"] --> AGG["EpisodeAggregator<br/>epidemica_proximity"]
     AGG --> OB["Outbox<br/>epidemica_core"]
     HEALTH["ModuleHealthReporter"] --> OB
+    SURVEY["SurveyModule<br/>epidemica_survey"] --> OB
     OB --> SYNC["SyncService"]
     UI["EpigamesApp"]
   end
@@ -25,6 +27,7 @@ flowchart TB
     CON --> REC["Reconciliation"]
     OBS --> HLTH["Health<br/>coverage"]
     ACT[("game_actions")]
+    INST[("instruments")]
     REC --> TWIN["Twin.run_tick"]
     HLTH --> TWIN
     ACT --> TWIN
@@ -35,6 +38,8 @@ flowchart TB
     ACT --> SETTLE
     SETTLE --> LEDGER[("game_ledger")]
     SETTLE --> PS[("participant_states")]
+    ACT --> PS
+    ING --> PS
   end
 
   subgraph engine["Engine"]
@@ -45,6 +50,7 @@ flowchart TB
   TWIN <-->|"JSON file / stdout"| PY
   PS -->|"GET /v1/participants/me/state"| UI
   UI -->|"POST /v1/participants/me/actions"| ACT
+  INST -->|"GET /v1/instruments/:id/:version"| SURVEY
 ```
 
 Four boundaries carry the whole design:
@@ -55,6 +61,13 @@ Four boundaries carry the whole design:
 | Observations → projections | Derived and rebuildable. Dropping `contacts` and rebuilding must reproduce it exactly. |
 | Elixir → Python | A tick is a pure function of a JSON document. The engine knows nothing about studies, participants or points. |
 | Twin → scoring | The twin decides what *happened*; scoring decides what it was *worth*. Either can run without the other. |
+
+One distinction cuts across all four and is worth naming early, because mistaking it has caused most
+of the bugs in this area: **some facts are the study's conclusions and some are the participant's or
+the device's.** A settled score, an epidemiological state and a coverage judgement are conclusions —
+published when a day is decided, never revised. Whether protection is running *now*, and whether the
+radio is on *now*, are not conclusions at all: they are present-tense facts the participant or the
+phone already holds, and reading them out of a settled document leaves the screen a day behind.
 
 ---
 
@@ -334,6 +347,10 @@ Or through Oban: `Twin.Worker` runs a day and then enqueues `Epigame.Worker` to 
 is queued separately so a failure to settle never looks like a failure to simulate. Days run one at
 a time and in order, because each tick starts from the state its predecessor wrote.
 
+`--catch-up` runs every day that has **finished**, which includes a study that has already ended:
+its days are all over and therefore all decidable, and `--day <n>` would run any of them
+individually. Refusing there would leave a study nobody ticked in time permanently unsettled.
+
 **Nothing schedules ticks automatically yet** — see [`tasks/backlog/0002`](../../tasks/backlog/0002-scheduled-ticks.md).
 
 The engine runs as a subprocess (`uv run python -m starsim_epidemica.twin <file>`) outside any
@@ -383,6 +400,10 @@ clock — because the app computes the same function for immediate feedback and 
 | `contacts` | +5 × count | Qualifying contacts on this day. |
 | `carried_over` | +5 × count | Qualifying contacts from earlier days, confirmed late. |
 
+Every line is rendered against the day named at the top of the settlement card, so none of them says
+"today": the card always describes a day that is over. `carried_over` is the one line that needs a
+time reference at all, because it is the only one not about the day named above it.
+
 An unobserved day is neither charged nor free by accident: charging would correlate the score with
 the participant's phone, and making it free would make going dark the dominant strategy and the
 study would collect nothing.
@@ -410,6 +431,13 @@ deliberate choice — the alternative is rewriting a day whose consequences part
 been told about — but it means **the tick's `received_before` cutoff is epidemiologically
 load-bearing.** Ticking a day the instant it closes will miss whatever is still in transit.
 
+**Every fact used to judge a late contact is the one that held on the day of the contact**, not
+today: `award_carry_over/4` recomputes both coverage and chosen protection for each earlier day it
+revisits. Using today's protection was a real bug — a participant protected on days 1 to 3 and
+unprotected on day 4 was paid 30 points on day 4 for contacts made while protected, refunding a cost
+they had accepted. The mirror case is as wrong: someone unprotected then and protected now would be
+denied contacts they had earned.
+
 ### 3.4 Publishing
 
 Each settled participant gets a state document written through `ParticipantState.put/5`, which
@@ -419,6 +447,19 @@ it, and the next run failing identically is the right noise for a bug in what a 
 
 Note `current_state/3`: the *screen* shows this tick's outcome, even though it was *yesterday's*
 state that earned today's points.
+
+**A settlement is not the only thing that writes a state document.** Three other moments do, because
+a participant looking at a blank or stale screen cannot tell a quiet study from a broken one:
+
+| When | What changes | Why not wait for the tick |
+|---|---|---|
+| Enrolment | `day: 0`, `points: 0`, `epi_state: "susceptible"` | Otherwise nothing renders until the first tick — for a whole day. `susceptible` is not a guess: seeding runs at the first tick, so nobody is infected before one has happened. |
+| `protect` / `release` | `protected_until` | The contract carries it as an instant *"so the app can count down and expire it locally without waiting for the next tick"*. A tap with no visible effect until tomorrow severs the act from its consequence. |
+| Observations arriving | `pending_contacts` | Says something is coming without keeping a second ledger. Written only when the number changes, so a 60 s poll does not churn the revision. |
+
+The day-0 document is what makes `day` mean *"which day the last tick covered"*: the day being
+**lived** is `day + 1`, which is what the app labels. Before it existed the screen read "Not started"
+while the study was running, and a player on day four was told it was day three.
 
 ---
 
@@ -434,10 +475,10 @@ sequenceDiagram
   App->>API: POST /v1/participants/me/actions {"action":"protect"}
   API->>API: study running? (else 409)
   API->>DB: insert effective_from = server now,<br/>effective_until = +protection_window_seconds
-  API-->>App: 200 {accepted: true}
-  App->>App: refreshState()
-  Note over DB: nothing else happens until the day is ticked
-  Twin->>DB: chosen_protection(study, period)
+  API->>Score: republish state with protected_until
+  API-->>App: 200 {accepted, protected_until}
+  App->>App: refreshState() — shield appears now, not tomorrow
+  Twin->>DB: protection_fractions(study, period)
   Twin->>Twin: rel_sus = rel_trans = 1 - efficacy × fraction of day covered
   Score->>DB: chosen_protection(study, period)
   Score->>Score: −1 point, and no contact awards
@@ -471,15 +512,31 @@ on a day that will never be settled.
 
 ### The two sources of protection
 
-They are computed independently and unioned, and neither can see the other's case:
+They are computed independently and neither can see the other's case:
 
-| Source | Set by | Player sees | Releasable |
+| Source | Set by | Applied to transmission as | Releasable |
 |---|---|---|---|
-| `chosen` | The player, via an action | Shield icon, −1 point | Yes |
-| `not_sensing` | The platform, from coverage | "Protected because your phone is not sensing", button disabled | No |
+| `chosen` | The player, via an action | The fraction of the period it covered | Yes |
+| below coverage threshold | The platform, from `module_status` | `1.0`, outright | No |
 
 The platform's inference is not a courtesy. A phone in a drawer must not be read as a participant
 who met nobody, so it is treated as protected in the model — and its day goes unscored.
+
+**What the screen shows is a third thing again.** `protection_source` on the state document records
+why a *settled* day was protected, which research needs in order to tell a deliberate choice from a
+silent phone. It is history, and driving the live UI from it is wrong in both directions: a shield
+would linger long after Bluetooth came back on, and turning Bluetooth off would change nothing until
+the next tick. So the app asks the module instead — `StudyController.refreshModuleStatus()`, polled
+every five seconds, because `isRadioEnabled()` is a cheap in-process check and the phone is the only
+thing that knows its own radio.
+
+Each field ends up with exactly one meaning:
+
+| Field | Tense | Answers |
+|---|---|---|
+| `protected_until` | live | Is the participant's own protection running? |
+| module status | live | Is the phone collecting? |
+| `protection_source` | settled | Why was *that day* protected? |
 
 ---
 
@@ -493,10 +550,12 @@ who met nobody, so it is treated as protected in the model — and its day goes 
 | Idle sweep | hardcoded, `ProximityModule` | 60 s | Closes episodes nothing announces the end of |
 | Health report | `health.interval_seconds` | 3600 s | One coverage assertion per module per interval |
 | Sync | **hardcoded in the app** | 60 s | Outbox drain + state refresh (see below) |
+| Sensing check | **hardcoded in the app** | 5 s | Whether the radio is on, for the button and the shield |
 | Tick | `twin.tick_interval_seconds` | 86 400 s | One immutable simulated day |
 | Protection window | `rules.pars.protection_window_seconds` | 86 400 s | How long one `protect` lasts |
 | Contact cooldown | `rules.pars.contact_cooldown_days` | 1 day | How often a pair can earn again |
 | Carry-over lookback | `rules.pars.carry_over_days` | 3 days | How far back late contacts are credited |
+| Survey offset | `modules.survey.instruments[].offset_seconds` | — | When an instrument comes due, measured from `starts_at` |
 
 ### How they interact
 
@@ -526,7 +585,15 @@ also be paid as a fresh day-3 contact.
 
 **Episodes straddling midnight are counted in both days.** `Reconciliation.network/4` selects on
 `started_at < to AND ended_at >= from` and does not apportion. An episode is capped at 15 minutes,
-so the overlap is bounded and small — but it is not zero.
+so the overlap is bounded and small — but it is not zero. Shorten the tick without shortening
+`max_episode_seconds` and it stops being small: at five-minute rounds one episode spans three of
+them, and no round sees a closed episode until the third.
+
+**Only the tick interval is measured in ticks.** `Studies.tick_interval/1` is the single definition,
+and `day_at`, `running?`, `Twin.period/4` and `award_carry_over` all read it, so a study cannot
+compute one day here and simulate a different one there. Survey offsets deliberately sit outside
+this: they are seconds from `starts_at`, so nothing on the device has to agree with the server about
+what a day is.
 
 ---
 
@@ -565,24 +632,46 @@ bundle's — see [`tasks/backlog/0005`](../../tasks/backlog/0005-bundle-study-id
 
 **`Twin.Worker` retries a premature day.** It calls `run_tick/2` without options, so a job enqueued
 for a day that has not finished returns `:day_not_finished` and burns all five Oban attempts. A
-snooze until `period_end` would be the right behaviour.
+snooze until `period_end` would be the right behaviour. Dormant until
+[`0002`](../../tasks/backlog/0002-scheduled-ticks.md) lands, since nothing enqueues yet.
 
-**A tick cannot be undone through any supported path.** Recovering from a wrongly-ticked day means
-deleting rows from `twin_ticks`, `game_ledger`, `game_contact_awards`, `participant_states` and
-`twin_agents` by hand. That immutability is deliberate, but there is no `--undo` and no operator
-story for "we ticked the wrong thing".
+**Surveys are only seen when the app is open.** `SurveyModule` decides when an instrument is due,
+but nothing tells a participant. There is no notification dependency anywhere in the repository —
+see [surveys](surveys.md).
+
+**A wrongly-ticked day is recoverable, but only by throwing the run away.**
+`mix epidemica.reset_study` clears ticks, agents, ledger, awards and published state while keeping
+observations and protection decisions, so a study can be replayed against the same real data. There
+is still no way to undo a *single* day: immutability is deliberate, but the operator story is
+all-or-nothing.
 
 ---
 
 ## Reading order for the code
 
-1. [`packages/epidemica_proximity/lib/src/episode_aggregator.dart`](../../packages/epidemica_proximity/lib/src/episode_aggregator.dart) — detections to episodes2. [`server/lib/epidemica_server/reconciliation.ex`](../../server/lib/epidemica_server/reconciliation.ex) — two sides to one edge
+1. [`packages/epidemica_proximity/lib/src/episode_aggregator.dart`](../../packages/epidemica_proximity/lib/src/episode_aggregator.dart) — detections to episodes
+2. [`server/lib/epidemica_server/reconciliation.ex`](../../server/lib/epidemica_server/reconciliation.ex) — two sides to one edge
 3. [`server/lib/epidemica_server/twin.ex`](../../server/lib/epidemica_server/twin.ex) — orchestration and immutability
 4. [`models/src/starsim_epidemica/twin.py`](../../models/src/starsim_epidemica/twin.py) — one simulated day
 5. [`server/lib/epidemica_server/epigame/rules.ex`](../../server/lib/epidemica_server/epigame/rules.ex) — the whole scoring function, pure
 6. [`server/lib/epidemica_server/epigame.ex`](../../server/lib/epidemica_server/epigame.ex) — settlement, carry-over, publishing
 7. [`apps/epigames/lib/src/game_state.dart`](../../apps/epigames/lib/src/game_state.dart) — the state document as a screen
 
+## Seeing it run
+
 To watch all of it happen in half an hour rather than a week, see
 [`studies/epigame-debug`](../../studies/epigame-debug), which compresses the seven days into
 five-minute rounds and comes with a step-by-step debugging guide.
+
+To see the network the model actually used — measured contacts, the simulated mixing rebuilt from
+each tick's seed, and every agent's state day by day — export it and open the viewer:
+
+```sh
+cd server && mix epidemica.export_network --study <id> --out ../analysis/netviz/network.json
+cd ../models && uv run python -m starsim_epidemica.netviz ../analysis/netviz/network.json
+cd ../analysis/netviz && python3 -m http.server 8000
+```
+
+The second step is not optional. Virtual edges are drawn inside the engine and never stored, so
+without rebuilding them the picture shows participants becoming infected with nothing touching
+them — a seven-round debug study exports around 15 measured edges and 2 300 virtual ones.

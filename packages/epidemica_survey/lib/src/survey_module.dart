@@ -15,8 +15,8 @@ import 'schedule.dart';
 /// response as an ordinary observation and keeps no ledger of its own beyond which instruments are
 /// finished, which it must remember across restarts or a participant would be asked twice.
 class SurveyModule extends ChangeNotifier implements EmbeddedModule {
-  SurveyModule({required this.startsAt, InstrumentSource? source, DateTime Function()? now})
-    : _source = source ?? HttpInstrumentSource(),
+  SurveyModule({required InstrumentSource source, DateTime Function()? now})
+    : _source = source,
       _now = now ?? (() => DateTime.now().toUtc());
 
   static const String schemaUri =
@@ -24,16 +24,16 @@ class SurveyModule extends ChangeNotifier implements EmbeddedModule {
 
   static const String _completedKey = 'completed';
 
-  /// When the study opens. Everything is scheduled as an offset from it, so nothing here counts
-  /// days and nothing can disagree with the server about which day it is.
-  final DateTime? startsAt;
-
   final InstrumentSource _source;
   final DateTime Function() _now;
 
   ModuleContext? _context;
   SurveySchedule _schedule = const SurveySchedule([]);
   Set<String> _completed = {};
+
+  /// When the study opens. Everything is scheduled as an offset from it, so nothing here counts
+  /// days and nothing can disagree with the server about which day it is.
+  DateTime? get startsAt => _context?.studyStartsAt;
 
   /// The instrument waiting to be answered, once one has been loaded.
   Instrument? get pending => _pending;

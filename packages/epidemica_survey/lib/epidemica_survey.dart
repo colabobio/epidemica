@@ -10,3 +10,4 @@ export 'src/instrument_source.dart';
 export 'src/response.dart';
 export 'src/schedule.dart';
 export 'src/survey_module.dart';
+export 'src/survey_screen.dart';

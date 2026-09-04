@@ -202,26 +202,29 @@ void main() {
       store = _MemoryStore();
     });
 
-    ModuleContext contextFor(List<Map<String, Object?>> entries, List<Map<String, Object?>> out) =>
-        ModuleContext(
-          config: {'instruments': entries},
-          studyId: 'c0badf00-1111-4222-8333-444455556666',
-          subject: 'alice-0001',
-          store: store,
-          record:
-              ({
-                required String schemaUri,
-                required DateTime observedAt,
-                required Map<String, Object?> payload,
-              }) {
-                out.add({'schema_uri': schemaUri, 'payload': payload});
-                return out.length;
-              },
-        );
+    ModuleContext contextFor(
+      List<Map<String, Object?>> entries,
+      List<Map<String, Object?>> out, {
+      DateTime? start,
+    }) => ModuleContext(
+      config: {'instruments': entries},
+      studyStartsAt: start ?? startsAt,
+      studyId: 'c0badf00-1111-4222-8333-444455556666',
+      subject: 'alice-0001',
+      store: store,
+      record:
+          ({
+            required String schemaUri,
+            required DateTime observedAt,
+            required Map<String, Object?> payload,
+          }) {
+            out.add({'schema_uri': schemaUri, 'payload': payload});
+            return out.length;
+          },
+    );
 
     test('it is sensing while anything remains to be asked', () async {
       final module = SurveyModule(
-        startsAt: startsAt,
         source: source,
         now: () => startsAt.add(const Duration(minutes: 20)),
       );
@@ -232,7 +235,6 @@ void main() {
 
     test('it has stopped once every window has closed', () async {
       final module = SurveyModule(
-        startsAt: startsAt,
         source: source,
         now: () => startsAt.add(const Duration(days: 30)),
       );
@@ -246,9 +248,26 @@ void main() {
     });
 
     test('a study with no schedule has nothing to time anything against', () async {
-      final module = SurveyModule(startsAt: null, source: source);
-      await module.start(contextFor([entryJson()], []));
+      final module = SurveyModule(source: source);
+      await module.start(
+        ModuleContext(
+          config: {
+            'instruments': [entryJson()],
+          },
+          studyId: 'c0badf00-1111-4222-8333-444455556666',
+          subject: 'alice-0001',
+          store: store,
+          record:
+              ({
+                required String schemaUri,
+                required DateTime observedAt,
+                required Map<String, Object?> payload,
+              }) => 1,
+        ),
+      );
 
+      // Every offset is measured from the study's start. Without one there is nothing to measure
+      // against, and guessing would ask a question at a moment nobody chose.
       expect((await module.status()).isSensing, isFalse);
       expect(module.pending, isNull);
     });
@@ -261,6 +280,7 @@ void main() {
 
     ModuleContext contextFor(List<Map<String, Object?>> entries) => ModuleContext(
       config: {'instruments': entries},
+      studyStartsAt: startsAt,
       studyId: 'c0badf00-1111-4222-8333-444455556666',
       subject: 'alice-0001',
       store: store,
@@ -283,7 +303,6 @@ void main() {
 
     Future<SurveyModule> started() async {
       final module = SurveyModule(
-        startsAt: startsAt,
         source: source,
         now: () => startsAt.add(const Duration(minutes: 20)),
       );
@@ -362,7 +381,6 @@ void main() {
       // The completed set is on the device, not in memory: a process death between the answer and
       // the next launch must not turn one measurement into two.
       final relaunched = SurveyModule(
-        startsAt: startsAt,
         source: source,
         now: () => startsAt.add(const Duration(minutes: 25)),
       );
@@ -373,7 +391,6 @@ void main() {
 
     test('a definition that does not match its digest is never presented', () async {
       final module = SurveyModule(
-        startsAt: startsAt,
         source: _RefusingSource(),
         now: () => startsAt.add(const Duration(minutes: 20)),
       );

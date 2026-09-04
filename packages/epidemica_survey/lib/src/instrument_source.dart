@@ -30,9 +30,19 @@ class InstrumentUnavailable implements Exception {
 /// identify what was actually delivered. Same rule as the protocol bundle, for the same reason —
 /// questions a study did not author must never reach a participant.
 class HttpInstrumentSource implements InstrumentSource {
-  HttpInstrumentSource({http.Client? httpClient, Map<String, String>? cache})
-    : _http = httpClient ?? http.Client(),
-      _cache = cache ?? {};
+  HttpInstrumentSource({
+    required this.baseUri,
+    this.authorization,
+    http.Client? httpClient,
+    Map<String, String>? cache,
+  }) : _http = httpClient ?? http.Client(),
+       _cache = cache ?? {};
+
+  /// The API base a relative definition URL resolves against.
+  final Uri baseUri;
+
+  /// Supplies a bearer token, for definitions the study server serves behind one.
+  final Future<String> Function()? authorization;
 
   final http.Client _http;
   final Map<String, String> _cache;
@@ -42,9 +52,14 @@ class HttpInstrumentSource implements InstrumentSource {
     final cached = _cache[entry.key];
     if (cached != null) return _parse(entry, utf8.encode(cached));
 
+    final token = await authorization?.call();
+
     final http.Response response;
     try {
-      response = await _http.get(entry.url);
+      response = await _http.get(
+        baseUri.resolveUri(entry.url),
+        headers: {if (token != null) 'authorization': 'Bearer $token'},
+      );
     } on Object catch (e) {
       throw InstrumentUnavailable('could not fetch ${entry.key}: $e');
     }

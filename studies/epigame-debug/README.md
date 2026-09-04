@@ -26,6 +26,7 @@ against it as many times as you like.
 | `sync.min_interval_seconds` | 900 | 60 | Consistency only — nothing reads it yet (see *Known gaps*). |
 | `rules.pars.contact_min_seconds` | 600 | **120** | 600 s rarely clears inside a 300 s window. |
 | `rules.pars.protection_window_seconds` | 86 400 | **300** | Protection must last one round, not 288 of them. |
+| `modules.survey.instruments[].offset_seconds` | — | **60** | A survey a minute in, so the whole flow is exercised in one sitting. |
 
 Everything else — `beta`, `dur_inf_days`, `population`, the virtual mixing, every point value — is
 deliberately identical, so what you observe here is the same game.
@@ -273,6 +274,33 @@ With rounds now landing every five minutes:
   "Protected because your phone is not sensing" with the button disabled, and score 0.
 - **Finishing.** After round 7 the app shows GAME OVER and a final score, and the protect button
   disappears.
+
+### The survey
+
+One minute after the study opens, a card appears above the score: **A quick check-in**, three
+questions. It is offered rather than forced — an instrument a participant cannot get past is
+abandoned along with everything after it.
+
+Worth checking:
+
+- Answering and sending records one observation. It should reach the server `validated: true`,
+  because the response is checked against
+  [`observations/instruments/survey_response`](../../contracts/observations/instruments/survey_response/1.0.0.json).
+- **Not now** leaves the card in place. Backing out is not an answer, and recording a refusal the
+  participant did not give would invent a decision.
+- **Rather not say** on an optional item records `refused`, which is a different measurement from
+  never reaching it.
+- **Finish later — send what I have** records the rest as `not_reached` and marks the response
+  `partial: true`. Attrition within an instrument is itself a measurement.
+- Once sent, the card does not come back, and it does not come back after a restart either.
+- The window is 30 minutes. After that the card disappears whether or not it was answered.
+
+```sh
+psql epidemica_server_dev -c "
+SELECT subject, validated, payload->>'partial' AS partial,
+       jsonb_array_length(payload->'answers') AS answers
+FROM observations WHERE module = 'survey';"
+```
 
 ## 7. Replay
 

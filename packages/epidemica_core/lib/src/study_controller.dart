@@ -102,6 +102,12 @@ class StudyController extends ChangeNotifier {
   /// for a server computation to be told what their own phone is doing.
   Map<String, ModuleStatus> get moduleStatus => Map.unmodifiable(_moduleStatus);
 
+  /// A bearer token for the study server.
+  ///
+  /// For a module that has to fetch something of its own, such as a definition the bundle only
+  /// points at. Refreshes when it is close to expiring, like every other request.
+  Future<String> accessToken() => _tokens.accessToken();
+
   /// Asks every running module how it is doing. Notifies only when something changed, so this can
   /// be polled often without rebuilding the screen on every tick of a timer.
   Future<void> refreshModuleStatus() async {
@@ -216,6 +222,7 @@ class StudyController extends ChangeNotifier {
               module: module.id,
             ),
             store: DatabaseModuleStore(db: _db, moduleId: module.id),
+            studyStartsAt: enrollment.bundle.startsAt,
           ),
         );
         _running.add(module.id);

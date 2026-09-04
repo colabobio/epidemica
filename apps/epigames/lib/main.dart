@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:epidemica_core/epidemica_core.dart';
 import 'package:epidemica_proximity_module/epidemica_proximity_module.dart';
+import 'package:epidemica_survey/epidemica_survey.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -23,15 +24,25 @@ Future<void> main() async {
   final directory = await getApplicationDocumentsDirectory();
   final db = EpidemicaDatabase.open(p.join(directory.path, 'epidemica.db'));
 
-  final controller = StudyController(
+  // Fetches its own definitions, so it needs the study server and a token for it. Declared before
+  // the controller because it borrows one, and created by the controller because it is a module.
+  late final StudyController controller;
+  final survey = SurveyModule(
+    source: HttpInstrumentSource(
+      baseUri: Uri.parse(_serverUrl),
+      authorization: () => controller.accessToken(),
+    ),
+  );
+
+  controller = StudyController(
     baseUri: Uri.parse(_serverUrl),
     // The module set of this binary. Everything else is decided by the bundle.
-    modules: [ProximityModule()],
+    modules: [ProximityModule(), survey],
     db: db,
     secrets: PlatformSecretStore(),
     platform: Platform.isIOS ? 'ios' : 'android',
   );
   await controller.initialize();
 
-  runApp(EpigamesApp(controller: controller));
+  runApp(EpigamesApp(controller: controller, survey: survey));
 }

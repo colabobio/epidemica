@@ -71,7 +71,12 @@ epidemica_seed() {
   local start="${START:-}"
 
   if [[ -n "$start" ]]; then
-    local dated="${TMPDIR:-/tmp}/epidemica-bundle-$$.json"
+    # A directory rather than a bare file, because instrument definitions are found beside the
+    # bundle. Rewriting the start date must not leave them behind.
+    local staged
+    staged="$(mktemp -d "${TMPDIR:-/tmp}/epidemica-bundle-XXXXXX")"
+    local dated="$staged/bundle.json"
+
     python3 - "$bundle" "$start" "$dated" <<'PY'
 import json, sys
 src, start, dest = sys.argv[1:4]
@@ -83,6 +88,11 @@ with open(dest, "w") as handle:
     json.dump(bundle, handle, indent=2)
     handle.write("\n")
 PY
+
+    if [[ -d "$(dirname "$bundle")/instruments" ]]; then
+      cp -R "$(dirname "$bundle")/instruments" "$staged/"
+    fi
+
     echo "==> Start time set to $start"
     bundle="$dated"
   fi
