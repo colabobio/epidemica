@@ -10,6 +10,7 @@ export 'src/clock.dart';
 export 'src/db/database.dart';
 export 'src/enrollment.dart';
 export 'src/identity.dart';
+export 'src/modules/database_module_store.dart';
 export 'src/modules/embedded_module.dart';
 export 'src/modules/module_health.dart';
 export 'src/outbox.dart';

@@ -215,6 +215,7 @@ class StudyController extends ChangeNotifier {
               clock: _clock,
               module: module.id,
             ),
+            store: DatabaseModuleStore(db: _db, moduleId: module.id),
           ),
         );
         _running.add(module.id);

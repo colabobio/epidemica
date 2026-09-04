@@ -1,0 +1,27 @@
+name: epidemica_survey
+description: >-
+  Scheduled instruments as an Epidemica app capability: reads instrument definitions, decides when
+  one is due, presents it, and records the response as an observation. Lives outside
+  epidemica_core because core must not depend on any module, and outside the apps because a second
+  study would otherwise copy it.
+version: 0.1.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.9.0
+  flutter: ">=3.29.0"
+
+dependencies:
+  crypto: ^3.0.3
+  epidemica_core:
+    path: ../epidemica_core
+  flutter:
+    sdk: flutter
+  http: ^1.2.0
+  meta: ^1.15.0
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter

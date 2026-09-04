@@ -38,6 +38,7 @@ class ModuleContext {
     required this.studyId,
     required this.subject,
     required this.record,
+    required this.store,
   });
 
   /// This module's block from the bundle.
@@ -50,6 +51,23 @@ class ModuleContext {
 
   /// Appends an observation to the outbox. Returns its sequence number.
   final ObservationRecorder record;
+
+  /// Somewhere to keep what the module must not forget when the process dies.
+  final ModuleStore store;
+}
+
+/// A module's own small, durable key-value store.
+///
+/// Namespaced per module, so one cannot read or overwrite another's keys, and cleared with the
+/// rest of the device's state on withdrawal. For what a module has to remember rather than what it
+/// observes: an instrument already answered, an encounter still open. Observations go to the
+/// outbox; this is not a second one.
+abstract class ModuleStore {
+  String? read(String key);
+
+  void write(String key, String value);
+
+  void delete(String key);
 }
 
 /// Appends an observation attributed to one module.
@@ -91,8 +109,7 @@ class ModuleStatus {
 
 /// Builds the recorder a module is given, binding the envelope fields a module has no business
 /// choosing for itself.
-ObservationRecorder recorderFor({
-  required Outbox outbox,
+ObservationRecorder recorderFor({  required Outbox outbox,
   required Enrollment enrollment,
   required DeviceClock clock,
   required String module,

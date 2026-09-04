@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.epidemica.info/instruments/definition/1.0.0.json",
+  "title": "Instrument definition",
+  "description": "The questions an instrument asks, and how they are presented. Versioned independently of the Study Protocol Bundle, which names an instrument and pins the version it uses: an instrument is revised mid-study more often than anyone plans, and a bundle change re-registers the study, which a typo fix must not do.\n\nThis is the document `observations/instruments/survey_response` defers to. That contract records what was answered and deliberately does not type the answers; the types live here, so a response can be checked against the exact version it was collected under.",
+  "type": "object",
+  "$comment": "There is no free-text item type, and that is the point. The response contract warns that free text can carry identifiers no schema can prevent, which makes the observation store pseudonymous by policy rather than by construction. Closed responses keep that promise structural: a study cannot break it by accident, because there is nothing here to ask an open question with.",
+  "required": ["instrument_version", "instrument_id", "version", "title", "items"],
+  "additionalProperties": false,
+  "properties": {
+    "instrument_version": {
+      "enum": ["1.0"],
+      "description": "Selects the definition schema this document is written against. Distinct from `version`, which is the version of the questions themselves."
+    },
+    "instrument_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{1,63}$",
+      "description": "Stable identifier, carried unchanged onto every response. Must match the `instrument_id` a response reports, or answers cannot be joined to the questions that produced them."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version of these questions. Any change that alters what is asked, or the options offered, needs a new version: pooling responses across revisions without knowing which is which is a common and silent source of measurement error."
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "description": "Shown at the top of the instrument. What a participant sees when deciding whether they are answering the right thing."
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 2000,
+      "description": "Optional preamble, shown before the first item. The place to say why the questions are being asked."
+    },
+    "language": {
+      "type": "string",
+      "pattern": "^[a-z]{2}(-[A-Za-z0-9]{2,8})*$",
+      "description": "BCP 47 tag of the language these questions are written in. Recorded on the response too, because translation affects answers."
+    },
+    "items": {
+      "type": "array",
+      "minItems": 1,
+      "description": "The questions, in the order they are presented. Order is part of the instrument: earlier questions change how later ones are answered, so a reordering is a new version.",
+      "items": { "$ref": "#/$defs/item" }
+    }
+  },
+  "$defs": {
+    "item": {
+      "type": "object",
+      "required": ["item_id", "type", "prompt"],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": { "type": { "enum": ["single_choice", "multi_choice"] } },
+            "required": ["type"]
+          },
+          "then": { "required": ["options"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "likert" } }, "required": ["type"] },
+          "then": { "required": ["scale"] }
+        }
+      ],
+      "properties": {
+        "item_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+          "description": "Identifier within the instrument, carried onto the answer. Unique within `items`; reusing one across versions for a different question silently merges two measurements."
+        },
+        "type": {
+          "enum": ["single_choice", "multi_choice", "likert"],
+          "description": "How the item is answered. Closed responses only: an open one would put text no schema can screen into the observation store."
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500,
+          "description": "The question as the participant reads it."
+        },
+        "help": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Optional clarification shown beneath the prompt."
+        },
+        "required": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether the instrument refuses to move on until this is answered. False by default: a participant who declines is recorded as having refused, which is a measurement, whereas one who is trapped abandons the whole instrument and takes the rest of the answers with them."
+        },
+        "options": {
+          "type": "array",
+          "minItems": 2,
+          "description": "The choices offered, for a choice item. At least two, because an item with one option asks nothing.",
+          "items": { "$ref": "#/$defs/option" }
+        },
+        "scale": {
+          "$ref": "#/$defs/scale",
+          "description": "The range offered, for a Likert item."
+        }
+      }
+    },
+    "option": {
+      "type": "object",
+      "required": ["value", "label"],
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "type": ["string", "integer"],
+          "description": "What is recorded when this option is chosen. Stable across revisions of the label: the wording shown to a participant may be improved without changing what the data means."
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "What the participant reads."
+        }
+      }
+    },
+    "scale": {
+      "type": "object",
+      "required": ["min", "max"],
+      "additionalProperties": false,
+      "properties": {
+        "min": { "type": "integer", "description": "Lowest value offered, recorded as given." },
+        "max": { "type": "integer", "description": "Highest value offered." },
+        "min_label": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "What the low end means, e.g. 'not at all'. A bare numeric scale is answered differently from an anchored one."
+        },
+        "max_label": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "What the high end means, e.g. 'extremely'."
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,82 @@
+[
+  {
+    "case": "a short knowledge survey with all three item types",
+    "instance": {
+      "instrument_version": "1.0",
+      "instrument_id": "knowledge",
+      "version": "1.0.0",
+      "title": "What you think about spread",
+      "description": "Five questions. There are no right answers we are marking you on.",
+      "language": "en",
+      "items": [
+        {
+          "item_id": "closest_contact",
+          "type": "single_choice",
+          "prompt": "How close do you think people need to be for an infection to pass between them?",
+          "required": true,
+          "options": [
+            { "value": "touching", "label": "Touching" },
+            { "value": "arms_length", "label": "About an arm's length" },
+            { "value": "same_room", "label": "Anywhere in the same room" },
+            { "value": "unsure", "label": "I am not sure" }
+          ]
+        },
+        {
+          "item_id": "protective_actions",
+          "type": "multi_choice",
+          "prompt": "Which of these do you think reduce the chance of passing something on?",
+          "help": "Choose as many as you like.",
+          "options": [
+            { "value": "distance", "label": "Keeping your distance" },
+            { "value": "ventilation", "label": "Opening a window" },
+            { "value": "staying_home", "label": "Staying at home when unwell" },
+            { "value": "none", "label": "None of these" }
+          ]
+        },
+        {
+          "item_id": "confidence",
+          "type": "likert",
+          "prompt": "How confident are you that you could avoid catching something this week?",
+          "scale": { "min": 1, "max": 5, "min_label": "not at all", "max_label": "very" }
+        }
+      ]
+    }
+  },
+  {
+    "case": "the smallest instrument that asks anything",
+    "instance": {
+      "instrument_version": "1.0",
+      "instrument_id": "one_question",
+      "version": "2.3.1",
+      "title": "One question",
+      "items": [
+        {
+          "item_id": "felt_unwell",
+          "type": "single_choice",
+          "prompt": "Have you felt unwell today?",
+          "options": [
+            { "value": 1, "label": "Yes" },
+            { "value": 0, "label": "No" }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "case": "a likert item with an unlabelled scale",
+    "instance": {
+      "instrument_version": "1.0",
+      "instrument_id": "bare_scale",
+      "version": "1.0.0",
+      "title": "Bare scale",
+      "items": [
+        {
+          "item_id": "how_many",
+          "type": "likert",
+          "prompt": "How many people did you spend time near today?",
+          "scale": { "min": 0, "max": 10 }
+        }
+      ]
+    }
+  }
+]

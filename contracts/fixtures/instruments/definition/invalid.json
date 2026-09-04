@@ -1,0 +1,146 @@
+[
+  {
+    "case": "a free-text item",
+    "why": "The response contract warns that free text carries identifiers no schema can screen. Having no open item type is what makes the store pseudonymous by construction rather than by policy, so this must be rejected rather than merely discouraged.",
+    "instance": {
+      "instrument_version": "1.0",
+      "instrument_id": "leaky",
+      "version": "1.0.0",
+      "title": "Leaky",
+      "items": [{ "item_id": "who", "type": "free_text", "prompt": "Who did you see today?" }]
+    }
+  },
+  {
+    "case": "a choice item with no options",
+    "why": "An item that offers nothing to choose cannot be answered, and would reach a participant as a question with no way past it.",
+    "instance": {
+      "instrument_version": "1.0",
+      "instrument_id": "empty_choice",
+      "version": "1.0.0",
+      "title": "Empty choice",
+      "items": [{ "item_id": "pick", "type": "single_choice", "prompt": "Pick one" }]
+    }
+  },
+  {
+    "case": "a choice item offering a single option",
+    "why": "One option asks nothing: every participant gives the same answer, and the item measures only who reached it.",
+    "instance": {
+      "instrument_version": "1.0",
+      "instrument_id": "one_option",
+      "version": "1.0.0",
+      "title": "One option",
+      "items": [
+        {
+          "item_id": "pick",
+          "type": "single_choice",
+          "prompt": "Pick one",
+          "options": [{ "value": "a", "label": "The only answer" }]
+        }
+      ]
+    }
+  },
+  {
+    "case": "a likert item with no scale",
+    "why": "Without a range there is nothing to render and nothing to interpret the recorded number against.",
+    "instance": {
+      "instrument_version": "1.0",
+      "instrument_id": "no_scale",
+      "version": "1.0.0",
+      "title": "No scale",
+      "items": [{ "item_id": "how_much", "type": "likert", "prompt": "How much?" }]
+    }
+  },
+  {
+    "case": "an instrument with no items",
+    "why": "An instrument that asks nothing would still be scheduled, notified and recorded, producing an empty response indistinguishable from a participant who answered nothing.",
+    "instance": {
+      "instrument_version": "1.0",
+      "instrument_id": "silent",
+      "version": "1.0.0",
+      "title": "Silent",
+      "items": []
+    }
+  },
+  {
+    "case": "a version that is not semantic",
+    "why": "Responses carry this string and are pooled by it. A version that does not order cannot tell an analyst which revision came first.",
+    "instance": {
+      "instrument_version": "1.0",
+      "instrument_id": "loose",
+      "version": "v2",
+      "title": "Loose",
+      "items": [
+        {
+          "item_id": "pick",
+          "type": "single_choice",
+          "prompt": "Pick one",
+          "options": [
+            { "value": "a", "label": "A" },
+            { "value": "b", "label": "B" }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "case": "an item id that does not match the response contract",
+    "why": "The same pattern governs `item_id` on a response. An id accepted here but rejected there would produce answers that cannot be uploaded.",
+    "instance": {
+      "instrument_version": "1.0",
+      "instrument_id": "bad_item",
+      "version": "1.0.0",
+      "title": "Bad item",
+      "items": [
+        {
+          "item_id": "Felt-Unwell",
+          "type": "single_choice",
+          "prompt": "Have you felt unwell?",
+          "options": [
+            { "value": 1, "label": "Yes" },
+            { "value": 0, "label": "No" }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "case": "an option with a label but no recorded value",
+    "why": "The label is what a participant reads and may be reworded freely; the value is what the data means. An option without one records the wording instead.",
+    "instance": {
+      "instrument_version": "1.0",
+      "instrument_id": "no_value",
+      "version": "1.0.0",
+      "title": "No value",
+      "items": [
+        {
+          "item_id": "pick",
+          "type": "single_choice",
+          "prompt": "Pick one",
+          "options": [{ "label": "Yes" }, { "value": "no", "label": "No" }]
+        }
+      ]
+    }
+  },
+  {
+    "case": "an unknown field on the instrument",
+    "why": "Contracts are closed so a study cannot quietly ship a field nobody agreed to store or render.",
+    "instance": {
+      "instrument_version": "1.0",
+      "instrument_id": "extra",
+      "version": "1.0.0",
+      "title": "Extra",
+      "scoring": { "weights": [1, 2] },
+      "items": [
+        {
+          "item_id": "pick",
+          "type": "single_choice",
+          "prompt": "Pick one",
+          "options": [
+            { "value": "a", "label": "A" },
+            { "value": "b", "label": "B" }
+          ]
+        }
+      ]
+    }
+  }
+]
