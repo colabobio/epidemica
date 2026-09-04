@@ -17,7 +17,7 @@ defmodule EpidemicaServer.Ingest do
 
   import Ecto.Query
 
-  alias EpidemicaServer.{Contracts, Projections, Repo}
+  alias EpidemicaServer.{Contracts, Projections, Repo, Studies}
   alias EpidemicaServer.Ingest.Observation
 
   @max_batch 1000
@@ -51,8 +51,22 @@ defmodule EpidemicaServer.Ingest do
       # `contacts` is indistinguishable from a study where nobody met anyone, so a projection that
       # only runs when something happens to ask for it is a silent wrong answer.
       Projections.project_contacts(auth.study_id, only: ids)
+      refresh_study_state(auth)
 
       {:ok, build_result(classified, storable, rejected, inserted, received_at)}
+    end
+  end
+
+  # A scored study tells the participant what has been recorded since the last tick, so a contact
+  # is visible while it is happening rather than only in the next day's arithmetic. Only the
+  # uploading participant is refreshed; their peer picks the same contact up on their own next sync.
+  defp refresh_study_state(%Auth{} = auth) do
+    case Studies.get_study(auth.study_id) do
+      %{protocol: %{"rules" => %{"engine" => "epigame"}}} ->
+        EpidemicaServer.Epigame.refresh_pending(auth.study_id, auth.subject)
+
+      _ ->
+        :ok
     end
   end
 

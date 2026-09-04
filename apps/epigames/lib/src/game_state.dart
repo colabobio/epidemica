@@ -18,6 +18,7 @@ class GameState {
     required this.population,
     required this.protectionSource,
     required this.protectedUntil,
+    required this.pendingContacts,
     required this.settlement,
     required this.asOf,
   });
@@ -34,6 +35,7 @@ class GameState {
         population: 0,
         protectionSource: null,
         protectedUntil: null,
+        pendingContacts: 0,
         settlement: null,
         asOf: null,
       );
@@ -53,6 +55,7 @@ class GameState {
       population: state['population'] as int? ?? 0,
       protectionSource: state['protection_source'] as String?,
       protectedUntil: until is String ? DateTime.tryParse(until)?.toUtc() : null,
+      pendingContacts: state['pending_contacts'] as int? ?? 0,
       settlement: settlement is Map
           ? Settlement.fromJson(settlement.cast<String, Object?>())
           : null,
@@ -77,6 +80,13 @@ class GameState {
   /// An instant rather than a flag so the app can expire it without waiting for a tick, which is
   /// what lets a decision show its effect the moment it is made.
   final DateTime? protectedUntil;
+
+  /// Long-enough contacts recorded since the last day was decided.
+  ///
+  /// Not a promise of points: whether one pays depends on protection and cooldown, which the
+  /// server settles at the end of the day. Shown so that a contact is visible while it is
+  /// happening rather than only as an unexplained number the following morning.
+  final int pendingContacts;
 
   final Settlement? settlement;
   final DateTime? asOf;
@@ -137,8 +147,9 @@ class GameState {
     'infected' => 'Infected — no points today',
     'protection' => 'Protection',
     'not_sensing' => 'Your phone was not sensing, so today was not scored',
-    'contacts' => '${line.count} contact${line.count == 1 ? '' : 's'}',
-    'carried_over' => '${line.count} contact${line.count == 1 ? '' : 's'} confirmed late',
+    'contacts' => '${line.count} contact${line.count == 1 ? '' : 's'} today',
+    'carried_over' =>
+      '${line.count} contact${line.count == 1 ? '' : 's'} from earlier days, confirmed late',
     _ => line.reason,
   };
 }

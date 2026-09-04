@@ -181,8 +181,35 @@ void main() {
     });
 
     test('one contact is singular and two are plural', () {
-      expect(GameState.describe(const SettlementLine('contacts', 5, count: 1)), '1 contact');
-      expect(GameState.describe(const SettlementLine('contacts', 10, count: 2)), '2 contacts');
+      expect(GameState.describe(const SettlementLine('contacts', 5, count: 1)), '1 contact today');
+      expect(
+        GameState.describe(const SettlementLine('contacts', 10, count: 2)),
+        '2 contacts today',
+      );
+    });
+
+    test('a late credit says the contacts came from earlier days', () {
+      // The two contact lines are scored differently and arrive for different reasons, so a
+      // participant reading the card has to be able to tell which is which.
+      expect(
+        GameState.describe(const SettlementLine('carried_over', 30, count: 6)),
+        '6 contacts from earlier days, confirmed late',
+      );
+    });
+  });
+
+  group('contacts not yet scored', () {
+    test('a recorded contact is visible before the day is settled', () {
+      final game = GameState.from(document({...healthy, 'pending_contacts': 2}));
+
+      expect(game.pendingContacts, 2);
+    });
+
+    test('a document that says nothing about them reports none', () {
+      // Never inferred from anything the phone can see: the count is the server's reconciliation
+      // of both sides, and a locally invented one would disagree with the score that follows.
+      expect(GameState.from(document(healthy)).pendingContacts, 0);
+      expect(GameState.from(null).pendingContacts, 0);
     });
   });
 

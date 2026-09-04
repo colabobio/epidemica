@@ -156,9 +156,9 @@ class _WaitingScreen extends StatelessWidget {
               ),
               const SizedBox(height: 32),
               TextButton(
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(builder: (_) => const InfoScreen()),
-                ),
+                onPressed: () => Navigator.of(
+                  context,
+                ).push(MaterialPageRoute<void>(builder: (_) => const InfoScreen())),
                 child: const Text('How this works', style: TextStyle(color: Colors.white)),
               ),
               TextButton(
@@ -256,7 +256,9 @@ class _GameScreen extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      game.finished ? 'You finished ${game.stateLabel.toLowerCase()}' : game.stateLabel,
+                      game.finished
+                          ? 'You finished ${game.stateLabel.toLowerCase()}'
+                          : game.stateLabel,
                       style: TextStyle(color: onColour, fontSize: 22, letterSpacing: 1),
                     ),
                   ],
@@ -265,6 +267,8 @@ class _GameScreen extends StatelessWidget {
               const SizedBox(height: 32),
               if (game.settlement != null) _SettlementCard(game: game, onColour: onColour),
               const SizedBox(height: 16),
+              if (game.pendingContacts > 0 && !game.finished)
+                _Pending(game: game, onColour: onColour),
               _Aggregate(game: game, onColour: onColour),
               const SizedBox(height: 32),
               // The decision disappears when there is no longer a day it could apply to. Leaving a
@@ -293,9 +297,9 @@ class _GameScreen extends StatelessWidget {
                   ),
                 ),
               TextButton(
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(builder: (_) => const InfoScreen()),
-                ),
+                onPressed: () => Navigator.of(
+                  context,
+                ).push(MaterialPageRoute<void>(builder: (_) => const InfoScreen())),
                 child: Text('How this works', style: TextStyle(color: onColour)),
               ),
               TextButton(
@@ -376,12 +380,7 @@ class _SettlementCard extends StatelessWidget {
               onColour: onColour,
             ),
           Divider(color: onColour.withValues(alpha: 0.2)),
-          _Line(
-            label: 'Total',
-            value: settlement.closing,
-            bold: true,
-            onColour: onColour,
-          ),
+          _Line(label: 'Total', value: settlement.closing, bold: true, onColour: onColour),
         ],
       ),
     );
@@ -405,10 +404,7 @@ class _Line extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final style = TextStyle(
-      color: onColour,
-      fontWeight: bold ? FontWeight.w700 : FontWeight.w400,
-    );
+    final style = TextStyle(color: onColour, fontWeight: bold ? FontWeight.w700 : FontWeight.w400);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
@@ -423,9 +419,44 @@ class _Line extends StatelessWidget {
   }
 }
 
+/// Contacts recorded today, before the day has been scored.
+///
+/// Deliberately worded as a record rather than a reward. Whether a contact pays depends on
+/// protection and cooldown, which the server decides at the end of the day, and promising points
+/// that then do not arrive would be the same unexplained arithmetic in the opposite direction.
+class _Pending extends StatelessWidget {
+  const _Pending({required this.game, required this.onColour});
+
+  final GameState game;
+  final Color onColour;
+
+  @override
+  Widget build(BuildContext context) {
+    final n = game.pendingContacts;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.people_outline, size: 18, color: onColour.withValues(alpha: 0.8)),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              n == 1
+                  ? 'Time near 1 other player recorded today'
+                  : 'Time near $n other players recorded today',
+              style: TextStyle(color: onColour.withValues(alpha: 0.8)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _Aggregate extends StatelessWidget {
   const _Aggregate({required this.game, required this.onColour});
-
   final GameState game;
   final Color onColour;
 

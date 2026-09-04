@@ -397,6 +397,152 @@ defmodule EpidemicaServer.EpigameTest do
     assert Epigame.balance(s.id, "alice-0001") == 9
   end
 
+  test "a late contact made while protected is not paid for once protection lapses" do
+    s = study()
+    participant(s, "alice-0001")
+    participant(s, "bob-0001")
+
+    for day <- 1..2 do
+      sensing(s, "alice-0001", day)
+      sensing(s, "bob-0001", day)
+    end
+
+    # Protected for the whole of day one, and not at all on day two.
+    {day_one, _} = day_window(1)
+
+    {:ok, _} =
+      Epigame.protect(s.id, "alice-0001", day_one, %{"protection_window_seconds" => 86_400})
+
+    tick(s, 1)
+    {:ok, _} = settle(s, 1)
+
+    episode(s, "alice-0001", "bob-0001", 1, 30)
+
+    tick(s, 2)
+    {:ok, _} = settle(s, 2)
+
+    # Protection removes the reward as well as the risk. Judging a day-one contact by day two's
+    # protection would refund a cost the participant accepted, and the mirror case would deny
+    # someone contacts they earned before they protected.
+    reasons = lines(s, "alice-0001", 2) |> Enum.map(& &1["reason"])
+    refute "carried_over" in reasons
+
+    # Bob was never protected, but the contact needs two unprotected sides, so he is not paid either.
+    refute "carried_over" in (lines(s, "bob-0001", 2) |> Enum.map(& &1["reason"]))
+  end
+
+  test "a late contact made while unprotected is paid even if protected now" do
+    s = study()
+    participant(s, "alice-0001")
+    participant(s, "bob-0001")
+
+    for day <- 1..2 do
+      sensing(s, "alice-0001", day)
+      sensing(s, "bob-0001", day)
+    end
+
+    tick(s, 1)
+    {:ok, _} = settle(s, 1)
+
+    episode(s, "alice-0001", "bob-0001", 1, 30)
+
+    {day_two, _} = day_window(2)
+    {:ok, _} = Epigame.protect(s.id, "alice-0001", day_two)
+
+    tick(s, 2)
+    {:ok, _} = settle(s, 2)
+
+    reasons = lines(s, "alice-0001", 2) |> Enum.map(& &1["reason"])
+    assert "carried_over" in reasons
+  end
+
+  describe "contacts a participant has not been paid for yet" do
+    test "a long enough contact shows as pending before the day settles" do
+      s = study(schedule: %{"starts_at" => "2026-09-02T00:00:00Z", "days" => 7})
+      participant(s, "alice-0001")
+      participant(s, "bob-0001")
+      episode(s, "alice-0001", "bob-0001", 1, 30)
+
+      {_, day_end} = day_window(1)
+
+      # The screen otherwise says nothing at all until the day is settled, which is what made a
+      # large contact payment look like it came from nowhere.
+      assert Epigame.pending_contacts(s.id, "alice-0001", day_end) == 1
+      assert Epigame.pending_contacts(s.id, "bob-0001", day_end) == 1
+    end
+
+    test "a contact too brief to score is not counted" do
+      s = study(schedule: %{"starts_at" => "2026-09-02T00:00:00Z", "days" => 7})
+      participant(s, "alice-0001")
+      participant(s, "bob-0001")
+      episode(s, "alice-0001", "bob-0001", 1, 2)
+
+      {_, day_end} = day_window(1)
+      assert Epigame.pending_contacts(s.id, "alice-0001", day_end) == 0
+    end
+
+    test "contacts already settled are no longer pending" do
+      s = study(schedule: %{"starts_at" => "2026-09-02T00:00:00Z", "days" => 7})
+      participant(s, "alice-0001")
+      participant(s, "bob-0001")
+      sensing(s, "alice-0001", 1)
+      sensing(s, "bob-0001", 1)
+      episode(s, "alice-0001", "bob-0001", 1, 30)
+
+      {_, day_end} = day_window(1)
+      assert Epigame.pending_contacts(s.id, "alice-0001", day_end) == 1
+
+      tick(s, 1)
+      {:ok, _} = settle(s, 1)
+
+      # The window starts again after the day that has been decided, or a contact would be
+      # advertised as coming for ever after it had been paid.
+      assert Epigame.pending_contacts(s.id, "alice-0001", day_end) == 0
+    end
+
+    test "a contact from another pair is not counted" do
+      s = study(schedule: %{"starts_at" => "2026-09-02T00:00:00Z", "days" => 7})
+      participant(s, "alice-0001")
+      participant(s, "bob-0001")
+      participant(s, "carol-0001")
+      episode(s, "bob-0001", "carol-0001", 1, 30)
+
+      {_, day_end} = day_window(1)
+      assert Epigame.pending_contacts(s.id, "alice-0001", day_end) == 0
+      assert Epigame.pending_contacts(s.id, "bob-0001", day_end) == 1
+    end
+
+    test "settlement publishes the count so the app can show it" do
+      s = study(schedule: %{"starts_at" => "2026-09-02T00:00:00Z", "days" => 7})
+      participant(s, "alice-0001")
+      participant(s, "bob-0001")
+      {:ok, _} = Epigame.publish_initial(s.id, "alice-0001")
+
+      {:ok, initial} = ParticipantState.fetch(s.id, "alice-0001")
+      assert initial.state["pending_contacts"] == 0
+
+      episode(s, "alice-0001", "bob-0001", 1, 30)
+      {:ok, _} = Epigame.refresh_pending(s.id, "alice-0001", elem(day_window(1), 1))
+
+      {:ok, document} = ParticipantState.fetch(s.id, "alice-0001")
+      assert document.state["pending_contacts"] == 1
+      assert document.revision > initial.revision
+    end
+
+    test "an unchanged count does not churn the revision" do
+      s = study(schedule: %{"starts_at" => "2026-09-02T00:00:00Z", "days" => 7})
+      participant(s, "alice-0001")
+      {:ok, _} = Epigame.publish_initial(s.id, "alice-0001")
+
+      {:ok, before} = ParticipantState.fetch(s.id, "alice-0001")
+      :ok = Epigame.refresh_pending(s.id, "alice-0001")
+
+      # A device syncing every minute must not make every poll look like news.
+      {:ok, document} = ParticipantState.fetch(s.id, "alice-0001")
+      assert document.revision == before.revision
+    end
+  end
+
   # -- immutability and publication ----------------------------------------------------------------
 
   test "a settled day is never settled twice" do

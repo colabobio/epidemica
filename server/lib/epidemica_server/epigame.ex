@@ -13,6 +13,7 @@ defmodule EpidemicaServer.Epigame do
   import Ecto.Query
 
   alias EpidemicaServer.{Health, ParticipantState, Reconciliation, Repo, Studies}
+  alias EpidemicaServer.Enrollment.Participant
   alias EpidemicaServer.Epigame.{LedgerEntry, Rules}
   alias EpidemicaServer.Twin.Tick
 
@@ -41,6 +42,7 @@ defmodule EpidemicaServer.Epigame do
           "points" => 0,
           "protected_until" => nil,
           "protection_source" => nil,
+          "pending_contacts" => 0,
           "total_cases" => 0
         }
         |> put_population(study)
@@ -79,7 +81,7 @@ defmodule EpidemicaServer.Epigame do
       chosen = chosen_protection(study_id, tick.period_start, tick.period_end)
 
       awards = award_day(study_id, day, tick, pars, chosen, observed)
-      carried = award_carry_over(study_id, day, study, pars, chosen)
+      carried = award_carry_over(study_id, day, study, pars)
 
       settlements =
         Enum.map(subjects, fn subject ->
@@ -224,6 +226,87 @@ defmodule EpidemicaServer.Epigame do
     |> MapSet.new()
   end
 
+  # -- contacts a participant has earned but not yet been paid for -------------------------------
+
+  @doc """
+  How many long-enough contacts a participant has had since the last tick.
+
+  Reported so the app can say something is coming without keeping a second ledger. It is not a
+  promise of points: whether a contact pays depends on protection and cooldown, which are decided
+  when the day settles.
+  """
+  def pending_contacts(study_id, subject, now \\ DateTime.utc_now()) do
+    with {:ok, study} <- fetch_study(study_id),
+         {:ok, rules} <- rules_block(study),
+         since when since != nil <- pending_since(study_id, study, subject),
+         :lt <- DateTime.compare(since, now) do
+      minimum = Rules.pars(rules)["contact_min_seconds"]
+
+      study_id
+      |> Reconciliation.network(since, now)
+      |> Enum.count(fn edge ->
+        {a, b} = edge.pair
+        (a == subject or b == subject) and edge.seconds >= minimum
+      end)
+    else
+      _ -> 0
+    end
+  end
+
+  @doc """
+  Recompute a participant's pending contacts and publish them if the number moved.
+
+  Only writes on a change, so a device syncing every minute does not churn the document's revision
+  and make every poll look like news.
+  """
+  def refresh_pending(study_id, subject, now \\ DateTime.utc_now()) do
+    case ParticipantState.fetch(study_id, subject) do
+      {:ok, %{state: state}} ->
+        count = pending_contacts(study_id, subject, now)
+
+        if state["pending_contacts"] == count do
+          :ok
+        else
+          ParticipantState.put(
+            study_id,
+            subject,
+            @state_uri,
+            Map.put(state, "pending_contacts", count)
+          )
+        end
+
+      {:error, :not_found} ->
+        :ok
+    end
+  end
+
+  # Everything after the last decided day is still open. Before the first tick that is the study's
+  # start, and for a study with no schedule it is when the participant joined -- never earlier, or
+  # a newcomer would inherit contacts made before they existed.
+  defp pending_since(study_id, study, subject) do
+    last_tick_end(study_id) || Studies.starts_at(study) || enrolled_at(study_id, subject)
+  end
+
+  defp last_tick_end(study_id) do
+    Repo.one(
+      from t in Tick,
+        where: t.study_id == type(^study_id, :binary_id),
+        order_by: [desc: t.day],
+        limit: 1,
+        select: t.period_end
+    )
+    |> to_utc()
+  end
+
+  defp enrolled_at(study_id, subject) do
+    Repo.one(
+      from p in Participant,
+        where: p.study_id == type(^study_id, :binary_id) and p.subject == ^subject,
+        select: p.enrolled_at
+    )
+    |> to_utc()
+  end
+
   # -- internals ----------------------------------------------------------------------------------
 
   defp fetch_study(study_id) do
@@ -302,7 +385,7 @@ defmodule EpidemicaServer.Epigame do
 
   # Days already settled are revisited only to find contacts whose other side had not yet arrived.
   # Their own settlements are untouched; the credit lands here instead.
-  defp award_carry_over(study_id, day, study, pars, chosen) do
+  defp award_carry_over(study_id, day, study, pars) do
     lookback = Map.get(pars, "carry_over_days", 3)
     interval = Studies.tick_interval(study)
 
@@ -317,8 +400,16 @@ defmodule EpidemicaServer.Epigame do
               received_before: DateTime.add(past.period_end, interval * lookback, :second)
             )
 
+          # Every fact used to judge a late contact is the one that held on the day of the contact,
+          # not today. Protection removes the reward as well as the risk, so paying a participant
+          # now for a contact they made while protected refunds a cost they agreed to -- and the
+          # mirror case would deny someone contacts they earned before protecting.
+          chosen_then = chosen_protection(study_id, past.period_start, past.period_end)
           observed_then = observed_subjects(study_id, past, participants_in(past), pars)
-          counts = record_awards(study_id, earlier, day, network, pars, chosen, observed_then)
+
+          counts =
+            record_awards(study_id, earlier, day, network, pars, chosen_then, observed_then)
+
           Map.merge(acc, counts, fn _k, a, b -> a + b end)
       end
     end)
@@ -425,6 +516,7 @@ defmodule EpidemicaServer.Epigame do
       "points" => settlement.closing,
       "protected_until" => iso(protected_until(study_id, subject)),
       "protection_source" => protection_source(subject, chosen, observed),
+      "pending_contacts" => pending_contacts(study_id, subject),
       "total_cases" => Map.get(tick.outputs, "total_cases", 0),
       "population" => Map.get(tick.inputs, "population", 0),
       "settlement" => stringify(settlement)
