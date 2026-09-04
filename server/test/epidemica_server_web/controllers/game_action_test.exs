@@ -9,7 +9,7 @@ defmodule EpidemicaServerWeb.GameActionTest do
 
   use EpidemicaServerWeb.ConnCase, async: true
 
-  alias EpidemicaServer.{Enrollment, Epigame, Studies}
+  alias EpidemicaServer.{Enrollment, Epigame, ParticipantState, Studies}
 
   setup %{conn: conn} do
     source =
@@ -74,6 +74,44 @@ defmodule EpidemicaServerWeb.GameActionTest do
     now = DateTime.utc_now()
     protected = Epigame.chosen_protection(ctx.study.id, now, DateTime.add(now, 60, :second))
     assert MapSet.member?(protected, ctx.enrolled.subject)
+  end
+
+  describe "the decision is visible at once" do
+    test "enrolling publishes a starting state, so there is something to update", ctx do
+      {:ok, document} = ParticipantState.fetch(ctx.study.id, ctx.enrolled.subject)
+
+      assert document.state["day"] == 0
+      assert document.state["epi_state"] == "susceptible"
+      assert document.state["points"] == 0
+    end
+
+    test "taking protection answers with when it lapses", ctx do
+      body = json_response(act(ctx, %{"action" => "protect"}), 200)
+
+      assert {:ok, until, _} = DateTime.from_iso8601(body["protected_until"])
+      assert DateTime.compare(until, DateTime.utc_now()) == :gt
+    end
+
+    test "taking protection updates the published state before any tick", ctx do
+      {:ok, before} = ParticipantState.fetch(ctx.study.id, ctx.enrolled.subject)
+      assert before.state["protected_until"] == nil
+
+      body = json_response(act(ctx, %{"action" => "protect"}), 200)
+
+      # The app renders the state document, so protection that only appeared at settlement would
+      # leave a player with no confirmation that their tap did anything for a whole day.
+      {:ok, document} = ParticipantState.fetch(ctx.study.id, ctx.enrolled.subject)
+      assert document.state["protected_until"] == body["protected_until"]
+      assert document.revision > before.revision
+    end
+
+    test "releasing clears it just as promptly", ctx do
+      act(ctx, %{"action" => "protect"})
+      assert json_response(act(ctx, %{"action" => "release"}), 200)["protected_until"] == nil
+
+      {:ok, document} = ParticipantState.fetch(ctx.study.id, ctx.enrolled.subject)
+      assert document.state["protected_until"] == nil
+    end
   end
 
   test "protection cannot be backdated by the client", ctx do

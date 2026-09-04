@@ -17,6 +17,48 @@ defmodule EpidemicaServer.Epigame do
   alias EpidemicaServer.Twin.Tick
 
   @proximity_module "proximity"
+  @state_uri "https://schemas.epidemica.info/state/epigame/1.0.0.json"
+
+  @doc """
+  Publish the state a participant starts with.
+
+  Without it there is nothing to render until the first tick lands, and a blank screen for a whole
+  day reads as a broken study rather than one that has not decided anything yet. `susceptible` is
+  not a guess: seeding runs at the first tick, so nobody is infected before one has happened.
+
+  Does nothing if a state already exists, because re-enrolling after a reinstall must not reset a
+  participant to day zero.
+  """
+  def publish_initial(study_id, subject) do
+    with {:ok, study} <- fetch_study(study_id),
+         {:ok, _rules} <- rules_block(study),
+         {:error, :not_found} <- ParticipantState.fetch(study_id, subject) do
+      state =
+        %{
+          "day" => 0,
+          "days_total" => Studies.scheduled_days(study),
+          "epi_state" => "susceptible",
+          "points" => 0,
+          "protected_until" => nil,
+          "protection_source" => nil,
+          "total_cases" => 0
+        }
+        |> put_population(study)
+
+      ParticipantState.put(study_id, subject, @state_uri, state)
+    else
+      {:ok, _already_has_state} -> :ok
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  # Omitted rather than zeroed for a study with no twin: the contract requires a population of at
+  # least one because `total_cases` is meaningless without it, and inventing a size to satisfy that
+  # would be worse than saying nothing.
+  defp put_population(state, %{protocol: %{"twin" => %{"population" => n}}}) when is_integer(n),
+    do: Map.put(state, "population", n)
+
+  defp put_population(state, _study), do: state
 
   @doc """
   Settle one study-day for every enrolled participant.
@@ -106,7 +148,8 @@ defmodule EpidemicaServer.Epigame do
       []
     )
 
-    :ok
+    publish_protection(study_id, subject, at)
+    {:ok, protected_until(study_id, subject, at)}
   end
 
   @doc "Release protection early. Does not refund the day already charged for."
@@ -121,8 +164,52 @@ defmodule EpidemicaServer.Epigame do
         set: [effective_until: at]
       )
 
-    if count > 0, do: :ok, else: {:error, :not_protected}
+    if count > 0 do
+      publish_protection(study_id, subject, at)
+      :ok
+    else
+      {:error, :not_protected}
+    end
   end
+
+  @doc "When a participant's chosen protection lapses, or nil when they have none running."
+  def protected_until(study_id, subject, at \\ DateTime.utc_now()) do
+    Repo.one(
+      from a in "game_actions",
+        where:
+          a.study_id == type(^study_id, :binary_id) and a.subject == ^subject and
+            a.type == "protect" and a.effective_from <= ^at and a.effective_until > ^at,
+        select: max(a.effective_until)
+    )
+    |> to_utc()
+  end
+
+  # Protection is the participant's own decision, so it is published the instant it is taken rather
+  # than at settlement. The contract carries `protected_until` as an instant for exactly this: a
+  # player who taps "protect" and sees nothing change until tomorrow cannot connect the act to its
+  # consequence, which is the thing the game exists to teach.
+  #
+  # Only `protected_until` is touched. `protection_source` says why a *settled* day was protected,
+  # which research needs in order to tell a deliberate choice from a phone that stopped sensing;
+  # overwriting it here would destroy that distinction on the next tap.
+  defp publish_protection(study_id, subject, at) do
+    case ParticipantState.fetch(study_id, subject) do
+      {:ok, %{state: state}} ->
+        updated = Map.put(state, "protected_until", iso(protected_until(study_id, subject, at)))
+        ParticipantState.put(study_id, subject, @state_uri, updated)
+
+      {:error, :not_found} ->
+        :ok
+    end
+  end
+
+  defp iso(nil), do: nil
+  defp iso(%DateTime{} = dt), do: DateTime.to_iso8601(dt)
+
+  # A schemaless query has no schema to say the column is UTC, so it arrives naive.
+  defp to_utc(nil), do: nil
+  defp to_utc(%DateTime{} = dt), do: dt
+  defp to_utc(%NaiveDateTime{} = naive), do: DateTime.from_naive!(naive, "Etc/UTC")
 
   @doc "Subjects who chose protection covering any part of `[from, to)`."
   def chosen_protection(study_id, from, to) do
@@ -336,15 +423,14 @@ defmodule EpidemicaServer.Epigame do
       "days_total" => Studies.scheduled_days(study),
       "epi_state" => current_state(tick, subject, shown),
       "points" => settlement.closing,
+      "protected_until" => iso(protected_until(study_id, subject)),
       "protection_source" => protection_source(subject, chosen, observed),
       "total_cases" => Map.get(tick.outputs, "total_cases", 0),
       "population" => Map.get(tick.inputs, "population", 0),
       "settlement" => stringify(settlement)
     }
 
-    state_uri = "https://schemas.epidemica.info/state/epigame/1.0.0.json"
-
-    case ParticipantState.put(study_id, subject, state_uri, state) do
+    case ParticipantState.put(study_id, subject, @state_uri, state) do
       {:ok, _} ->
         :ok
 

@@ -8,6 +8,8 @@ defmodule EpidemicaServer.Enrollment do
 
   import Ecto.Query
 
+  require Logger
+
   alias EpidemicaServer.Enrollment.{Device, Participant, Token}
   alias EpidemicaServer.Ingest.Auth
   alias EpidemicaServer.{Repo, Studies}
@@ -35,6 +37,8 @@ defmodule EpidemicaServer.Enrollment do
              :ok <- ensure_device_available(participant, device_id, join_code.study_id),
              {:ok, device} <- upsert_device(participant, join_code.study_id, device_id, attrs),
              {:ok, access, refresh} <- issue_tokens(device, now) do
+          publish_initial_state(join_code.study, participant)
+
           %{
             subject: participant.subject,
             study_id: join_code.study_id,
@@ -55,6 +59,31 @@ defmodule EpidemicaServer.Enrollment do
   end
 
   def enroll(_), do: {:error, :invalid_request}
+
+  # A scored study publishes what the participant starts with, so the app has something true to show
+  # before the first tick rather than a blank screen that reads as a broken study. A study with no
+  # rules has no state to publish.
+  #
+  # Never fails an enrolment: being unable to publish an opening screen is not a reason to refuse
+  # someone entry to the study. It is logged rather than dropped, because a study whose state
+  # contract has drifted would otherwise show every participant a blank screen and report nothing.
+  defp publish_initial_state(
+         %{protocol: %{"rules" => %{"engine" => "epigame"}}} = study,
+         participant
+       ) do
+    case EpidemicaServer.Epigame.publish_initial(study.id, participant.subject) do
+      {:error, reason} ->
+        Logger.warning(
+          "could not publish initial state for #{participant.subject} " <>
+            "in study #{study.id}: #{inspect(reason)}"
+        )
+
+      _ ->
+        :ok
+    end
+  end
+
+  defp publish_initial_state(_study, _participant), do: :ok
 
   defp ensure_open(%{status: "open"}), do: :ok
   defp ensure_open(_), do: {:error, :study_closed}

@@ -85,8 +85,10 @@ class _HomeState extends State<_Home> {
     final startsAt = widget.controller.enrollment?.bundle.startsAt;
 
     // Joining before the study opens is normal — codes go out in advance — so the app says when
-    // play starts rather than leaving a participant to wonder whether something is broken.
-    if (!game.hasState && startsAt != null && DateTime.now().toUtc().isBefore(startsAt)) {
+    // play starts rather than leaving a participant to wonder whether something is broken. Decided
+    // by the clock rather than by whether a state document exists, because the server publishes a
+    // starting state at enrolment and that must not be mistaken for the game having begun.
+    if (startsAt != null && DateTime.now().toUtc().isBefore(startsAt)) {
       return _WaitingScreen(
         startsAt: startsAt,
         onLeave: () async {
@@ -361,7 +363,7 @@ class _SettlementCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Day ${settlement.day}',
+            'Day ${settlement.day} result',
             style: TextStyle(color: onColour, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 8),

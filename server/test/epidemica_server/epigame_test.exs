@@ -237,7 +237,7 @@ defmodule EpidemicaServer.EpigameTest do
     sensing(s, "careful-0001", 1)
 
     {from, _} = day_window(1)
-    :ok = Epigame.protect(s.id, "careful-0001", from)
+    {:ok, _} = Epigame.protect(s.id, "careful-0001", from)
 
     tick(s, 1)
     {:ok, _} = settle(s, 1)
@@ -256,7 +256,7 @@ defmodule EpidemicaServer.EpigameTest do
     sensing(s, "chose-0001", 1)
 
     {from, _} = day_window(1)
-    :ok = Epigame.protect(s.id, "chose-0001", from)
+    {:ok, _} = Epigame.protect(s.id, "chose-0001", from)
 
     tick(s, 1)
     {:ok, _} = settle(s, 1)
@@ -294,7 +294,7 @@ defmodule EpidemicaServer.EpigameTest do
     episode(s, "alice-0001", "bob-0001", 1, 30)
 
     {from, _} = day_window(1)
-    :ok = Epigame.protect(s.id, "bob-0001", from)
+    {:ok, _} = Epigame.protect(s.id, "bob-0001", from)
 
     tick(s, 1)
     {:ok, _} = settle(s, 1)
@@ -451,7 +451,7 @@ defmodule EpidemicaServer.EpigameTest do
     sensing(s, "alice-0001", 1)
 
     {from, _} = day_window(1)
-    :ok = Epigame.protect(s.id, "alice-0001", from)
+    {:ok, _} = Epigame.protect(s.id, "alice-0001", from)
 
     tick(s, 1)
     {:ok, _} = settle(s, 1)
@@ -514,7 +514,7 @@ defmodule EpidemicaServer.EpigameTest do
     sensing(s, "alice-0001", 1)
 
     {from, _} = day_window(1)
-    :ok = Epigame.protect(s.id, "alice-0001", from)
+    {:ok, _} = Epigame.protect(s.id, "alice-0001", from)
 
     tick(s, 1)
 
@@ -533,7 +533,7 @@ defmodule EpidemicaServer.EpigameTest do
 
     {from, _} = day_window(1)
     earlier = DateTime.add(from, -7200, :second)
-    :ok = Epigame.protect(s.id, "alice-0001", earlier)
+    {:ok, _} = Epigame.protect(s.id, "alice-0001", earlier)
     :ok = Epigame.release(s.id, "alice-0001", DateTime.add(earlier, 60, :second))
 
     tick(s, 1)
@@ -547,5 +547,160 @@ defmodule EpidemicaServer.EpigameTest do
     participant(s, "alice-0001")
 
     assert {:error, :not_protected} = Epigame.release(s.id, "alice-0001")
+  end
+
+  describe "protection is visible before the day is settled" do
+    test "choosing it publishes it immediately" do
+      s = study()
+      participant(s, "alice-0001")
+      {:ok, _} = Epigame.publish_initial(s.id, "alice-0001")
+
+      {:ok, before} = ParticipantState.fetch(s.id, "alice-0001")
+      assert before.state["protected_until"] == nil
+
+      {:ok, until} = Epigame.protect(s.id, "alice-0001")
+
+      # A player who taps protect and sees nothing change until the next tick cannot connect the
+      # act to its consequence, which is the thing the game exists to teach.
+      {:ok, document} = ParticipantState.fetch(s.id, "alice-0001")
+      assert document.state["protected_until"] == DateTime.to_iso8601(until)
+      assert document.revision > before.revision
+    end
+
+    test "releasing publishes that too" do
+      s = study()
+      participant(s, "alice-0001")
+      {:ok, _} = Epigame.publish_initial(s.id, "alice-0001")
+      {:ok, _} = Epigame.protect(s.id, "alice-0001")
+
+      :ok = Epigame.release(s.id, "alice-0001")
+
+      {:ok, document} = ParticipantState.fetch(s.id, "alice-0001")
+      assert document.state["protected_until"] == nil
+    end
+
+    test "a live decision does not overwrite why a settled day was protected" do
+      s = study()
+      participant(s, "alice-0001")
+      {:ok, _} = Epigame.publish_initial(s.id, "alice-0001")
+
+      {:ok, initial} = ParticipantState.fetch(s.id, "alice-0001")
+
+      {:ok, _} =
+        ParticipantState.put(
+          s.id,
+          "alice-0001",
+          initial.state_uri,
+          Map.put(initial.state, "protection_source", "not_sensing")
+        )
+
+      {:ok, _} = Epigame.protect(s.id, "alice-0001")
+      :ok = Epigame.release(s.id, "alice-0001")
+
+      # `protection_source` is the research record of why a settled day was protected. A phone that
+      # stopped sensing and a deliberate choice have to stay distinguishable, so tapping protect
+      # must not rewrite it.
+      {:ok, document} = ParticipantState.fetch(s.id, "alice-0001")
+      assert document.state["protection_source"] == "not_sensing"
+    end
+
+    test "settlement carries a protection that is still running" do
+      s = study()
+      participant(s, "alice-0001")
+      sensing(s, "alice-0001", 1)
+
+      {:ok, until} = Epigame.protect(s.id, "alice-0001")
+
+      tick(s, 1)
+      {:ok, _} = settle(s, 1)
+
+      {:ok, document} = ParticipantState.fetch(s.id, "alice-0001")
+      assert document.state["protected_until"] == DateTime.to_iso8601(until)
+    end
+
+    test "settlement reports a lapsed protection as none" do
+      s = study()
+      participant(s, "alice-0001")
+      sensing(s, "alice-0001", 1)
+
+      {from, _} = day_window(1)
+      {:ok, _} = Epigame.protect(s.id, "alice-0001", from)
+
+      tick(s, 1)
+      {:ok, _} = settle(s, 1)
+
+      # The protection covered day 1 and was scored, but it has since expired, and the app must not
+      # show a shield for a protection that has run out.
+      {:ok, document} = ParticipantState.fetch(s.id, "alice-0001")
+      assert document.state["protected_until"] == nil
+      assert document.state["protection_source"] == "chosen"
+    end
+
+    test "an expired protection is reported as no protection" do
+      s = study()
+      participant(s, "alice-0001")
+
+      {from, _} = day_window(1)
+      long_ago = DateTime.add(from, -200_000, :second)
+      {:ok, _} = Epigame.protect(s.id, "alice-0001", long_ago)
+
+      assert Epigame.protected_until(s.id, "alice-0001") == nil
+    end
+  end
+
+  describe "the state a participant starts with" do
+    test "is published so there is something true to show before the first tick" do
+      s = study(schedule: %{"starts_at" => "2026-09-02T00:00:00Z", "days" => 7})
+      participant(s, "alice-0001")
+
+      {:ok, _} = Epigame.publish_initial(s.id, "alice-0001")
+
+      {:ok, document} = ParticipantState.fetch(s.id, "alice-0001")
+
+      # Susceptible is not a guess: seeding runs at the first tick, so nobody is infected before one
+      # has happened.
+      assert document.state["day"] == 0
+      assert document.state["days_total"] == 7
+      assert document.state["epi_state"] == "susceptible"
+      assert document.state["points"] == 0
+      assert document.state["protection_source"] == nil
+    end
+
+    test "does not overwrite a state that already exists" do
+      s = study()
+      participant(s, "alice-0001")
+      sensing(s, "alice-0001", 1)
+      tick(s, 1)
+      {:ok, _} = settle(s, 1)
+
+      {:ok, settled} = ParticipantState.fetch(s.id, "alice-0001")
+
+      # Re-enrolling after a reinstall must not reset a participant to day zero.
+      :ok = Epigame.publish_initial(s.id, "alice-0001")
+
+      {:ok, after_republish} = ParticipantState.fetch(s.id, "alice-0001")
+      assert after_republish.state == settled.state
+      assert after_republish.revision == settled.revision
+    end
+
+    test "a study without rules has no state to publish" do
+      protocol = %{
+        "bundle_version" => "1.0",
+        "study_id" => Ecto.UUID.generate(),
+        "title" => "Collection only",
+        "modules" => %{"proximity" => %{}}
+      }
+
+      {:ok, plain} = Studies.create_study_from_bundle("plain", Jason.encode!(protocol))
+
+      Repo.insert!(%Participant{
+        study_id: plain.id,
+        subject: "alice-0001",
+        enrolled_at: @day_start
+      })
+
+      assert {:error, :not_a_scored_study} = Epigame.publish_initial(plain.id, "alice-0001")
+      assert {:error, :not_found} = ParticipantState.fetch(plain.id, "alice-0001")
+    end
   end
 end

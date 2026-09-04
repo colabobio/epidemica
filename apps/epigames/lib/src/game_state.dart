@@ -17,6 +17,7 @@ class GameState {
     required this.totalCases,
     required this.population,
     required this.protectionSource,
+    required this.protectedUntil,
     required this.settlement,
     required this.asOf,
   });
@@ -32,6 +33,7 @@ class GameState {
         totalCases: 0,
         population: 0,
         protectionSource: null,
+        protectedUntil: null,
         settlement: null,
         asOf: null,
       );
@@ -39,6 +41,7 @@ class GameState {
 
     final state = document.state;
     final settlement = state['settlement'];
+    final until = state['protected_until'];
 
     return GameState._(
       hasState: true,
@@ -49,6 +52,7 @@ class GameState {
       totalCases: state['total_cases'] as int? ?? 0,
       population: state['population'] as int? ?? 0,
       protectionSource: state['protection_source'] as String?,
+      protectedUntil: until is String ? DateTime.tryParse(until)?.toUtc() : null,
       settlement: settlement is Map
           ? Settlement.fromJson(settlement.cast<String, Object?>())
           : null,
@@ -67,10 +71,21 @@ class GameState {
   final int totalCases;
   final int population;
   final String? protectionSource;
+
+  /// When chosen protection lapses, or null when none is running.
+  ///
+  /// An instant rather than a flag so the app can expire it without waiting for a tick, which is
+  /// what lets a decision show its effect the moment it is made.
+  final DateTime? protectedUntil;
+
   final Settlement? settlement;
   final DateTime? asOf;
 
-  bool get protected => protectionSource != null;
+  /// Whether protection is in force right now, for any reason.
+  bool protectedAt(DateTime now) =>
+      protectionForced || (protectedUntil != null && protectedUntil!.isAfter(now));
+
+  bool get protected => protectedAt(DateTime.now().toUtc());
 
   /// Protection the participant did not choose, and cannot release: their phone stopped sensing.
   bool get protectionForced => protectionSource == 'not_sensing';
@@ -102,8 +117,12 @@ class GameState {
   String get dayLabel {
     if (!hasState) return 'Not started';
     if (finished) return 'Finished · $daysTotal days';
-    return daysTotal == null ? 'Day $day' : 'Day $day of $daysTotal';
+    // `day` is the last day the twin settled, so the day being lived is the next one. Showing the
+    // settled number would tell a player on day four that it was still day three.
+    final current = day + 1;
+    return daysTotal == null ? 'Day $current' : 'Day $current of $daysTotal';
   }
+
   /// How old the computation is, said plainly.
   String get freshness {
     if (asOf == null) return '';

@@ -17,8 +17,14 @@ defmodule EpidemicaServerWeb.GameActionController do
     auth = conn.assigns.auth
 
     with {:ok, study} <- running_study(auth.study_id) do
-      :ok = Epigame.protect(auth.study_id, auth.subject, DateTime.utc_now(), pars_for(study))
-      json(conn, %{"action" => "protect", "accepted" => true})
+      {:ok, until} =
+        Epigame.protect(auth.study_id, auth.subject, DateTime.utc_now(), pars_for(study))
+
+      json(conn, %{
+        "action" => "protect",
+        "accepted" => true,
+        "protected_until" => until && DateTime.to_iso8601(until)
+      })
     else
       {:error, :not_running} -> not_running(conn)
     end
@@ -30,7 +36,7 @@ defmodule EpidemicaServerWeb.GameActionController do
     with {:ok, _study} <- running_study(auth.study_id) do
       case Epigame.release(auth.study_id, auth.subject) do
         :ok ->
-          json(conn, %{"action" => "release", "accepted" => true})
+          json(conn, %{"action" => "release", "accepted" => true, "protected_until" => nil})
 
         {:error, :not_protected} ->
           Problem.send(conn, 409, "not_protected", "This participant is not currently protected.")

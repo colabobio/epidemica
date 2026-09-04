@@ -65,11 +65,50 @@ void main() {
   });
 
   group('protection', () {
-    test('a chosen protection can be released', () {
-      final game = GameState.from(document({...healthy, 'protection_source': 'chosen'}));
+    test('a chosen protection that is still running shows as protected', () {
+      final until = DateTime.now().toUtc().add(const Duration(hours: 6));
+      final game = GameState.from(
+        document({
+          ...healthy,
+          'protection_source': 'chosen',
+          'protected_until': until.toIso8601String(),
+        }),
+      );
 
       expect(game.protected, isTrue);
       expect(game.protectionForced, isFalse);
+    });
+
+    test('a chosen protection that has lapsed does not', () {
+      // `protection_source` records why a *settled* day was protected and stays on the document
+      // afterwards. Reading it as the current state would leave a shield on screen over a
+      // participant who is no longer protected at all.
+      final game = GameState.from(
+        document({
+          ...healthy,
+          'protection_source': 'chosen',
+          'protected_until': DateTime.now()
+              .toUtc()
+              .subtract(const Duration(minutes: 1))
+              .toIso8601String(),
+        }),
+      );
+
+      expect(game.protected, isFalse);
+    });
+
+    test('protection expires on the phone without waiting for a tick', () {
+      final until = DateTime.now().toUtc().add(const Duration(minutes: 30));
+      final game = GameState.from(
+        document({
+          ...healthy,
+          'protection_source': 'chosen',
+          'protected_until': until.toIso8601String(),
+        }),
+      );
+
+      expect(game.protectedAt(until.subtract(const Duration(minutes: 1))), isTrue);
+      expect(game.protectedAt(until.add(const Duration(minutes: 1))), isFalse);
     });
 
     test('protection from a phone that stopped sensing cannot be released', () {
@@ -135,8 +174,10 @@ void main() {
     });
 
     test('a late contact is described as such', () {
-      expect(GameState.describe(const SettlementLine('carried_over', 5, count: 1)),
-          contains('late'));
+      expect(
+        GameState.describe(const SettlementLine('carried_over', 5, count: 1)),
+        contains('late'),
+      );
     });
 
     test('one contact is singular and two are plural', () {
@@ -146,8 +187,18 @@ void main() {
   });
 
   group('progress', () {
-    test('the day is shown against the length of the study', () {
-      expect(GameState.from(document(healthy)).dayLabel, 'Day 3 of 7');
+    test('the day shown is the one being lived, not the one last settled', () {
+      // `day` is the last day the twin settled. A player whose day 3 has been scored is living
+      // day 4, and labelling the screen with the settled number tells them the game is a day
+      // behind where they are.
+      expect(GameState.from(document(healthy)).dayLabel, 'Day 4 of 7');
+    });
+
+    test('before any tick the game is on its first day', () {
+      final game = GameState.from(document({...healthy, 'day': 0, 'points': 0}));
+
+      expect(game.dayLabel, 'Day 1 of 7');
+      expect(game.finished, isFalse);
     });
 
     test('the aggregate is the population, not the enrolment', () {
@@ -176,7 +227,10 @@ void main() {
       // The document says which day was settled. A device with a wrong clock must not be able to
       // end a participant's game early or keep it open after everyone else has finished.
       final stale = GameState.from(
-        document({...healthy, 'day': 7}, asOf: DateTime.now().toUtc().subtract(const Duration(days: 30))),
+        document({
+          ...healthy,
+          'day': 7,
+        }, asOf: DateTime.now().toUtc().subtract(const Duration(days: 30))),
       );
 
       expect(stale.finished, isTrue);
@@ -188,14 +242,14 @@ void main() {
       final game = GameState.from(document({...healthy, 'days_total': null}));
 
       expect(game.finished, isFalse);
-      expect(game.dayLabel, 'Day 3');
+      expect(game.dayLabel, 'Day 4');
     });
 
     test('an open-ended study still shows progress, just without a total', () {
       final game = GameState.from(document({...healthy, 'day': 40, 'days_total': null}));
 
       expect(game.finished, isFalse);
-      expect(game.dayLabel, 'Day 40');
+      expect(game.dayLabel, 'Day 41');
     });
 
     test('a missing total is treated as open-ended rather than as day zero', () {
