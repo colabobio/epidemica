@@ -2,21 +2,13 @@
 title: "Epidemica: An Open, Agentic-Ready Research Platform for Participatory Epidemiology Studies"
 abstract: "Epidemica is an open-source platform for building study apps that collect high-resolution, multi-modal epidemiological data — proximity contacts, survey responses, and, in a companion transmission engine, a simulated infection outcome — and for running interventions over that data. It is organised as a set of versioned data and protocol contracts, implemented once each in Dart client packages, an Elixir/Phoenix server, and a Python transmission model, so that a study is authored as a configuration document rather than a fork of an app. This paper describes the platform's motivation, its architecture, a reference application (a seven-day transmission game whose infections are decided by a real contact network rather than scripted), and a deliberate extension of that same contracts-first discipline to the agents that help build it: machine-readable convention files that let a coding agent work in this codebase without re-deriving rules that have already been paid for in debugging time. We report the platform's current state honestly against its own stated milestones — extensively tested and field-exercised end to end, not yet operated unattended or at the scale its own acceptance criteria require — and discuss what would need to be true for that to change."
 authors:
-  - orcid: "0000-0000-0000-0000"
+  - orcid: "0000-0001-5559-9661"
     name: "Andrés Colubri"
 subjects:
   - "Medical and health sciences > Health sciences"
   - "Natural sciences > Computer and information sciences"
   - "Engineering and technology > Electrical, electronic, information engineering"
 ---
-
-> **Note to the human author before submission (delete this callout):** the ORCID iD above is a
-> placeholder — GenRxiv requires the submitter's real, verified ORCID iD and will reject a
-> submission where it is absent from the author list. Add any co-authors the same way. The figure
-> in §5 is referenced by relative path for readability in this repository; GenRxiv accepts a single
-> Markdown file, so before upload either inline it as a `data:image/svg+xml;base64,...` URI or host
-> it and use an absolute URL. Everything else in this document was checked against the repository
-> at the commit this draft was written against — re-run the checks in §7 if time has passed.
 
 ## 1. Introduction
 
@@ -32,7 +24,7 @@ does so again for the next study.
 Epidemica is an attempt at the alternative: infrastructure a study is *assembled from* rather than
 *built against*. Its central claim is that this is possible without sacrificing the two things a
 one-off app usually gets right by construction — a data model that means exactly what the study
-needed it to mean, and a transmission model a specific research question actually calls for — provided
+needed it to mean, and a epidemiological model a specific research question actually calls for — provided
 the boundary between "what the platform guarantees" and "what a study defines" is drawn as an
 explicit, versioned **contract** rather than left implicit in whichever code happens to run.
 
