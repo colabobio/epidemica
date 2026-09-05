@@ -64,6 +64,8 @@ Explanations of how the platform works, as opposed to why decisions were made:
 - [Arms](docs/concepts/arms.md) — randomised assignment and per-arm rules.
 - [Licensing](docs/concepts/licensing.md) — what governs your own app or module if you build on
   this, and what the automated license scan protects against.
+- [AI-assisted coding](docs/concepts/ai-assisted-coding.md) — accepted practice for working with a
+  coding agent here, and what this platform specifically asks of you.
 
 ## Milestones
 

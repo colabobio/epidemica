@@ -108,6 +108,24 @@ own vendored dependencies if you get it wrong the way this repository initially 
 cadence recommendation applies: not before every commit, but before a release, and before opening a
 pull request that came out of a long agent-assisted session touching many files at once.
 
+### Evidencing your own human authorship
+
+The scan above addresses whether your code infringes someone else's copyright. A separate question —
+whether *you* can claim authorship over what an agent helped you write — turns on a different kind of
+evidence: the US Copyright Office's stated position is that a work needs meaningful human creative
+control, not mere prompting, to support a copyright claim, and the record that demonstrates that
+control is the back-and-forth itself — direction given, alternatives rejected, output reviewed and
+revised — not the final diff alone.
+
+`tools/render-transcript.py` renders a coding session's raw log into readable Markdown for exactly
+this purpose: every message from both sides in full, so the human direction and review is legible
+without wading through megabytes of tool call scrollback. It is not specific to this repository
+either — point it at any session log from any project. See [`tools/README.md`](../../tools/README.md)
+for how to find the raw log and how to render just a time range. As with the license scan: this
+produces a record, not a legal opinion, and rendering a transcript doesn't make anything
+copyrightable by itself — it only preserves the evidence, for whoever eventually has to make that
+argument, that the evidence existed.
+
 ## See also
 
 - [ADR-0009](../adr/0009-open-source-license.md) — why Apache-2.0, and the alternatives weighed
