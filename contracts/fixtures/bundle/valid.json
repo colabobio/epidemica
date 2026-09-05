@@ -233,5 +233,74 @@
         }
       }
     }
+  },
+  {
+    "case": "a study with two randomised arms",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "77777777-8888-4999-8aaa-bbbbbbbbbbbb",
+      "title": "Epigame seven-day",
+      "modules": {
+        "proximity": {}
+      },
+      "twin": {
+        "engine": "starsim",
+        "state_uri": "https://schemas.epidemica.info/state/epigame/1.0.0.json",
+        "population": 50
+      },
+      "rules": {
+        "engine": "epigame",
+        "pars": {
+          "healthy_points": 2,
+          "protection_cost": 1,
+          "contact_points": 5
+        },
+        "arms": [
+          {
+            "name": "low",
+            "weight": 1,
+            "pars": {}
+          },
+          {
+            "name": "high",
+            "weight": 2,
+            "pars": {
+              "protection_cost": 2
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "case": "an arm that overrides nothing inherits the shared pars",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "77777777-8888-4999-8aaa-bbbbbbbbbbbb",
+      "title": "Epigame seven-day",
+      "modules": {
+        "proximity": {}
+      },
+      "twin": {
+        "engine": "starsim",
+        "state_uri": "https://schemas.epidemica.info/state/epigame/1.0.0.json",
+        "population": 50
+      },
+      "rules": {
+        "engine": "epigame",
+        "pars": {
+          "healthy_points": 2,
+          "protection_cost": 3,
+          "contact_points": 5
+        },
+        "arms": [
+          {
+            "name": "only",
+            "weight": 1,
+            "pars": {}
+          }
+        ]
+      }
+    }
   }
 ]

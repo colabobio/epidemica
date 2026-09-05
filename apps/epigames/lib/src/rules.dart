@@ -12,9 +12,31 @@ library;
 class RulePars {
   const RulePars(this._values);
 
-  factory RulePars.fromBundle(Map<String, Object?>? rules) {
-    final pars = (rules?['pars'] as Map?)?.cast<String, Object?>() ?? const {};
-    return RulePars({...defaults, ...pars});
+  factory RulePars.fromBundle(Map<String, Object?>? rules) => RulePars._overlay(rules, null);
+
+  /// The constants one participant plays by: the bundle's, overlaid with their arm's.
+  ///
+  /// The same overlay the server applies, so the number on the screen and the number in the ledger
+  /// stay the same answer. A study with no arms has one group and this is identical to
+  /// [RulePars.fromBundle].
+  factory RulePars.forArm(Map<String, Object?>? rules, String? arm) =>
+      RulePars._overlay(rules, arm);
+
+  factory RulePars._overlay(Map<String, Object?>? rules, String? arm) {
+    final shared = (rules?['pars'] as Map?)?.cast<String, Object?>() ?? const {};
+
+    final arms = (rules?['arms'] as List?) ?? const [];
+    Map<String, Object?> armPars = const {};
+    if (arm != null) {
+      for (final entry in arms) {
+        if (entry is Map && entry['name'] == arm) {
+          armPars = (entry['pars'] as Map?)?.cast<String, Object?>() ?? const {};
+          break;
+        }
+      }
+    }
+
+    return RulePars({...defaults, ...shared, ...armPars});
   }
 
   static const Map<String, Object?> defaults = {

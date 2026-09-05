@@ -107,4 +107,80 @@ defmodule EpidemicaServer.Epigame.RulesTest do
       assert Rules.pars(nil)["protection_cost"] == 1
     end
   end
+
+  describe "arms" do
+    defp armed do
+      %{
+        "pars" => %{"protection_cost" => 1, "contact_points" => 5},
+        "arms" => [
+          %{"name" => "low", "weight" => 1, "pars" => %{}},
+          %{"name" => "high", "weight" => 3, "pars" => %{"protection_cost" => 2}}
+        ]
+      }
+    end
+
+    test "an arm overlays the shared pars" do
+      assert Rules.pars_for(armed(), "high")["protection_cost"] == 2
+
+      # Anything an arm does not name stays shared, or overriding one constant would zero the rest.
+      assert Rules.pars_for(armed(), "high")["contact_points"] == 5
+      assert Rules.pars_for(armed(), "low")["protection_cost"] == 1
+    end
+
+    test "no arm is the shared pars, not an error" do
+      assert Rules.pars_for(armed(), nil) == Rules.pars(armed())
+      assert Rules.pars_for(armed(), "nobody") == Rules.pars(armed())
+    end
+
+    test "a study with no arms is one group" do
+      assert Rules.arms(%{"pars" => %{}}) == nil
+
+      assert Rules.pars_for(%{"pars" => %{"protection_cost" => 9}}, "anything")["protection_cost"] ==
+               9
+    end
+
+    test "the draw is weighted" do
+      rules = %{
+        "arms" => [
+          %{"name" => "low", "weight" => 1, "pars" => %{}},
+          %{"name" => "high", "weight" => 3, "pars" => %{}}
+        ]
+      }
+
+      assignments =
+        for n <- 1..4000,
+            do: Rules.assign_arm(rules, "study", "subject-#{n}")
+
+      share = Enum.count(assignments, &(&1 == "high")) / 4000
+
+      # 3:1, so the truth is 0.75. Loose bounds rather than exact, because this is a draw: tight
+      # enough to catch a broken weighting, loose enough that a fair one does not flake.
+      assert share > 0.70
+      assert share < 0.80
+    end
+
+    test "the same subject is always drawn the same way" do
+      # An audit has to be able to re-derive the split, and a reinstall has to keep the arm.
+      assert Rules.assign_arm(armed(), "s1", "subj") == Rules.assign_arm(armed(), "s1", "subj")
+    end
+
+    test "every draw lands in an arm that exists" do
+      for n <- 1..500 do
+        assert Rules.assign_arm(armed(), "s", "s#{n}") in ["low", "high"]
+      end
+    end
+
+    test "two arms with one name are refused" do
+      # JSON Schema cannot say this, so it is said here: a duplicate name would merge two
+      # conditions into one, silently, in exactly the measurement the arm exists to split.
+      assert_raise ArgumentError, fn ->
+        Rules.arms(%{
+          "arms" => [
+            %{"name" => "low", "weight" => 1, "pars" => %{}},
+            %{"name" => "low", "weight" => 1, "pars" => %{}}
+          ]
+        })
+      end
+    end
+  end
 end

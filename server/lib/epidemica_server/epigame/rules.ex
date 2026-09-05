@@ -31,6 +31,91 @@ defmodule EpidemicaServer.Epigame.Rules do
   def pars(_), do: @defaults
 
   @doc """
+  The constants one participant plays by: defaults, then the study's `pars`, then their arm's.
+
+  One function on purpose. Every caller that asks "what are the rules" asks it here, so a caller
+  cannot compute them for the wrong group, and the answer a participant is scored by and the answer
+  their app shows are the same overlay.
+  """
+  def pars_for(rules_block, arm) when is_map(rules_block) do
+    arm_pars =
+      case arm do
+        nil ->
+          %{}
+
+        name when is_binary(name) ->
+          rules_block
+          |> Map.get("arms", [])
+          |> Enum.find_value(%{}, fn a -> if a["name"] == name, do: a["pars"] || %{} end)
+      end
+
+    Map.merge(pars(rules_block), arm_pars)
+  end
+
+  def pars_for(_rules_block, _arm), do: @defaults
+
+  @doc """
+  The arms a study declares, as `[{name, weight}]`, or nil for one that does not.
+
+  Nil rather than an empty list so "no randomisation" and "an empty arms array" stay distinct: the
+  first is an ordinary study, the second is a bundle that asks for a draw with nothing to draw.
+  """
+  def arms(rules_block) when is_map(rules_block) do
+    case Map.get(rules_block, "arms") do
+      list when is_list(list) ->
+        choices =
+          Enum.map(list, fn arm -> {Map.fetch!(arm, "name"), Map.fetch!(arm, "weight")} end)
+
+        # A duplicate name merges two conditions into one, which is exactly the split the arm
+        # exists to make. Rejected here because JSON Schema cannot say it.
+        names = Enum.map(choices, &elem(&1, 0))
+
+        if Enum.uniq(names) != names do
+          duplicates = names -- Enum.uniq(names)
+          raise ArgumentError, "two arms share a name: #{inspect(duplicates)}"
+        end
+
+        choices
+
+      _ ->
+        nil
+    end
+  end
+
+  def arms(_), do: nil
+
+  @doc """
+  Which arm a new enrolment lands in, drawn by weight.
+
+  Weighted rather than blocked on purpose. Blocking balances small groups but makes the assignment
+  depend on join order, which two phones joining at once can disagree about. A weighted draw is
+  independent per participant, and imbalance at small numbers is the price of not having to
+  coordinate. Reproducible for a given study and subject, so an audit can re-derive the split.
+  """
+  def assign_arm(rules_block, study_id, subject) do
+    case arms(rules_block) do
+      nil ->
+        nil
+
+      [] ->
+        nil
+
+      choices ->
+        total = Enum.sum(Enum.map(choices, fn {_name, weight} -> weight end))
+        draw = :erlang.phash2({study_id, subject}, total)
+
+        choices
+        |> Enum.reduce_while(0, fn {name, weight}, acc ->
+          if draw < acc + weight, do: {:halt, {:found, name}}, else: {:cont, acc + weight}
+        end)
+        |> case do
+          {:found, name} -> name
+          _ -> nil
+        end
+    end
+  end
+
+  @doc """
   Settle one participant-day.
 
   `facts` carries only what the participant could have known: the state they were shown, whether

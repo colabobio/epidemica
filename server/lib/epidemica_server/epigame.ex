@@ -72,19 +72,21 @@ defmodule EpidemicaServer.Epigame do
     with {:ok, study} <- fetch_study(study_id),
          {:ok, rules} <- rules_block(study),
          {:ok, tick} <- fetch_tick(study_id, day) do
-      pars = Rules.pars(rules)
       now = Keyword.get(opts, :now, DateTime.utc_now())
 
+      arms = arms_by_subject(study_id)
       subjects = participants_in(tick)
       shown = states_shown_during(study_id, day, subjects)
-      observed = observed_subjects(study_id, tick, subjects, pars)
+      observed = observed_subjects(study_id, tick, subjects)
       chosen = chosen_protection(study_id, tick.period_start, tick.period_end)
 
-      awards = award_day(study_id, day, tick, pars, chosen, observed)
-      carried = award_carry_over(study_id, day, study, pars)
+      awards = award_day(study_id, day, tick, rules, arms, chosen, observed)
+      carried = award_carry_over(study_id, day, study, rules, arms)
 
       settlements =
         Enum.map(subjects, fn subject ->
+          pars = pars_for_subject(rules, arms, subject)
+
           facts = %{
             day: day,
             opening: balance(study_id, subject),
@@ -130,8 +132,27 @@ defmodule EpidemicaServer.Epigame do
   Recorded with a time rather than held as a flag, so that "I was protected all along" is answerable
   from the record.
   """
-  def protect(study_id, subject, at \\ DateTime.utc_now(), pars \\ %{}) do
-    window = Map.get(Rules.pars(%{"pars" => pars}), "protection_window_seconds")
+  def protect(study_id, subject, at \\ DateTime.utc_now(), pars_override \\ %{}) do
+    window =
+      case pars_override do
+        %{} = override when map_size(override) > 0 ->
+          Rules.pars(%{"pars" => override})["protection_window_seconds"]
+
+        _ ->
+          # Read from the study, overlaid with the participant's arm, so a study that makes
+          # protection longer for one group is honoured rather than charged at the shared window.
+          case fetch_study(study_id) do
+            {:ok, study} ->
+              rules = Map.get(study.protocol, "rules", %{})
+
+              Rules.pars_for(rules, participant_arm(study_id, subject))[
+                "protection_window_seconds"
+              ]
+
+            {:error, _} ->
+              Rules.pars(%{})["protection_window_seconds"]
+          end
+      end
 
     Repo.insert_all(
       "game_actions",
@@ -293,7 +314,8 @@ defmodule EpidemicaServer.Epigame do
          {:ok, rules} <- rules_block(study),
          since when since != nil <- pending_since(study_id, study, subject),
          :lt <- DateTime.compare(since, now) do
-      minimum = Rules.pars(rules)["contact_min_seconds"]
+      minimum =
+        Rules.pars_for(rules, participant_arm(study_id, subject))["contact_min_seconds"]
 
       study_id
       |> Reconciliation.network(since, now)
@@ -372,6 +394,30 @@ defmodule EpidemicaServer.Epigame do
   defp rules_block(%{protocol: %{"rules" => rules}}) when is_map(rules), do: {:ok, rules}
   defp rules_block(_), do: {:error, :not_a_scored_study}
 
+  # Every participant's arm, once, so a caller scoring a whole day does not ask the database for
+  # each subject in turn.
+  defp arms_by_subject(study_id) do
+    Repo.all(
+      from p in Participant,
+        where: p.study_id == type(^study_id, :binary_id) and is_nil(p.withdrawn_at),
+        select: {p.subject, p.arm}
+    )
+    |> Map.new()
+  end
+
+  defp pars_for_subject(rules, arms, subject), do: Rules.pars_for(rules, Map.get(arms, subject))
+
+  # A participant's arm, or nil for a study that does not randomise. Read here rather than passed
+  # down from every caller, because the arm is the only thing an action should be priced by and it
+  # has to be the same answer scoring reaches.
+  defp participant_arm(study_id, subject) do
+    Repo.one(
+      from p in Participant,
+        where: p.study_id == type(^study_id, :binary_id) and p.subject == ^subject,
+        select: p.arm
+    )
+  end
+
   defp fetch_tick(study_id, day) do
     case Repo.get_by(Tick, study_id: study_id, day: day) do
       nil -> {:error, :no_tick}
@@ -402,16 +448,14 @@ defmodule EpidemicaServer.Epigame do
     end
   end
 
-  defp observed_subjects(study_id, tick, subjects, pars) do
-    threshold = Map.get(pars, "coverage_threshold", 0.5)
-
+  defp observed_subjects(study_id, tick, subjects) do
     unobserved =
       Health.insufficiently_observed(
         study_id,
         @proximity_module,
         tick.period_start,
         tick.period_end,
-        threshold,
+        0.5,
         subjects
       )
       |> MapSet.new()
@@ -427,20 +471,22 @@ defmodule EpidemicaServer.Epigame do
     end
   end
 
-  defp award_day(study_id, day, tick, pars, chosen, observed) do
+  defp award_day(study_id, day, tick, rules, arms, chosen, observed) do
     network =
       Reconciliation.network(study_id, tick.period_start, tick.period_end,
         received_before: tick.received_before
       )
 
-    record_awards(study_id, day, day, network, pars, chosen, observed)
+    record_awards(study_id, day, day, network, rules, arms, chosen, observed)
   end
 
   # Days already settled are revisited only to find contacts whose other side had not yet arrived.
   # Their own settlements are untouched; the credit lands here instead.
-  defp award_carry_over(study_id, day, study, pars) do
-    lookback = Map.get(pars, "carry_over_days", 3)
+  defp award_carry_over(study_id, day, study, rules, arms) do
     interval = Studies.tick_interval(study)
+    # The furthest any participant can look back, which is the most generous arm's. Reaching no
+    # further would deny the credits a longer window was entitled to.
+    lookback = max_longest(rules, arms, "carry_over_days")
 
     Enum.reduce(max(day - lookback, 1)..(day - 1)//1, %{}, fn earlier, acc ->
       case Repo.get_by(Tick, study_id: study_id, day: earlier) do
@@ -458,19 +504,38 @@ defmodule EpidemicaServer.Epigame do
           # now for a contact they made while protected refunds a cost they agreed to -- and the
           # mirror case would deny someone contacts they earned before protecting.
           chosen_then = chosen_protection(study_id, past.period_start, past.period_end)
-          observed_then = observed_subjects(study_id, past, participants_in(past), pars)
+          observed_then = observed_subjects(study_id, past, participants_in(past))
 
           counts =
-            record_awards(study_id, earlier, day, network, pars, chosen_then, observed_then)
+            record_awards(
+              study_id,
+              earlier,
+              day,
+              network,
+              rules,
+              arms,
+              chosen_then,
+              observed_then
+            )
 
           Map.merge(acc, counts, fn _k, a, b -> a + b end)
       end
     end)
   end
 
-  defp record_awards(study_id, contact_day, awarded_on_day, network, pars, chosen, observed) do
-    # A participant the study could not hear from is not credited: the contact cannot be attested
-    # any more than the day can.
+  # Scores a pair by the more permissive of its two arms. A contact is worth what it is worth to
+  # the participant who was there, and the only defensible reading when two players are scored
+  # differently is to charge each of them by the rules they were shown.
+  defp record_awards(
+         study_id,
+         contact_day,
+         awarded_on_day,
+         network,
+         rules,
+         arms,
+         chosen,
+         observed
+       ) do
     unavailable =
       network
       |> Enum.flat_map(fn e -> Tuple.to_list(e.pair) end)
@@ -479,9 +544,17 @@ defmodule EpidemicaServer.Epigame do
       |> MapSet.new()
       |> MapSet.union(chosen)
 
-    already = awarded_pairs(study_id, contact_day, pars, awarded_on_day)
+    already = awarded_pairs(study_id, contact_day, rules, arms)
 
-    pairs = Rules.award_contacts(pars, network, unavailable, already)
+    pairs =
+      network
+      |> Enum.filter(fn edge ->
+        {a, b} = edge.pair
+
+        qualifies_by?(edge, pars_for_subject(rules, arms, a), unavailable, already) or
+          qualifies_by?(edge, pars_for_subject(rules, arms, b), unavailable, already)
+      end)
+      |> Enum.map(& &1.pair)
 
     rows =
       Enum.flat_map(pairs, fn {a, b} ->
@@ -510,10 +583,20 @@ defmodule EpidemicaServer.Epigame do
     Enum.frequencies(Enum.map(inserted, & &1.subject))
   end
 
-  # Pairs that must not be paid again: those already credited for this exact day, and those the
-  # cooldown still covers.
-  defp awarded_pairs(study_id, contact_day, pars, _awarded_on_day) do
-    cooldown = Map.get(pars, "contact_cooldown_days", 1)
+  defp qualifies_by?(edge, pars, unavailable, already) do
+    {a, b} = edge.pair
+
+    edge.seconds >= pars["contact_min_seconds"] and
+      not MapSet.member?(unavailable, a) and
+      not MapSet.member?(unavailable, b) and
+      not MapSet.member?(already, edge.pair)
+  end
+
+  # Pairs that must not be paid again: those already credited for this exact day, and those still
+  # inside the longest cooldown any arm declares, since a pair the rules disagree about is judged by
+  # the arm whose window is longer.
+  defp awarded_pairs(study_id, contact_day, rules, arms) do
+    cooldown = max_longest(rules, arms, "contact_cooldown_days")
 
     Repo.all(
       from a in "game_contact_awards",
@@ -523,6 +606,14 @@ defmodule EpidemicaServer.Epigame do
         select: {a.subject, a.peer}
     )
     |> MapSet.new()
+  end
+
+  # The largest value of a rule across every arm in play, so a window shared by a pair is never
+  # shorter than either side's.
+  defp max_longest(rules, arms, key) do
+    ([Rules.pars(rules)[key]] ++
+       Enum.map(Map.keys(arms), fn subject -> pars_for_subject(rules, arms, subject)[key] end))
+    |> Enum.max()
   end
 
   defp write(study_id, day, settlements, tick, study, shown, chosen, observed, now) do

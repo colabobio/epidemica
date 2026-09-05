@@ -31,10 +31,17 @@ defmodule EpidemicaServer.EpigameTest do
         "state_uri" => "https://schemas.epidemica.info/state/epigame/1.0.0.json",
         "population" => Keyword.get(opts, :population, 4)
       },
-      "rules" => %{
-        "engine" => "epigame",
-        "pars" => Keyword.get(opts, :pars, %{})
-      }
+      "rules" =>
+        %{
+          "engine" => "epigame",
+          "pars" => Keyword.get(opts, :pars, %{})
+        }
+        |> then(fn rules ->
+          case Keyword.get(opts, :arms) do
+            nil -> rules
+            arms -> Map.put(rules, "arms", arms)
+          end
+        end)
     }
 
     protocol =
@@ -49,6 +56,15 @@ defmodule EpidemicaServer.EpigameTest do
 
   defp participant(study, subject) do
     Repo.insert!(%Participant{study_id: study.id, subject: subject, enrolled_at: @day_start})
+  end
+
+  defp participant_in_arm(study, subject, arm) do
+    Repo.insert!(%Participant{
+      study_id: study.id,
+      subject: subject,
+      arm: arm,
+      enrolled_at: @day_start
+    })
   end
 
   defp day_window(day) do
@@ -967,6 +983,75 @@ defmodule EpidemicaServer.EpigameTest do
 
       assert {:error, :not_a_scored_study} = Epigame.publish_initial(plain.id, "alice-0001")
       assert {:error, :not_found} = ParticipantState.fetch(plain.id, "alice-0001")
+    end
+  end
+
+  describe "arms" do
+    defp randomised(arm_pars) do
+      study(
+        schedule: %{"starts_at" => "2026-09-02T00:00:00Z", "days" => 7},
+        pars: %{"protection_cost" => 1},
+        arms: [
+          %{"name" => "low", "weight" => 1, "pars" => arm_pars},
+          %{"name" => "high", "weight" => 1, "pars" => %{"protection_cost" => 2}}
+        ]
+      )
+    end
+
+    test "each arm is charged by its own rules" do
+      s = randomised(%{"protection_cost" => 1})
+      participant_in_arm(s, "alice-0001", "low")
+      participant_in_arm(s, "bob-0001", "high")
+
+      sensing(s, "alice-0001", 1)
+      sensing(s, "bob-0001", 1)
+
+      {from, _} = day_window(1)
+      {:ok, _} = Epigame.protect(s.id, "alice-0001", from)
+      {:ok, _} = Epigame.protect(s.id, "bob-0001", from)
+
+      tick(s, 1)
+      {:ok, _} = settle(s, 1)
+
+      # The point of the arm is that two participants in the same outbreak are priced differently,
+      # so a shared answer would defeat it.
+      assert [%{"reason" => "protection", "points" => -1}] ++ _ =
+               lines(s, "alice-0001", 1) |> Enum.filter(&(&1["reason"] == "protection"))
+
+      assert [%{"reason" => "protection", "points" => -2}] =
+               lines(s, "bob-0001", 1) |> Enum.filter(&(&1["reason"] == "protection"))
+    end
+
+    test "an arm that overrides nothing inherits the shared pars" do
+      s = randomised(%{})
+      participant_in_arm(s, "alice-0001", "low")
+
+      sensing(s, "alice-0001", 1)
+      {from, _} = day_window(1)
+      {:ok, _} = Epigame.protect(s.id, "alice-0001", from)
+
+      tick(s, 1)
+      {:ok, _} = settle(s, 1)
+
+      assert [%{"reason" => "protection", "points" => -1}] =
+               lines(s, "alice-0001", 1) |> Enum.filter(&(&1["reason"] == "protection"))
+    end
+
+    test "a participant with no arm is charged the shared pars" do
+      s = randomised(%{})
+      participant(s, "carol-0001")
+
+      sensing(s, "carol-0001", 1)
+      {from, _} = day_window(1)
+      {:ok, _} = Epigame.protect(s.id, "carol-0001", from)
+
+      tick(s, 1)
+      {:ok, _} = settle(s, 1)
+
+      # Joined before arms were assigned, or enrolled against a code: the default is the honest
+      # answer, and an arm that does not name a rule must not mean it cannot be priced at all.
+      assert [%{"reason" => "protection", "points" => -1}] =
+               lines(s, "carol-0001", 1) |> Enum.filter(&(&1["reason"] == "protection"))
     end
   end
 end

@@ -296,5 +296,94 @@
         }
       }
     }
+  },
+  {
+    "case": "an arm with zero weight",
+    "why": "A zero-weight arm can never be drawn, so it would exist in the bundle while no participant is ever in it.",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "77777777-8888-4999-8aaa-bbbbbbbbbbbb",
+      "title": "Epigame seven-day",
+      "modules": {
+        "proximity": {}
+      },
+      "twin": {
+        "engine": "starsim",
+        "state_uri": "https://schemas.epidemica.info/state/epigame/1.0.0.json",
+        "population": 50
+      },
+      "rules": {
+        "engine": "epigame",
+        "pars": {
+          "healthy_points": 2,
+          "protection_cost": 1,
+          "contact_points": 5
+        },
+        "arms": [
+          {
+            "name": "low",
+            "weight": 0,
+            "pars": {}
+          }
+        ]
+      }
+    }
+  },
+  {
+    "case": "an arm with no pars",
+    "why": "An arm that overrides nothing inherits the default, but an arm must still be a real object or there is nothing to draw.",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "77777777-8888-4999-8aaa-bbbbbbbbbbbb",
+      "title": "Epigame seven-day",
+      "modules": {
+        "proximity": {}
+      },
+      "twin": {
+        "engine": "starsim",
+        "state_uri": "https://schemas.epidemica.info/state/epigame/1.0.0.json",
+        "population": 50
+      },
+      "rules": {
+        "engine": "epigame",
+        "pars": {
+          "healthy_points": 2,
+          "protection_cost": 1,
+          "contact_points": 5
+        },
+        "arms": [
+          {
+            "name": "low",
+            "weight": 1
+          }
+        ]
+      }
+    }
+  },
+  {
+    "case": "an empty arms array",
+    "why": "Declaring arms asks for a draw at enrolment; an empty array asks for a draw with nothing to draw, so no participant could be assigned.",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "77777777-8888-4999-8aaa-bbbbbbbbbbbb",
+      "title": "Epigame seven-day",
+      "modules": {
+        "proximity": {}
+      },
+      "twin": {
+        "engine": "starsim",
+        "state_uri": "https://schemas.epidemica.info/state/epigame/1.0.0.json",
+        "population": 50
+      },
+      "rules": {
+        "engine": "epigame",
+        "pars": {
+          "healthy_points": 2,
+          "protection_cost": 1,
+          "contact_points": 5
+        },
+        "arms": []
+      }
+    }
   }
 ]

@@ -11,6 +11,7 @@ defmodule EpidemicaServer.Enrollment do
   require Logger
 
   alias EpidemicaServer.Enrollment.{Device, Participant, Token}
+  alias EpidemicaServer.Epigame.Rules
   alias EpidemicaServer.Ingest.Auth
   alias EpidemicaServer.{Repo, Studies}
 
@@ -97,13 +98,22 @@ defmodule EpidemicaServer.Enrollment do
         |> Participant.changeset(%{
           study_id: join_code.study_id,
           subject: subject,
-          arm: join_code.arm,
+          # A randomised study draws its arm here and keeps it. One stamped on the join code is the
+          # other case: stratification by distribution channel, which is a different experiment.
+          arm: arm_for(join_code, subject),
           enrolled_at: now
         })
         |> Repo.insert()
 
       existing ->
         {:ok, existing}
+    end
+  end
+
+  defp arm_for(join_code, subject) do
+    case Rules.arms(Map.get(join_code.study.protocol, "rules", %{})) do
+      nil -> join_code.arm
+      _arms -> Rules.assign_arm(join_code.study.protocol["rules"], join_code.study_id, subject)
     end
   end
 
