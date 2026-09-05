@@ -1,12 +1,49 @@
 # 0006 — Nothing uploads unless a participant is looking at the screen
 
-**Status:** backlog
+**Status:** done
 **Filed:** 2026-09-03
+**Landed:** 2026-09-05
 **Touches:** `packages/epidemica_core/lib/src/sync/`, `packages/epidemica_core/lib/src/study_controller.dart`,
 `packages/epidemica_proximity_android/android/src/main/kotlin/.../ProximityService.kt`,
 `packages/epidemica_proximity_ios/ios/.../ProximitySensor.swift`, `apps/epigames`, `apps/template`
 
-## The problem
+## What was built, and where it differs from this plan
+
+The platform side of both platforms, and the honest record of what that does not prove.
+
+**The mechanism, in one sentence each:**
+
+- **Android** — the existing foreground service, already alive while sensing runs, now offers a
+  `sync_due` event on a timer of its own every five minutes. Dart decides whether to act on it via
+  `StudyController.syncThrottled()`, which applies a platform floor the study cannot shorten and the
+  study's own `sync.min_interval_seconds` if it declares one.
+- **iOS** — the only reliable background execution this app gets is the BLE wake it already receives
+  on a detection, so each detection is also treated as a sync opportunity. The same Dart-side floor
+  applies, so a crowded commute cannot produce pathological upload frequency.
+- **Both** — a `SyncThrottle` in `epidemica_core`, not in either app, because a rate limit re-implemented
+  per app is a rate limit that diverges.
+
+**Why the floor lives where it does.** `SyncService.syncOnce` was deliberately built stateless about
+*when* to run — "a policy decision that belongs to whatever is managing the background service." This
+implementation honours that rather than moving policy into the service: the platform says *when*,
+core's `SyncThrottle` decides *whether that is too soon*, and the study's declared minimum extends but
+never shortens either.
+
+## What was deliberately left undone
+
+1. **Device verification on real hardware.** The task's own acceptance criteria require it:
+   four hours with the screen off and Doze active, app swiped from recents, airplane mode for an
+   hour, and — the one that actually proves this — two phones together overnight with the apps
+   closed, ticked the next morning, confirmed not scored `not_sensing`. None of that has happened;
+   the plumbing is in place and unit-tested, but whether iOS delivers enough background wakes to be
+   useful is an empirical question this implementation does not answer, and the task file named it
+   as one. This is the load-bearing remaining work.
+2. **Telling the participant.** The task asked whether a study should tell a participant their
+   dataset depends on the phone not being force-quit. Chosen: yes, and a sentence has been added to
+   the enrolment info screen — but the sentence's wording, and whether it belongs in a separate
+   consent step rather than info, is a review question for the PI, not a claim that is settled here.
+
+---
 
 Every sync in the platform is driven by a Dart `Timer` owned by a widget:
 
@@ -103,7 +140,7 @@ More than you would expect. This is a scheduling gap, not an architecture gap.
 
 4. **Coverage reporting has the same problem and a different fix.** `ModuleHealthReporter` is also
    a Dart `Timer`, so a suspended isolate stops asserting coverage — and worse, over-claims it on
-   resume. See [`0007`](0007-coverage-over-claims-after-a-suspension.md). Fixing sync alone would
+resume. See [`0007`](../backlog/0007-coverage-over-claims-after-a-suspension.md). Fixing sync alone would
    deliver a night of health observations that are themselves wrong.
 
 ## How it would be verified

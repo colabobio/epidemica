@@ -615,7 +615,7 @@ For a collection-only study that is merely a delay, because the outbox is durabl
 with a twin it is a correctness bug**, because a tick freezes the record at `received_before` and is
 immutable: a participant whose phone slept through the night has no coverage on record when the
 tick runs, so they are treated as protected, excluded from transmission, and scored `not_sensing` —
-permanently. See [`tasks/backlog/0006`](../../tasks/backlog/0006-no-background-sync.md).
+permanently. See [`tasks/done/0006`](../../tasks/done/0006-no-background-sync.md).
 
 **Coverage can be over-claimed across a suspension.** `ModuleHealthReporter`'s windows abut by
 construction, so if the isolate is suspended and later resumed *in the same process*, the next

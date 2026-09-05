@@ -22,4 +22,5 @@ export 'src/sync/backoff.dart';
 export 'src/sync/ingest_client.dart';
 export 'src/sync/ingest_result.dart';
 export 'src/sync/sync_service.dart';
+export 'src/sync/sync_throttle.dart';
 export 'src/tokens.dart';

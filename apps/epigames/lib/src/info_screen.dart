@@ -43,6 +43,12 @@ class InfoScreen extends StatelessWidget {
                 'nobody. You are not charged the protection point, but you do not earn for that '
                 'day either. We only score days we can actually see.',
           ]),
+          _Section('Leave the app running', [
+            'The study needs the app to upload what it records. It does this on its own while it '
+                'is running, including in the background.',
+            'If you force-quit the app — swiping it away — it stops doing that until you open it '
+                'again, and your day may be scored as if you were not there.',
+          ]),
           _Section('What is recorded', [
             'A random code for each nearby participant, how close they were, and for how long.',
             'Your location is never recorded. Neither is anything about who you are.',

@@ -42,6 +42,7 @@ class StudyController extends ChangeNotifier {
       clock: _clock,
       client: IngestClient(baseUri: this.baseUri, tokens: _tokens, httpClient: _http),
     );
+    _syncThrottle = SyncThrottle(floor: syncFloor);
     _states = StateChannel(baseUri: this.baseUri, db: _db, tokens: _tokens, httpClient: _http);
   }
 
@@ -68,6 +69,14 @@ class StudyController extends ChangeNotifier {
   late final EnrollmentService _enrollments;
   late final SyncService _sync;
   late final StateChannel _states;
+  late final SyncThrottle _syncThrottle;
+
+  /// How often the platform will let a sync fire at all, no matter what triggered it.
+  ///
+  /// A background trigger could fire as often as the device wakes for a BLE detection, which on a
+  /// crowded commute would be pathological without a floor. This is that floor — the study's own
+  /// declared `sync.min_interval_seconds` may extend it, but cannot shorten it.
+  static const Duration syncFloor = Duration(minutes: 5);
 
   Enrollment? _enrollment;
   final Set<String> _running = {};
@@ -258,6 +267,14 @@ class StudyController extends ChangeNotifier {
     notifyListeners();
     return report;
   }
+
+  /// Runs a sync only if enough time has passed since the last one.
+  ///
+  /// For triggers that can fire arbitrarily often — a background wake, a platform event — rather
+  /// than on a timer somebody chose. `sync()` is for those; this is for everything that could fire
+  /// too fast if it always ran. Returns `true` if a sync actually ran, so a caller that needs to
+  /// know can tell a skipped run from a failure.
+  Future<bool> syncThrottled() => _syncThrottle.run(() => sync(), _enrollment?.bundle.minSyncInterval);
 
   /// Stops collection and removes everything held locally.
   ///

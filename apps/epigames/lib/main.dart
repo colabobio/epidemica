@@ -24,6 +24,8 @@ Future<void> main() async {
   final directory = await getApplicationDocumentsDirectory();
   final db = EpidemicaDatabase.open(p.join(directory.path, 'epidemica.db'));
 
+  final proximity = ProximityModule();
+
   // Fetches its own definitions, so it needs the study server and a token for it. Declared before
   // the controller because it borrows one, and created by the controller because it is a module.
   late final StudyController controller;
@@ -37,11 +39,18 @@ Future<void> main() async {
   controller = StudyController(
     baseUri: Uri.parse(_serverUrl),
     // The module set of this binary. Everything else is decided by the bundle.
-    modules: [ProximityModule(), survey],
+    modules: [proximity, survey],
     db: db,
     secrets: PlatformSecretStore(),
     platform: Platform.isIOS ? 'ios' : 'android',
   );
+
+  // A background wake is the platform saying "now is a safe time to upload". Whether anything
+  // actually happens is `syncThrottled`'s call, which applies its own floor — and the study's own
+  // `sync.min_interval_seconds`, if it declares one — so this callback cannot fire more often than
+  // either allows no matter how often the platform offers.
+  proximity.onSyncDue = () => controller.syncThrottled();
+
   await controller.initialize();
 
   runApp(EpigamesApp(controller: controller, survey: survey));

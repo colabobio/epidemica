@@ -55,6 +55,7 @@ class MethodChannelProximity extends ProximityPlatform {
     return switch (json['type']) {
       'detection' => ProximityDetection.fromJson(json),
       'started' => const ProximitySensingStarted(),
+      'sync_due' => const SyncDue(),
       'dropped' => ProximityDetectionsDropped(
         count: (json['count']! as num).toInt(),
         oldestRetained: switch (json['oldest_retained_ms']) {

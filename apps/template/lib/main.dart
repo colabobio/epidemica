@@ -24,14 +24,23 @@ Future<void> main() async {
   final directory = await getApplicationDocumentsDirectory();
   final db = EpidemicaDatabase.open(p.join(directory.path, 'epidemica.db'));
 
+  final proximity = ProximityModule();
+
   final controller = StudyController(
     baseUri: Uri.parse(_serverUrl),
     // The module set of this binary. Everything else is decided by the bundle.
-    modules: [ProximityModule()],
+    modules: [proximity],
     db: db,
     secrets: PlatformSecretStore(),
     platform: Platform.isIOS ? 'ios' : 'android',
   );
+
+  // A background wake is the platform saying "now is a safe time to upload". Whether anything
+  // actually happens is `syncThrottled`'s call, which applies its own floor — and the study's own
+  // `sync.min_interval_seconds`, if it declares one — so this callback cannot fire more often than
+  // either allows no matter how often the platform offers.
+  proximity.onSyncDue = () => controller.syncThrottled();
+
   await controller.initialize();
 
   runApp(EpidemicaApp(controller: controller));

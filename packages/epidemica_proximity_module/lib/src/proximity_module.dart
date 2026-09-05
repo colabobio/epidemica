@@ -17,6 +17,14 @@ class ProximityModule implements EmbeddedModule {
   /// Injected in tests; in production the endorsed platform implementation is used.
   final ProximityPlatform? platform;
 
+  /// Called when the platform reports a moment when a background sync is appropriate.
+  ///
+  /// Assigned by whatever owns this module, not by the module itself: a module has no business
+  /// knowing what an upload is, only that the native side just handed Dart execution time during a
+  /// background wake (iOS) or on a timer it owns (Android's foreground service). What happens with
+  /// the offer — and the floor on how often it is acted on — belongs to `StudyController.syncThrottled()`.
+  void Function()? onSyncDue;
+
   EpisodeAggregator? _aggregator;
   StreamSubscription<ProximityEvent>? _subscription;
   Timer? _tick;
@@ -109,6 +117,8 @@ class ProximityModule implements EmbeddedModule {
         droppedDetections += count;
       case ProximitySensingStarted():
         break;
+      case SyncDue():
+        onSyncDue?.call();
     }
   }
 

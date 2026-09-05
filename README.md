@@ -5,11 +5,9 @@ epidemiological data and deliver interventions.
 
 > **Status: alpha.** The full arc — join, sense, upload, ingest, reconcile, simulate, settle,
 > publish — runs end to end, and has been field-tested on real devices with two study types.
-> **Not yet suitable for unattended data collection:** there is no background sync
-> ([task 0006](tasks/backlog/0006-no-background-sync.md)) and ticks are run by hand
-> ([task 0002](tasks/backlog/0002-scheduled-ticks.md)). Self-hosting has not been exercised outside
-> development. See the [architecture and roadmap](docs/architecture-and-roadmap.md) for the plan and
-> [`docs/milestones/`](docs/milestones/) for what has been built.
+> **Not yet suitable for unattended data collection:** ticks are run by hand
+> ([task 0002](tasks/backlog/0002-scheduled-ticks.md)). Background sync is now in place
+> ([task 0006](tasks/done/0006-no-background-sync.md)), but not yet verified on physical devices.
 
 ## What this is
 
@@ -58,6 +56,8 @@ Explanations of how the platform works, as opposed to why decisions were made:
 - [The server](docs/concepts/server.md) — ingest, projections, and what is derived from what.
 - [Building a study](docs/concepts/building-a-study.md) — authoring a protocol bundle.
 - [Proximity](docs/concepts/proximity.md) — BLE sensing, episodes, and reconciliation.
+- [Background sync](docs/concepts/background-sync.md) — how observations leave the device when
+  nobody is looking at the screen, and why that differs by platform.
 - [The state channel](docs/concepts/state-channel.md) — how conclusions reach a participant.
 - [Surveys](docs/concepts/surveys.md) — scheduled instruments and how they are delivered.
 - [Epigame](docs/concepts/epigame.md) — the transmission game built on all of the above.

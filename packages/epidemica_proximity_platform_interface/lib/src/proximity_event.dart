@@ -97,3 +97,15 @@ final class ProximityDetectionsDropped extends ProximityEvent {
   @override
   String toString() => 'ProximityDetectionsDropped($count)';
 }
+
+/// A platform thinks this is a good time to sync.
+///
+/// Android's foreground service fires this on a timer while it is running; iOS's sensor fires it
+/// when a background BLE wake gives the app execution time anyway. Fired deliberately at the
+/// platform layer rather than in Dart: what makes a background moment a sync opportunity is a
+/// platform question, not something a Dart timer can know. Whether anything actually happens is the
+/// app's call — see `StudyController.syncThrottled()`, which applies its own floor on top of this.
+@immutable
+final class SyncDue extends ProximityEvent {
+  const SyncDue();
+}

@@ -18,7 +18,7 @@ Three facts constrain the decision:
 
 1. **There is no notification dependency anywhere in the repository.** This is the first one.
 2. **Notifications are scheduled by the operating system, not by us.** Unlike upload, they do *not*
-   depend on [`0006`](../../tasks/backlog/0006-no-background-sync.md): the OS fires them whether or
+   depend on [`0006`](../../tasks/done/0006-no-background-sync.md): the OS fires them whether or
    not the app is running, so this is independent of the background-sync problem.
 3. **Asking to interrupt someone is a request, not a technical step.** It needs a runtime permission
    on both platforms and a sentence in what a participant agrees to before joining.

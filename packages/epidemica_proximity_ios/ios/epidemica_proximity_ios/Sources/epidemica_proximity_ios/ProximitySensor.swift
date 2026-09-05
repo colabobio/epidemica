@@ -106,6 +106,11 @@ final class ProximitySensor: NSObject, SensorDelegate {
         ]
         event["peer_device_class"] = decoded.deviceClass
         ProximityEvents.shared.emit(event)
+
+        // A background wake is the only execution time this app gets when the screen is off, so
+        // it is also the only opportunity to offer a sync. The Dart side applies its own floor, so
+        // offering on every detection cannot actually fire more often than that floor allows.
+        ProximityEvents.shared.emit(["type": "sync_due"])
     }
 
     func sensor(_ sensor: SensorType, didDetect: TargetIdentifier) {}
