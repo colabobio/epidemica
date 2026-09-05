@@ -52,7 +52,7 @@ Coverage is not diagnostics. It decides whether a participant is treated as obse
 whether the twin lets them catch anything and whether their day is scored. Both failure directions
 are harmful and they are harmful in different ways:
 
-- **Under-claiming** (task [`0006`](0006-no-background-sync.md)) marks a real participant
+- **Under-claiming** (task [`0006`](../done/0006-no-background-sync.md)) marks a real participant
   `not_sensing`, drops them from transmission, and scores them zero.
 - **Over-claiming** — this task — is worse for the science. It tells the model a participant was
   observed all night and met nobody. That is not a missing datum the analysis can exclude; it is a

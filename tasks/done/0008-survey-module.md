@@ -147,7 +147,7 @@ it only updates when something recomputes state — currently a tick — and it 
 **There is no notification dependency anywhere in the repository.** Without one, a survey is only
 seen when the participant next opens the app, which for a study running over days means "eventually,
 maybe". Local notifications are OS-scheduled, so unlike upload they do *not* depend on
-[`0006`](../backlog/0006-no-background-sync.md) — but they need a package, permissions on both
+[`0006`](../done/0006-no-background-sync.md) — but they need a package, permissions on both
 platforms, and a sentence in the consent screen. Response *upload* is unaffected either way:
 a participant answering a survey is by definition in the foreground, so the outbox drains on the
 spot.

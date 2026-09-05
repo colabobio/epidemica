@@ -34,7 +34,7 @@ participant's own protection is running now comes from `protected_until`, not fr
 The outbox is SQLite in WAL mode and survives termination. `SyncService.syncOnce` is one pass with
 no timers — when to call it is a policy decision that belongs to whatever manages the background
 service, not to core. There is currently no background sync
-([`tasks/backlog/0006`](../tasks/backlog/0006-no-background-sync.md)).
+([`tasks/done/0006`](../tasks/done/0006-no-background-sync.md)).
 
 A client removes an observation from the outbox on **absence** from the server's exception list, not
 on acknowledgement. Removing only what the server listed would delete the failures, keep every
