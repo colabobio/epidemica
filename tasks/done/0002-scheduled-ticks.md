@@ -1,9 +1,41 @@
 # 0002 — Ticks do not run on their own
 
-**Status:** backlog
+**Status:** done
 **Filed:** 2026-09-02
+**Landed:** 2026-09-05
 **Touches:** `server/config/config.exs`, `server/lib/epidemica_server/twin/worker.ex`,
 `server/lib/epidemica_server/ops.ex` (new)
+
+## What was built, and where it differs from this plan
+
+A `Twin.Scheduler` worker, run hourly by `Oban.Plugins.Cron`, that decides which twin study-days
+are due and enqueues them. `Twin.Worker` and `Epigame.Worker` were already idempotent as this task
+described — a day already run returns `already_run` and is treated as success — so the scheduler
+itself is a decision, not an actor: it answers "what should run" rather than running it, which is
+what makes running it twice safe by construction rather than by discipline.
+
+**The buffer, and why it is not a guess.** A tick freezes its network at `received_before`, and a
+phone syncs on its own schedule, so a tick that fires the moment a day ends settles it before the
+last uploads land. The lag is derived from `sync.min_interval_seconds` when the study declares one,
+and from a fixed 30-minute default when it does not — the task's own instruction, implemented rather
+than approximated. This is the load-bearing constraint this task shares with
+[`0001`](../backlog/0001-configurable-tick-interval.md): both are really about when a day's data has
+finished arriving.
+
+**`Ops`** exists as this task asked — a small module of named operator entry points for
+`bin/epidemica_server eval` — because a host cron entry inlining multi-line Elixir is exactly the
+kind of thing that is wrong under pressure and nobody finds afterwards.
+
+## What was deliberately left undone
+
+The multi-node trap is documented, not closed: two nodes would each run their own scheduler, and
+`Oban.Plugins.Cron`'s leadership would prevent both from firing, but the unique-index catch that
+makes a duplicate tick harmless would still show up as a silent failure in the losing node's logs.
+Until a deployment actually runs more than one node, that is a documented constraint rather than a
+bug — the same posture the task file itself takes. The `0001` interaction (both tasks are really
+about when a day's data has finished arriving) is likewise noted rather than resolved; resolving
+configurable tick intervals is [task 0001](../backlog/0001-configurable-tick-interval.md)'s own job,
+not this one's.
 
 ## The problem
 

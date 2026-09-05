@@ -54,10 +54,19 @@ config :phoenix, :json_library, Jason
 
 # The twin queue runs one job at a time: a tick reads the state its predecessor wrote, so two of
 # them for the same study must never overlap.
+#
+# Cron owns the decision to look at all, on the hour. `Twin.Scheduler` decides which days are
+# actually due from that moment, so an hour's downtime is a delayed tick, not a missed one.
 config :epidemica_server, Oban,
   repo: EpidemicaServer.Repo,
   queues: [twin: 1],
-  plugins: [{Oban.Plugins.Pruner, max_age: 60 * 60 * 24 * 7}]
+  plugins: [
+    {Oban.Plugins.Pruner, max_age: 60 * 60 * 24 * 7},
+    {Oban.Plugins.Cron,
+     crontab: [
+       {"@hourly", EpidemicaServer.Twin.Scheduler}
+     ]}
+  ]
 
 # Where the Starsim bridge lives. Set explicitly so a release fails loudly rather than guessing a
 # path and silently running nothing.
