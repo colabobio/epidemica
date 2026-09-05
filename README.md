@@ -36,6 +36,7 @@ Directories appear as their first real content lands. Empty scaffolding is delib
 | `studies/` | Reference protocol bundles — study definitions containing no code | **built** — `contactlog`, `epigame7`, `epigame-debug` |
 | `docs/` | ADRs, concepts, milestones, tutorials | **started** — tutorials not written |
 | `tasks/` | Known work, filed with the investigation already done | **built** |
+| `tools/` | Development-only scripts, not part of any shipped runtime | **started** — [license scan](tools/README.md) |
 
 ## Architecture decisions
 
@@ -61,6 +62,8 @@ Explanations of how the platform works, as opposed to why decisions were made:
 - [Surveys](docs/concepts/surveys.md) — scheduled instruments and how they are delivered.
 - [Epigame](docs/concepts/epigame.md) — the transmission game built on all of the above.
 - [Arms](docs/concepts/arms.md) — randomised assignment and per-arm rules.
+- [Licensing](docs/concepts/licensing.md) — what governs your own app or module if you build on
+  this, and what the automated license scan protects against.
 
 ## Milestones
 

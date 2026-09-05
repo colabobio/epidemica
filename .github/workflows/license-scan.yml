@@ -1,0 +1,36 @@
+name: license-scan
+
+# Catches embedded license text or SPDX identifiers from copyleft-licensed sources
+# (GPL/AGPL/LGPL) that do not belong in this Apache-2.0 repository — see ADR-0009 and
+# ADR-0016. This is a text-matching check, not a guarantee against infringement: a
+# functionally-derived but rewritten snippet will not be caught. See docs/adr/0016.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install ScanCode Toolkit
+        run: pip install -r tools/requirements-license-scan.txt
+
+      - name: Run license scan
+        run: bash tools/license-scan.sh "$RUNNER_TEMP/license-scan.json"
+
+      - name: Apply allow-list
+        run: python3 tools/check-license-scan.py "$RUNNER_TEMP/license-scan.json"
+
+      - name: Upload full report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: license-scan-report
+          path: ${{ runner.temp }}/license-scan.json

@@ -39,6 +39,9 @@ require), it carries a patent grant that matters given the distance-estimation a
 is compatible with both Starsim's MIT and Herald's Apache-2.0, and it is one-way compatible with
 GPL-3.0 should a code-level CIAS combination ever become desirable in that direction.
 
+See [Licensing](../concepts/licensing.md) for what this means in practice for someone building their
+own app or module on Epidemica.
+
 ## Consequences
 
 **Positive.** Broad adoption, including by groups that cannot use copyleft. Explicit patent grant.
@@ -80,8 +83,11 @@ None block this decision. Two items remain as due diligence:
 - [x] Add `LICENSE` (canonical Apache-2.0 text) and `NOTICE`.
 - [ ] Add per-file `SPDX-License-Identifier: Apache-2.0` headers — do this as each file is created,
       not as a retrofit sweep later.
-- [ ] Add a CI dependency-license allow-list check (allow: Apache-2.0, MIT, BSD-2/3, ISC, CC-BY-4.0;
-      flag: MPL, LGPL; reject: GPL, AGPL, and anything unlicensed).
+- [x] Add a CI dependency-license allow-list check (allow: Apache-2.0, MIT, BSD-2/3, ISC, CC-BY-4.0;
+      flag: MPL, LGPL; reject: GPL, AGPL, and anything unlicensed). Implemented as
+      [ADR-0016](0016-automated-license-and-provenance-scanning.md), `tools/license-scan.sh` +
+      `.github/workflows/license-scan.yml` — note this checklist item was marked done in the
+      roadmap before the tooling actually existed; ADR-0016 is what makes it true.
 - [ ] **Decide DCO sign-off vs. CLA** before the first outside pull request. Recommendation: **DCO**
       — a one-line `Signed-off-by` trailer, no paperwork, no institutional agreement to negotiate, and
       standard practice for research infrastructure. A CLA would be warranted only if relicensing
