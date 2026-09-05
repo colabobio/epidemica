@@ -33,7 +33,8 @@ alternatives that were rejected. Its value is mostly to whoever inherits the cod
 | [0012](0012-starsim-as-canonical-transmission-model.md) | Starsim as the canonical transmission model | **Accepted** — Spike A passed |
 | [0014](0014-participant-state-channel.md) | Participant state channel | **Accepted** |
 | [0015](0015-local-notifications-for-scheduled-instruments.md) | Local notifications for scheduled instruments | Proposed |
-| [0016](0016-automated-license-and-provenance-scanning.md) | Automated license and provenance scanning | **Accepted** |
+| [0016](0016-automated-license-and-provenance-scanning.md) | Automated license and provenance scanning | **Accepted** — CI clause superseded by 0017 |
+| [0017](0017-manual-license-scan-not-ci.md) | Run the license scan manually, not in CI | **Accepted** |
 
 ## Planned, not yet drafted
 

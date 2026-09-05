@@ -83,17 +83,20 @@ None block this decision. Two items remain as due diligence:
 - [x] Add `LICENSE` (canonical Apache-2.0 text) and `NOTICE`.
 - [ ] Add per-file `SPDX-License-Identifier: Apache-2.0` headers — do this as each file is created,
       not as a retrofit sweep later.
-- [x] Add a CI dependency-license allow-list check (allow: Apache-2.0, MIT, BSD-2/3, ISC, CC-BY-4.0;
+- [x] Add a dependency-license allow-list check (allow: Apache-2.0, MIT, BSD-2/3, ISC, CC-BY-4.0;
       flag: MPL, LGPL; reject: GPL, AGPL, and anything unlicensed). Implemented as
-      [ADR-0016](0016-automated-license-and-provenance-scanning.md), `tools/license-scan.sh` +
-      `.github/workflows/license-scan.yml` — note this checklist item was marked done in the
-      roadmap before the tooling actually existed; ADR-0016 is what makes it true.
+      [ADR-0016](0016-automated-license-and-provenance-scanning.md), `tools/license-scan.sh` — note
+      this checklist item was marked done in the roadmap before the tooling actually existed.
+      Originally CI-triggered on every push; [ADR-0017](0017-manual-license-scan-not-ci.md) moved
+      that to a manual invocation after a real run took 5+ minutes and failed on a confirmed false
+      positive.
 - [ ] **Decide DCO sign-off vs. CLA** before the first outside pull request. Recommendation: **DCO**
       — a one-line `Signed-off-by` trailer, no paperwork, no institutional agreement to negotiate, and
       standard practice for research infrastructure. A CLA would be warranted only if relicensing
       later is a realistic need.
 - [ ] State the CIAS boundary policy explicitly in the connectors ADR: network boundary only, no
-      vendored or derived CIAS code, enforced by the CI license check.
+      vendored or derived CIAS code, enforced by the manually-run license check
+      ([ADR-0017](0017-manual-license-scan-not-ci.md)).
 
 ## Validation
 

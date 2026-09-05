@@ -254,19 +254,21 @@ it carries the human creative control that copyright protection is generally und
 applies everywhere else: name the risk, build a check, and state plainly what the check does not
 cover.
 
-For the first, an automated scan runs an open-source license-text detector against the repository's
-own source on every push and pull request, matching file contents against known license text and
-failing the build on any GPL-, AGPL-, or LGPL-family match in project source; matches that are
-neither on the project's license allow-list nor clearly copyleft are surfaced for a human to look at
-rather than auto-rejected, on the reasoning that blocking every low-confidence match trains people to
-ignore the report entirely. The check is explicitly scoped: it is a text-matching tool, not a
-semantic clone detector, and a clean run is not evidence that no code was derived from anything — a
-limitation the project states rather than elides. Its first run against this repository's own source
-is itself an instructive example of that scope: it correctly flagged two code comments explaining why
-a GPL-licensed package had been excluded from a dependency list, which a human confirmed on
-inspection to be the tool doing exactly its job — a documented exclusion, not an inclusion — and it
-correctly left the project's own license-comparison documentation alone despite that documentation
-naming every license under discussion.
+For the first, an open-source license-text detector is run against the repository's own source,
+matching file contents against known license text and flagging any GPL-, AGPL-, or LGPL-family match
+in project source; matches that are neither on the project's license allow-list nor clearly copyleft
+are surfaced for a human to look at rather than auto-rejected, on the reasoning that blocking every
+low-confidence match trains people to ignore the report entirely. The check is explicitly scoped: it
+is a text-matching tool, not a semantic clone detector, and a clean run is not evidence that no code
+was derived from anything — a limitation the project states rather than elides. It was first wired
+into continuous integration on every push and pull request, and removed from there within the same
+day: a real run took several minutes and then failed a merge on a confirmed false positive — a code
+comment explaining why a GPL-licensed dependency had been deliberately excluded, whose own mention of
+the license name the text matcher read as license text rather than as a comment about one. Gating
+every commit on a signal already known to be benign was judged a worse failure mode than simply
+running the check by hand before a release or a dependency change, so it now runs on demand rather
+than automatically — a reversal recorded, like everything else reported here, rather than quietly
+walked back.
 
 For the second, a companion tool renders a coding session's raw interaction log into a readable
 transcript — every message from both sides in full, tool invocations reduced to one line each — on

@@ -1,9 +1,9 @@
 # ADR-0016: Automated license and provenance scanning
 
-- **Status:** Accepted
+- **Status:** Accepted — **the CI-triggering clause below is superseded by [ADR-0017](0017-manual-license-scan-not-ci.md)**; the scan, its allow-list, and its scope remain in effect for manual use
 - **Date:** 2026-09-05
 - **Deciders:** Colubri (PI)
-- **Supersedes / Superseded by:** —
+- **Supersedes / Superseded by:** — (partially superseded by ADR-0017; see above)
 
 ## Context
 
@@ -32,15 +32,16 @@ addresses the second problem. It has no bearing on the first, and this ADR takes
 ## Decision
 
 We will run **ScanCode Toolkit** (Apache-2.0, `nexB/scancode-toolkit`) against the repository's own
-source — never against vendored dependency trees — on every push and pull request, applying an
-allow-list derived directly from ADR-0009: Apache-2.0, MIT, BSD-2/3-Clause, ISC, and CC-BY-4.0 (for
-docs/schemas) pass; any GPL/AGPL/LGPL match in project source fails the build; anything else is
-printed for a human to look at and does not block.
+source — never against vendored dependency trees. **As originally written this ran on every push and
+pull request; [ADR-0017](0017-manual-license-scan-not-ci.md) moved that to a manual invocation** after
+a real run took over five minutes and failed on a confirmed false positive. The applied allow-list is
+unchanged: Apache-2.0, MIT, BSD-2/3-Clause, ISC, and CC-BY-4.0 (for docs/schemas) pass; any
+GPL/AGPL/LGPL match in project source fails the check; anything else is printed for a human to look
+at and does not block.
 
-For how to run this locally, when to bother doing so outside of CI, and what each step of the
-GitHub Action does, see [`tools/README.md`](../../tools/README.md) — this ADR is the why, that file
-is the how. For what this means if you're building your own app or module on top of Epidemica,
-see [Licensing](../concepts/licensing.md).
+For how to run this locally and when to bother doing so, see [`tools/README.md`](../../tools/README.md)
+— this ADR is the why, that file is the how. For what this means if you're building your own app or
+module on top of Epidemica, see [Licensing](../concepts/licensing.md).
 
 ### Why ScanCode, and not a broader "clone detection" tool
 
@@ -84,10 +85,11 @@ license in a policy document is to talk about it, not to avoid the word.
 
 ## Consequences
 
-**Positive.** ADR-0009's outstanding CI item is closed. A GPL/AGPL license header or SPDX identifier
-landing in project source — from any source, human or agent — now fails a build instead of merging
-silently. The check is free, runs in under a minute once ScanCode's index is warm, and requires no
-new infrastructure beyond GitHub Actions.
+**Positive.** ADR-0009's outstanding CI item is closed — the scan and its allow-list exist and are
+documented, even though ADR-0017 moved *when* it runs to manual rather than automatic. A GPL/AGPL
+license header or SPDX identifier landing in project source — from any source, human or agent — is
+now checkable in under a minute once ScanCode's index is warm, at no cost beyond a pinned Python
+dependency.
 
 **Negative.** This is a text-matching check and nothing more. It will not catch a function that was
 copied and then renamed, reformatted, or lightly paraphrased — which is a realistic way for an LLM to
