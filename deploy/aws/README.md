@@ -174,39 +174,39 @@ daylight saving changes during it.
 
 ## 5. Advance the days
 
-> **This is not automatic yet.** Oban is configured with a `twin` queue but no
-> [`Oban.Plugins.Cron`](https://hexdocs.pm/oban/Oban.Plugins.Cron.html) entry, and there is no job
-> that decides which studies are due. Filed as
-> [`tasks/backlog/0002-scheduled-ticks.md`](../../tasks/backlog/0002-scheduled-ticks.md). Until it
-> is done, the days must be driven from outside.
+Ticks are scheduled automatically. `Oban.Plugins.Cron` runs `Twin.Scheduler` hourly, and the
+scheduler itself decides which study-days are due and enqueues them — see
+[`tasks/done/0002-scheduled-ticks.md`](../../tasks/done/0002-scheduled-ticks.md) for the design, and
+note in particular that a day is only offered once its period has ended *plus* a buffer derived from
+the study's own `sync.min_interval_seconds` (or a 30-minute default), so late uploads have time to
+land before the network is frozen.
 
-A host cron entry, running shortly after each day's boundary so late uploads have landed:
+Nothing needs to be configured for this to work. It is wired into the image's own
+`config/config.exs`, not into anything an operator sets.
 
-```cron
-30 4 * * * cd /home/ubuntu/epidemica/deploy/docker && /usr/bin/docker compose exec -T server \
-  /app/bin/epidemica_server eval 'EpidemicaServer.Ops.catch_up("<study-id>")' >> /var/log/epidemica-tick.log 2>&1
-```
+### Checking it is actually working
 
-`EpidemicaServer.Ops.catch_up/1` does not exist either — the equivalent today is the
-`mix epidemica.tick --catch-up` task, which is not available in a release because releases have no
-Mix. Both are covered by the same task file. In the meantime, `eval` the two calls directly:
+A scheduler that has never run looks exactly like a scheduler that is running fine and finding
+nothing due, until it doesn't. Check it explicitly rather than assuming:
 
 ```sh
-docker compose exec -T server /app/bin/epidemica_server eval '
-  study = EpidemicaServer.Studies.get_study("<study-id>")
-  day = EpidemicaServer.Studies.day_at(study)
-  if day do
-    for d <- 1..day do
-      EpidemicaServer.Twin.run_tick(study.id, d)
-      EpidemicaServer.Epigame.settle_day(study.id, d)
-    end
-  end
+# Which days are currently due, if any
+docker compose exec server /app/bin/epidemica_server eval '
+  EpidemicaServer.Twin.Scheduler.due_ticks() |> IO.inspect(label: "due")
+'
+
+# What the scheduler has actually enqueued and run so far
+docker compose exec server /app/bin/epidemica_server eval '
+  EpidemicaServer.Repo.all(
+    from j in Oban.Job, where: j.worker == "EpidemicaServer.Twin.Scheduler",
+    order_by: [desc: j.inserted_at], limit: 5
+  ) |> Enum.map(&{&1.state, &1.inserted_at}) |> IO.inspect(label: "scheduler runs")
 '
 ```
 
-Running this repeatedly is safe: a day already ticked returns `{:error, :already_run}` and a day
-already settled returns `{:error, :already_settled}`. Both are ignored rather than retried, which
-is the guarantee that no participant's history changes after they have been shown it.
+A study that should have ticked and has not is a study whose scheduler is not running — check the
+second of these before concluding anything else. `Ops.status/1` and `Ops.catch_up/1` (see section 4)
+are the operator-facing entry points for the same question from a different direction.
 
 ## 6. Backups
 
@@ -249,13 +249,13 @@ understand with five.
 - One Fargate service, **desired count 1**, behind an ALB with an ACM certificate.
 - `SECRET_KEY_BASE` from Secrets Manager; `PHX_HOST` the ALB's DNS name or your CNAME.
 - Health check `/v1/health`.
-- Ticks via EventBridge Scheduler invoking an ECS run-task, rather than host cron.
 
-**Keep the desired count at 1 until scheduled ticks land.** Oban's `twin` queue is limited to one
-job per node, not one per cluster, so two tasks can run ticks concurrently. The unique index on
-`twin_ticks (study_id, day)` means the loser fails rather than corrupting anything — but you would
-be relying on a database constraint to paper over a scheduling mistake, and the failure would be
-silent in the logs of whichever node lost.
+Ticks run on their own via `Oban.Plugins.Cron` — no EventBridge schedule is needed. **Keep the
+desired count at 1.** `Oban.Plugins.Cron` runs only on the leader node, so a two-task deployment
+would not double-schedule — but the `twin` queue's `twin: 1` limit is per node, not per cluster, so
+two tasks could still run ticks concurrently if a job were ever enqueued by hand. The unique index
+on `twin_ticks (study_id, day)` means the loser fails rather than corrupting anything, and the
+failure would be silent in the logs of whichever node lost. One node makes that impossible.
 
 ## Costs
 

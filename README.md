@@ -6,7 +6,7 @@ epidemiological data and deliver interventions.
 > **Status: alpha.** The full arc — join, sense, upload, ingest, reconcile, simulate, settle,
 > publish — runs end to end, and has been field-tested on real devices with two study types.
 > **Not yet suitable for unattended data collection:** ticks are run by hand
-> ([task 0002](tasks/backlog/0002-scheduled-ticks.md)). Background sync is now in place
+> ([task 0002](tasks/done/0002-scheduled-ticks.md)). Background sync is now in place
 > ([task 0006](tasks/done/0006-no-background-sync.md)), but not yet verified on physical devices.
 
 ## What this is

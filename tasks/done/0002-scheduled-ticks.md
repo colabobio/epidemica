@@ -79,7 +79,7 @@ outside the repository where nobody will find it.
    every 15 minutes. Ticking at the instant a day ends settles it before the last uploads land.
    Half an hour is a reasonable default; it should be derived from `sync.min_interval_seconds`
    rather than guessed, and it interacts with
-   [`0001`](0001-configurable-tick-interval.md) — both are really the same constraint about data
+   [`0001`](../backlog/0001-configurable-tick-interval.md) — both are really the same constraint about data
    arrival.
 
 4. **`EpidemicaServer.Ops`**, a small module of operator entry points callable from

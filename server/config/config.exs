@@ -57,16 +57,28 @@ config :phoenix, :json_library, Jason
 #
 # Cron owns the decision to look at all, on the hour. `Twin.Scheduler` decides which days are
 # actually due from that moment, so an hour's downtime is a delayed tick, not a missed one.
+#
+# Prod only. In dev and test a scheduler that fires on its own is the opposite of what debugging
+# needs: `studies/epigame-debug` exists precisely so a day can be ticked by hand, inspected, and
+# ticked again, and a job that fires while that is happening is not a safety net, it is an
+# interference. Test mode disables Oban entirely; dev gets the queue without the cron.
+oban_plugins =
+  if config_env() == :prod do
+    [
+      {Oban.Plugins.Pruner, max_age: 60 * 60 * 24 * 7},
+      {Oban.Plugins.Cron,
+       crontab: [
+         {"@hourly", EpidemicaServer.Twin.Scheduler}
+       ]}
+    ]
+  else
+    [{Oban.Plugins.Pruner, max_age: 60 * 60 * 24 * 7}]
+  end
+
 config :epidemica_server, Oban,
   repo: EpidemicaServer.Repo,
   queues: [twin: 1],
-  plugins: [
-    {Oban.Plugins.Pruner, max_age: 60 * 60 * 24 * 7},
-    {Oban.Plugins.Cron,
-     crontab: [
-       {"@hourly", EpidemicaServer.Twin.Scheduler}
-     ]}
-  ]
+  plugins: oban_plugins
 
 # Where the Starsim bridge lives. Set explicitly so a release fails loudly rather than guessing a
 # path and silently running nothing.

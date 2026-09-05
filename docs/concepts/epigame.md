@@ -352,7 +352,9 @@ a time and in order, because each tick starts from the state its predecessor wro
 its days are all over and therefore all decidable, and `--day <n>` would run any of them
 individually. Refusing there would leave a study nobody ticked in time permanently unsettled.
 
-**Nothing schedules ticks automatically yet** — see [`tasks/backlog/0002`](../../tasks/backlog/0002-scheduled-ticks.md).
+Ticks are scheduled automatically — see
+[`tasks/done/0002`](../../tasks/done/0002-scheduled-ticks.md). `Oban.Plugins.Cron` runs the
+scheduler hourly; the scheduler decides which days are due and enqueues them.
 
 The engine runs as a subprocess (`uv run python -m starsim_epidemica.twin <file>`) outside any
 transaction: a job taking seconds should not hold a database connection, and if it fails there is
@@ -634,7 +636,8 @@ bundle's — see [`tasks/backlog/0005`](../../tasks/backlog/0005-bundle-study-id
 **`Twin.Worker` retries a premature day.** It calls `run_tick/2` without options, so a job enqueued
 for a day that has not finished returns `:day_not_finished` and burns all five Oban attempts. A
 snooze until `period_end` would be the right behaviour. Dormant until
-[`0002`](../../tasks/backlog/0002-scheduled-ticks.md) lands, since nothing enqueues yet.
+[`0002`](../../tasks/done/0002-scheduled-ticks.md) landed, since nothing enqueued yet — now that it
+has, this is the next thing to fix.
 
 **Surveys are only seen when the app is open.** `SurveyModule` decides when an instrument is due,
 but nothing tells a participant. There is no notification dependency anywhere in the repository —
