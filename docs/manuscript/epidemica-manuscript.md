@@ -38,7 +38,7 @@ prevent, whether the reader is a person or a language model.
 
 We do not report epidemiological results. Epidemica has not yet run a study at the scale or duration
 its own milestones require, and this paper is explicit about that rather than eliding it — see
-§7. What we report is a platform whose internal seams have been exercised end to end with real
+§8. What we report is a platform whose internal seams have been exercised end to end with real
 devices, whose behaviour is pinned down by an automated test suite in three languages, and whose
 architecture we believe generalises past its first reference application.
 
@@ -93,7 +93,7 @@ implementation detail of one. A module, in this platform, is not "a package that
 proximity data"; it is a package that owns a payload contract, is activated and configured at
 runtime by a study's protocol document, and emits observations into a shared, append-only store
 without ever touching another module's data. This is what makes a second module (surveys, built
-after the first field test, described in §6) additive rather than a rewrite, and it is what makes a
+after the first field test, described in §5) additive rather than a rewrite, and it is what makes a
 study author's job writing a configuration document rather than forking an app.
 
 **One ingest path for every kind of data.** Proximity episodes, survey answers, and a module's report
@@ -154,7 +154,7 @@ published. Conclusions reach a participant's device through a **state channel** 
 the server publishes and the client can only read, never negotiate — which keeps a hard line between
 what the platform has concluded (a settled score, a coverage judgement) and what is true right now (a
 radio is or is not scanning), a distinction that proved easy to blur in practice and is discussed
-further in §7.
+further in §8.
 
 Every payload contract, the protocol bundle format, and the participant-facing state documents are
 JSON Schema, closed to additional properties, with machine-checked valid and invalid examples for
@@ -242,7 +242,52 @@ than an exception requiring disclosure [@genrxiv2026] — is a small piece of ev
 contracts-first instinct extends naturally from data formats, to software interfaces, to the
 documents that describe both to a reader that may not be human.
 
-## 7. Current Status and Validation
+## 7. Safeguards for Agent-Assisted Development
+
+Agentic readiness cuts in a second direction beyond the one §6 describes. A codebase built
+substantially by coding agents inherits two risks that a documented convention file does not, by
+itself, address: an agent can reproduce a distinctive, non-trivial snippet from its training data,
+some of which is licensed under terms this project's Apache-2.0 license cannot absorb without
+consequence, and a body of code produced primarily through prompting invites the question of whether
+it carries the human creative control that copyright protection is generally understood to require
+[@uscopyright2023]. Epidemica treats both as engineering problems, with the same discipline it
+applies everywhere else: name the risk, build a check, and state plainly what the check does not
+cover.
+
+For the first, an automated scan runs an open-source license-text detector against the repository's
+own source on every push and pull request, matching file contents against known license text and
+failing the build on any GPL-, AGPL-, or LGPL-family match in project source; matches that are
+neither on the project's license allow-list nor clearly copyleft are surfaced for a human to look at
+rather than auto-rejected, on the reasoning that blocking every low-confidence match trains people to
+ignore the report entirely. The check is explicitly scoped: it is a text-matching tool, not a
+semantic clone detector, and a clean run is not evidence that no code was derived from anything — a
+limitation the project states rather than elides. Its first run against this repository's own source
+is itself an instructive example of that scope: it correctly flagged two code comments explaining why
+a GPL-licensed package had been excluded from a dependency list, which a human confirmed on
+inspection to be the tool doing exactly its job — a documented exclusion, not an inclusion — and it
+correctly left the project's own license-comparison documentation alone despite that documentation
+naming every license under discussion.
+
+For the second, a companion tool renders a coding session's raw interaction log into a readable
+transcript — every message from both sides in full, tool invocations reduced to one line each — on
+the premise that the record of direction given, alternatives rejected, and output reviewed and
+revised is the evidence a human-authorship claim would actually rest on, not the final diff by
+itself. Neither tool is specific to this repository: a research group building its own study app or
+module with a coding agent can point either at their own source, and the project's documentation says
+so explicitly rather than assuming the practice stops at this codebase's boundary.
+
+That documentation is itself a third safeguard, and the one that generalises furthest: guidance
+addressed to anyone adopting the platform, not only to this project's own contributors, states what
+license obligations follow from building on Apache-2.0 code, what a copyleft dependency does to a
+combined binary, and what agent-assisted development specifically asks of a study that may handle
+IRB-governed data — most concretely, that a general-purpose coding agent's context window is not
+bound by a study's own privacy protocol, and real participant data has no more business there than it
+does in a screenshot posted to a public forum. Writing this down for adopters, rather than assuming
+it is obvious, follows the same instinct that produced the observation envelope in §4: the platform's
+job is to make the correct choice the legible one, not to trust that everyone would have found it
+unprompted.
+
+## 8. Current Status and Validation
 
 We report this honestly rather than optimistically, because a platform whose whole premise is that
 contracts should be checked rather than assumed ought to hold its own status claims to the same
@@ -276,7 +321,7 @@ named, scoped, and filed as prioritised work rather than left implicit, in keepi
 own convention that a problem worth remembering is written down once rather than rediscovered by the
 next person who hits it.
 
-## 8. Applications and Future Directions
+## 9. Applications and Future Directions
 
 The reference application in §5 exercises one point on a wider design space the architecture was
 built for. The same contract — an observation envelope, a protocol bundle, a module boundary — should
@@ -300,9 +345,9 @@ None of this is built yet; it is named here because the architecture in §4 was 
 make it additive rather than a redesign, and that claim is falsifiable by whether it turns out to be
 true.
 
-## 9. Limitations
+## 10. Limitations
 
-Beyond the validation gaps named in §7, three limitations are structural rather than incidental.
+Beyond the validation gaps named in §8, three limitations are structural rather than incidental.
 Epidemica's proximity module currently broadcasts a stable per-participant pseudonym in the clear over
 Bluetooth for its first reference deployment, which is an explicit, documented trade-off adequate for
 a consenting internal pilot and not for an externally facing study without rotating identifiers, a
@@ -317,7 +362,7 @@ in the authors' own development environment; whether the deployment tooling hold
 someone who did not write it is, at the time of writing, untested and the single largest open question
 standing between the alpha status reported here and the platform's stated goal.
 
-## 10. Conclusion
+## 11. Conclusion
 
 Epidemica generalises three single-purpose platforms built by the same lab into infrastructure a
 study is assembled from rather than built against, by drawing an explicit, versioned contract between
@@ -441,5 +486,12 @@ author(s) before submission to GenRxiv.*
   title = {GenRxiv: An Open Archive for AI-Generated Research},
   year = {2026},
   howpublished = {GenRxiv, ark:99999/genrxiv-2026-00001, \url{https://genrxiv.org/article/ark:99999/genrxiv-2026-00001}}
+}
+
+@misc{uscopyright2023,
+  author = {{U.S. Copyright Office}},
+  title = {Copyright Registration Guidance: Works Containing Material Generated by Artificial Intelligence},
+  year = {2023},
+  howpublished = {Federal Register, 88 FR 16190, \url{https://www.federalregister.gov/documents/2023/03/16/2023-05321/copyright-registration-guidance-works-containing-material-generated-by-artificial-intelligence}}
 }
 ```
