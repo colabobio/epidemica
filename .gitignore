@@ -24,4 +24,5 @@ packages/*/pubspec.lock
 
 # Deployment secrets. The .env.example templates are tracked; a filled-in copy never is.
 .env
+.venv*
 !.env.example
