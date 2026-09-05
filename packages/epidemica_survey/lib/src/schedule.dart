@@ -13,6 +13,7 @@ class ScheduledInstrument {
     required this.sha256,
     required this.offset,
     required this.window,
+    required this.anchor,
   });
 
   final String instrumentId;
@@ -38,6 +39,12 @@ class ScheduledInstrument {
   /// How long it stays answerable. A participant who opens the app late should still be able to
   /// answer rather than find a question that silently expired.
   final Duration window;
+
+  /// What the offset is measured from: the study's start, or this participant's enrollment.
+  ///
+  /// An instrument about the study belongs to the calendar; one about the participant —
+  /// demographics, baseline beliefs — belongs to them, and a late joiner should still be asked.
+  final ScheduleAnchor anchor;
 
   /// A key that changes when the questions change, so a revision is not treated as already done.
   String get key => '$instrumentId@$version';
@@ -70,8 +77,20 @@ class ScheduledInstrument {
       // A week by default: long enough that an ordinary participant is never locked out, short
       // enough that an answer still refers to roughly the period it was asked about.
       window: Duration(seconds: (raw['window_seconds'] as num?)?.round() ?? 604800),
+      anchor: ScheduleAnchor.parse(raw['anchor'] as String?),
     );
   }
+}
+
+/// What an offset is measured from.
+enum ScheduleAnchor {
+  study,
+  enrollment;
+
+  static ScheduleAnchor parse(String? raw) => switch (raw) {
+    'enrollment' => ScheduleAnchor.enrollment,
+    _ => ScheduleAnchor.study,
+  };
 }
 
 /// The study's whole survey schedule, and what it says right now.
@@ -93,16 +112,19 @@ class SurveySchedule {
 
   /// Entries due at [now] and not yet answered, earliest first.
   ///
-  /// Due means the offset has passed and the window has not closed. Both ends matter: showing one
-  /// early asks about a period that has not happened, and showing one for ever turns a scheduled
-  /// measurement into an open invitation.
-  List<ScheduledInstrument> dueAt(DateTime now, DateTime startsAt, Set<String> completed) {
+  /// Due means the offset has passed and the window has not closed. Each entry is timed from its
+  /// own anchor: the study's start for one about the study, this participant's enrollment for one
+  /// about them. A participant who joins after a study-anchored window closed was never owed that
+  /// question; one whose window is measured from joining is owed it regardless of when they came.
+  List<ScheduledInstrument> dueAt(
+    DateTime now,
+    DateTime startsAt,
+    DateTime? enrolledAt,
+    Set<String> completed,
+  ) {
     final due = [
       for (final entry in entries)
-        if (!completed.contains(entry.key) &&
-            !now.isBefore(entry.dueAt(startsAt)) &&
-            now.isBefore(entry.closesAt(startsAt)))
-          entry,
+        if (!completed.contains(entry.key) && entry._isDue(now, startsAt, enrolledAt)) entry,
     ];
 
     return due..sort((a, b) => a.offset.compareTo(b.offset));
@@ -112,7 +134,27 @@ class SurveySchedule {
   ///
   /// What tells the module it still has work to do. Once nothing remains it is finished, and
   /// reporting otherwise would claim the study was still collecting something.
-  bool anythingLeft(DateTime now, DateTime startsAt, Set<String> completed) => entries.any(
-    (entry) => !completed.contains(entry.key) && now.isBefore(entry.closesAt(startsAt)),
-  );
+  bool anythingLeft(DateTime now, DateTime startsAt, DateTime? enrolledAt, Set<String> completed) =>
+      entries.any(
+        (entry) => !completed.contains(entry.key) && entry._isOpen(now, startsAt, enrolledAt),
+      );
+}
+
+extension on ScheduledInstrument {
+  DateTime? _anchor(DateTime startsAt, DateTime? enrolledAt) => switch (anchor) {
+    ScheduleAnchor.study => startsAt,
+    ScheduleAnchor.enrollment => enrolledAt,
+  };
+
+  bool _isDue(DateTime now, DateTime startsAt, DateTime? enrolledAt) {
+    final anchor = _anchor(startsAt, enrolledAt);
+    if (anchor == null) return false;
+    return !now.isBefore(dueAt(anchor)) && now.isBefore(closesAt(anchor));
+  }
+
+  bool _isOpen(DateTime now, DateTime startsAt, DateTime? enrolledAt) {
+    final anchor = _anchor(startsAt, enrolledAt);
+    if (anchor == null) return false;
+    return now.isBefore(closesAt(anchor));
+  }
 }

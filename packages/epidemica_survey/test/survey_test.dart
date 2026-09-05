@@ -53,6 +53,7 @@ void main() {
     int offset = 900,
     int? window,
     String? digest,
+    String? anchor,
   }) => {
     'instrument_id': id,
     'version': version,
@@ -60,6 +61,7 @@ void main() {
     'sha256': digest ?? digestOf(definitionJson(id: id, version: version)),
     'offset_seconds': offset,
     if (window != null) 'window_seconds': window,
+    if (anchor != null) 'anchor': anchor,
   };
 
   group('reading a definition', () {
@@ -128,18 +130,21 @@ void main() {
 
     test('nothing is due before its offset has passed', () {
       // Asking early puts a question about a period that has not happened yet.
-      expect(schedule.dueAt(startsAt, startsAt, {}), isEmpty);
-      expect(schedule.dueAt(startsAt.add(const Duration(minutes: 14)), startsAt, {}), isEmpty);
+      expect(schedule.dueAt(startsAt, startsAt, null, {}), isEmpty);
+      expect(
+        schedule.dueAt(startsAt.add(const Duration(minutes: 14)), startsAt, null, {}),
+        isEmpty,
+      );
     });
 
     test('minute-level offsets are honoured', () {
-      final due = schedule.dueAt(startsAt.add(const Duration(minutes: 15)), startsAt, {});
+      final due = schedule.dueAt(startsAt.add(const Duration(minutes: 15)), startsAt, null, {});
 
       expect(due.map((e) => e.instrumentId), ['first']);
     });
 
     test('an offset of days and hours is just a longer offset', () {
-      final due = schedule.dueAt(startsAt.add(const Duration(days: 2, hours: 6)), startsAt, {
+      final due = schedule.dueAt(startsAt.add(const Duration(days: 2, hours: 6)), startsAt, null, {
         'first@1.0.0',
       });
 
@@ -151,13 +156,13 @@ void main() {
       // open invitation, and the answer stops referring to the period it asked about.
       final late = startsAt.add(const Duration(minutes: 15) + const Duration(hours: 2));
 
-      expect(schedule.dueAt(late, startsAt, {}).map((e) => e.instrumentId), isEmpty);
+      expect(schedule.dueAt(late, startsAt, null, {}).map((e) => e.instrumentId), isEmpty);
     });
 
     test('one already answered is not offered again', () {
       final now = startsAt.add(const Duration(minutes: 20));
 
-      expect(schedule.dueAt(now, startsAt, {'first@1.0.0'}), isEmpty);
+      expect(schedule.dueAt(now, startsAt, null, {'first@1.0.0'}), isEmpty);
     });
 
     test('a revised instrument is a different question', () {
@@ -168,14 +173,16 @@ void main() {
       });
       final now = startsAt.add(const Duration(minutes: 20));
 
-      expect(revised.dueAt(now, startsAt, {'first@1.0.0'}).map((e) => e.key), ['first@1.1.0']);
+      expect(revised.dueAt(now, startsAt, null, {'first@1.0.0'}).map((e) => e.key), [
+        'first@1.1.0',
+      ]);
     });
 
     test('the earliest due comes first when several are waiting', () {
       final now = startsAt.add(const Duration(days: 3));
 
       expect(
-        schedule.dueAt(now, startsAt, {}).map((e) => e.instrumentId),
+        schedule.dueAt(now, startsAt, null, {}).map((e) => e.instrumentId),
         ['second'],
         reason: 'the first has expired; only the second is still open',
       );
@@ -190,6 +197,62 @@ void main() {
       });
 
       expect(schedule.entries.map((e) => e.instrumentId), ['good']);
+    });
+
+    group('anchored to the study or to enrollment', () {
+      // A demographics instrument is about the person and should be asked of a late joiner; one
+      // about the study is about a calendar the late joiner was not there for. The anchor says
+      // which is which.
+      final schedule = SurveySchedule.fromModuleConfig({
+        'instruments': [
+          entryJson(id: 'demographics', offset: 300, window: 1800, anchor: 'enrollment'),
+          entryJson(id: 'about_study', offset: 36000, window: 1800, anchor: 'study'),
+        ],
+      });
+
+      test('a study-anchored window that closed before joining is never offered', () {
+        final enrolledLate = startsAt.add(const Duration(hours: 12));
+        final now = startsAt.add(const Duration(hours: 12));
+
+        // 36 000 s into the study is 10 hours; the participant joined at 12. The window closed
+        // before they existed, and offering it would ask them to describe a period they were not in.
+        expect(schedule.dueAt(now, startsAt, enrolledLate, {}), isEmpty);
+      });
+
+      test('an enrollment-anchored instrument is due minutes after joining, whenever they join', () {
+        final enrolledLate = startsAt.add(const Duration(hours: 12));
+        final justJoined = enrolledLate.add(const Duration(minutes: 6));
+
+        // 300 s after enrollment is 5 minutes in; a 30-minute window, so it is open. The study's
+        // clock is irrelevant to a question about the person.
+        expect(schedule.dueAt(justJoined, startsAt, enrolledLate, {}).map((e) => e.instrumentId), [
+          'demographics',
+        ]);
+      });
+
+      test('an enrollment-anchored instrument with no enrollment time is never due', () {
+        // Without enrolledAt there is nothing to measure from, and guessing would ask a question
+        // at a moment nobody chose.
+        expect(schedule.dueAt(startsAt.add(const Duration(days: 3)), startsAt, null, {}), isEmpty);
+      });
+
+      test('both kinds can be due at once and the earliest comes first', () {
+        final enrolled = startsAt;
+        final now = startsAt.add(const Duration(minutes: 6));
+
+        // The enrollment one opened 5 minutes in; the study one opens at 10 hours. Only the first is
+        // due now, which is the proof the two clocks are read separately.
+        expect(schedule.dueAt(now, startsAt, enrolled, {}).map((e) => e.instrumentId), [
+          'demographics',
+        ]);
+      });
+
+      test('the module still has work while an enrollment-anchored window is open', () {
+        final enrolledLate = startsAt.add(const Duration(days: 40));
+        final now = enrolledLate.add(const Duration(minutes: 2));
+
+        expect(schedule.anythingLeft(now, startsAt, enrolledLate, {}), isTrue);
+      });
     });
   });
 

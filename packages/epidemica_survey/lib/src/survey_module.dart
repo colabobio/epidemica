@@ -75,7 +75,7 @@ class SurveyModule extends ChangeNotifier implements EmbeddedModule {
     if (startsAt == null) {
       return const ModuleStatus(ModuleState.stopped, detail: 'study has no schedule');
     }
-    if (_schedule.anythingLeft(_now(), startsAt!, _completed)) {
+    if (_schedule.anythingLeft(_now(), startsAt!, _context!.enrolledAt, _completed)) {
       return const ModuleStatus(ModuleState.sensing);
     }
     return const ModuleStatus(ModuleState.stopped, detail: 'every instrument is done');
@@ -87,7 +87,7 @@ class SurveyModule extends ChangeNotifier implements EmbeddedModule {
     final start = startsAt;
     if (context == null || start == null) return;
 
-    final due = _schedule.dueAt(_now(), start, _completed);
+    final due = _schedule.dueAt(_now(), start, context.enrolledAt, _completed);
     if (due.isEmpty) {
       _set(pending: null, entry: null, problem: null);
       return;

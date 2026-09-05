@@ -18,7 +18,11 @@ String _bundleJson({List<String> modules = const ['proximity']}) => jsonEncode({
   'title': 'Contact logging pilot',
   'modules': {
     for (final m in modules)
-      m: m == 'proximity' ? {'on_device': {'max_episode_seconds': 900}} : {},
+      m: m == 'proximity'
+          ? {
+              'on_device': {'max_episode_seconds': 900},
+            }
+          : {},
   },
 });
 
@@ -65,6 +69,7 @@ void main() {
           'protocol_hash': protocolHash ?? ProtocolBundle.hashOf(utf8.encode(body)),
           'protocol_url': _bundleUrl,
           'access_token': 'access-1',
+          'enrolled_at': '2026-09-02T12:00:00Z',
           'token_type': 'Bearer',
           'expires_in': 3600,
           'refresh_token': 'refresh-1',
@@ -75,19 +80,17 @@ void main() {
     });
   }
 
-  EnrollmentService serviceWith(
-    http.Client client, {
-    Set<String> modules = const {'proximity'},
-  }) => EnrollmentService(
-    baseUri: baseUri,
-    db: db,
-    identity: identity,
-    tokens: tokens,
-    registry: ModuleRegistry(modules),
-    platform: 'android',
-    httpClient: client,
-    now: () => now,
-  );
+  EnrollmentService serviceWith(http.Client client, {Set<String> modules = const {'proximity'}}) =>
+      EnrollmentService(
+        baseUri: baseUri,
+        db: db,
+        identity: identity,
+        tokens: tokens,
+        registry: ModuleRegistry(modules),
+        platform: 'android',
+        httpClient: client,
+        now: () => now,
+      );
 
   group('identity', () {
     test('is generated once and is stable across restarts', () {
@@ -194,9 +197,7 @@ void main() {
 
   group('bundle satisfiability', () {
     test('a study needing a module this build lacks fails loudly', () async {
-      final client = clientFor(
-        bundleBody: _bundleJson(modules: ['proximity', 'biosensing']),
-      );
+      final client = clientFor(bundleBody: _bundleJson(modules: ['proximity', 'biosensing']));
 
       await expectLater(
         serviceWith(client, modules: {'proximity'}).enroll('JOIN-1234'),
@@ -323,9 +324,7 @@ void main() {
         now: () => now,
         httpClient: MockClient((_) async => http.Response('{}', 401)),
       );
-      await store.save(
-        StudyTokens(accessToken: 'a1', expiresAt: now, refreshToken: 'r1'),
-      );
+      await store.save(StudyTokens(accessToken: 'a1', expiresAt: now, refreshToken: 'r1'));
 
       await expectLater(store.refresh(), throwsA(isA<ReEnrollmentRequired>()));
       expect(await store.read(), isNull, reason: 'a dead token would only produce a retry loop');

@@ -52,6 +52,7 @@ class Enrollment {
     required this.deviceId,
     required this.protocolHash,
     required this.bundle,
+    required this.enrolledAt,
     this.arm,
   });
 
@@ -64,6 +65,10 @@ class Enrollment {
 
   final ProtocolBundle bundle;
   final String? arm;
+
+  /// When the server says this participant joined, so a module can time something from their
+  /// enrollment rather than from the study's start.
+  final DateTime enrolledAt;
 }
 
 /// Joins a study.
@@ -90,6 +95,7 @@ class EnrollmentService {
   static const String protocolHashKey = 'protocol_hash';
   static const String armKey = 'study_arm';
   static const String bundleKey = 'protocol_bundle';
+  static const String enrolledAtKey = 'enrolled_at';
 
   final Uri baseUri;
   final EpidemicaDatabase _db;
@@ -145,9 +151,7 @@ class EnrollmentService {
     await _tokens.save(
       StudyTokens(
         accessToken: body['access_token']! as String,
-        expiresAt: _now().toUtc().add(
-          Duration(seconds: (body['expires_in']! as num).toInt()),
-        ),
+        expiresAt: _now().toUtc().add(Duration(seconds: (body['expires_in']! as num).toInt())),
         refreshToken: body['refresh_token'] as String?,
       ),
     );
@@ -159,6 +163,7 @@ class EnrollmentService {
       protocolHash: protocolHash,
       bundle: bundle,
       arm: body['arm'] as String?,
+      enrolledAt: DateTime.parse(body['enrolled_at']! as String).toUtc(),
     );
     _persist(enrollment, bundleBytes);
     return enrollment;
@@ -169,7 +174,10 @@ class EnrollmentService {
     final studyId = _db.readMeta(studyIdKey);
     final protocolHash = _db.readMeta(protocolHashKey);
     final bundle = _db.readMeta(bundleKey);
-    if (studyId == null || protocolHash == null || bundle == null) return null;
+    final enrolledAt = _db.readMeta(enrolledAtKey);
+    if (studyId == null || protocolHash == null || bundle == null || enrolledAt == null) {
+      return null;
+    }
 
     return Enrollment(
       studyId: studyId,
@@ -178,6 +186,7 @@ class EnrollmentService {
       protocolHash: protocolHash,
       bundle: ProtocolBundle.parse(utf8.encode(bundle)),
       arm: _db.readMeta(armKey),
+      enrolledAt: DateTime.parse(enrolledAt),
     );
   }
 
@@ -186,6 +195,7 @@ class EnrollmentService {
       _db.writeMeta(studyIdKey, enrollment.studyId);
       _db.writeMeta(protocolHashKey, enrollment.protocolHash);
       _db.writeMeta(bundleKey, utf8.decode(bundleBytes));
+      _db.writeMeta(enrolledAtKey, enrollment.enrolledAt.toIso8601String());
       if (enrollment.arm != null) _db.writeMeta(armKey, enrollment.arm!);
     });
   }

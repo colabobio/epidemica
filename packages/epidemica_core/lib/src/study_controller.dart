@@ -223,6 +223,7 @@ class StudyController extends ChangeNotifier {
             ),
             store: DatabaseModuleStore(db: _db, moduleId: module.id),
             studyStartsAt: enrollment.bundle.startsAt,
+            enrolledAt: enrollment.enrolledAt,
           ),
         );
         _running.add(module.id);

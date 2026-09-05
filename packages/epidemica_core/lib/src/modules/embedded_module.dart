@@ -40,6 +40,7 @@ class ModuleContext {
     required this.record,
     required this.store,
     this.studyStartsAt,
+    this.enrolledAt,
   });
 
   /// This module's block from the bundle.
@@ -56,6 +57,10 @@ class ModuleContext {
   /// module times has to be timed against the same instant the server uses, or the two will
   /// disagree about when something was due.
   final DateTime? studyStartsAt;
+
+  /// When this participant joined. An instrument about the participant is anchored here; one about
+  /// the study is anchored to [studyStartsAt].
+  final DateTime? enrolledAt;
 
   /// Appends an observation to the outbox. Returns its sequence number.
   final ObservationRecorder record;
@@ -117,7 +122,8 @@ class ModuleStatus {
 
 /// Builds the recorder a module is given, binding the envelope fields a module has no business
 /// choosing for itself.
-ObservationRecorder recorderFor({  required Outbox outbox,
+ObservationRecorder recorderFor({
+  required Outbox outbox,
   required Enrollment enrollment,
   required DeviceClock clock,
   required String module,

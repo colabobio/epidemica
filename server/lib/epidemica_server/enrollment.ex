@@ -44,6 +44,10 @@ defmodule EpidemicaServer.Enrollment do
             subject: participant.subject,
             study_id: join_code.study_id,
             arm: participant.arm,
+            # When this participant joined, so anything scheduled from enrolment rather than from
+            # the study's start has a moment to be measured against. A first survey that is about
+            # the participant belongs to them, not to the calendar.
+            enrolled_at: participant.enrolled_at,
             protocol_hash: join_code.study.protocol_hash,
             protocol_url: protocol_url(join_code.study_id),
             access_token: access,

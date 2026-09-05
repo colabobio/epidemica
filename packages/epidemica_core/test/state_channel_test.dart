@@ -192,7 +192,7 @@ void main() {
       expect((await gone.refresh())!.revision, 4);
     });
 
-    test('a document belonging to a previous enrolment is not shown', () async {
+    test('a document belonging to a previous enrollment is not shown', () async {
       final channel = channelOn(
         MockClient((_) async => http.Response(document(revision: 4), 200)),
       );

@@ -98,6 +98,26 @@ invitation, with answers that no longer refer to the period they asked about.
 The key that records completion is `instrument_id@version`, so **revising an instrument asks it
 again** rather than treating the old answer as covering the new wording.
 
+### Anchored to the study, or to the participant
+
+The offset is measured from the study's start by default. Set `anchor: "enrollment"` to measure it
+from when *this participant* joined instead:
+
+```json
+{ "instrument_id": "demographics", "version": "1.0.0", "offset_seconds": 300,
+  "window_seconds": 86400, "anchor": "enrollment" }
+```
+
+The distinction is what the instrument is about. One about the study — "how is the outbreak going"
+— belongs to the calendar, and a participant who joined after its window closed was never owed it:
+they were not there. One about the person — demographics, baseline beliefs — belongs to them, and a
+late joiner should still be asked, minutes after they join, whenever they join. Anchoring both to
+the study would silently skip the second kind for anyone who enrolled late, which is exactly the
+case rolling enrollment produces.
+
+`anchor: "study"` is the default and is what every instrument above uses. An enrollment-anchored
+instrument whose enrollment time the device does not have is never due, rather than guessed at.
+
 ## How it reaches the phone
 
 ```mermaid
@@ -164,7 +184,7 @@ shasum -a 256 studies/my-study/instruments/checkin-1.0.0.json | awk '{print "sha
 ```
 
 **3. Declare it in the bundle** under `modules.survey`. Naming the module is what enables it; a
-binary that does not embed `survey` will refuse the study at enrolment rather than run it half:
+binary that does not embed `survey` will refuse the study at enrollment rather than run it half:
 
 ```json
 "modules": {

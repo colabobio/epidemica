@@ -88,6 +88,7 @@ void main() {
         'protocol_hash': ProtocolBundle.hashOf(utf8.encode(bundle)),
         'protocol_url': _bundleUrl,
         'access_token': 'access-1',
+        'enrolled_at': '2026-09-02T12:00:00Z',
         'token_type': 'Bearer',
         'expires_in': 3600,
         'refresh_token': 'refresh-1',

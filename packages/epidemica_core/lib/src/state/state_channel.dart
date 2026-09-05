@@ -38,7 +38,7 @@ class StateChannel {
   ParticipantState? current({String? expectedSubject}) {
     final cached = _cached ??= _readCache();
     if (cached == null) return null;
-    // A document belonging to a previous enrolment on this device is not this participant's.
+    // A document belonging to a previous enrollment on this device is not this participant's.
     if (expectedSubject != null && cached.subject != expectedSubject) return null;
     return cached;
   }
