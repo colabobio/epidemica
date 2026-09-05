@@ -1,10 +1,53 @@
 # 0008 — A survey module: scheduled instruments delivered in the app
 
-**Status:** backlog
+**Status:** done
 **Filed:** 2026-09-03
-**Touches:** `contracts/instruments/` (new), `contracts/observations/instruments/survey_response/1.0.0.json`,
-`packages/epidemica_instruments/` (new), `packages/epidemica_core/lib/src/modules/embedded_module.dart`,
+**Landed:** 2026-09-05
+**Touches:** `contracts/instruments/`, `contracts/observations/instruments/survey_response/1.0.0.json`,
+`packages/epidemica_survey/`, `packages/epidemica_core/lib/src/modules/embedded_module.dart`,
 `apps/epigames`, `studies/*/bundle.json`
+
+## What was built, and where it differs from this plan
+
+Shipped as **`packages/epidemica_survey`** with module id **`survey`**, not
+`epidemica_instruments`/`instruments`. The narrower name says what it actually does; instruments
+delivered over SMS or web are a different problem and should not inherit this package's assumptions.
+
+The four open decisions were resolved as follows.
+
+- **Where instrument definitions live** — served separately and versioned independently, as the
+  contract already assumed. `contracts/instruments/definition/1.0.0.json` defines them,
+  `Instruments.register/2` stores them byte-exact, `GET /instruments/:id/:version` serves them, and
+  `HttpInstrumentSource` verifies the digest on the device. The bundle names and pins the versions,
+  so a study stays reproducible without its hash changing when a typo is fixed.
+- **Who decides it is day 3** — the device, via `SurveySchedule.dueAt`, using the study's own
+  interval rather than a hardcoded day. Schedules anchor to either the study start or the
+  participant's enrolment, which the server-side option could not express per-participant.
+- **What a survey module reports as its status** — `ModuleState` was *not* extended. The module
+  reports `stopped` with a `detail` of `'every instrument is done'`. A new state would have been a
+  `module_status` contract change to describe something no coverage calculation reads.
+- **How the participant finds out** — deferred. See below.
+
+## What was deliberately left undone
+
+1. **Notification delivery.** Without it a survey is seen only when the participant next opens the
+   app. [ADR-0015](../../docs/adr/0015-local-notifications-for-scheduled-instruments.md) is
+   *Proposed*, and the implementation is filed as
+   [task 0010](../backlog/0010-local-notifications.md). This is the one gap that matters for a
+   real study.
+2. **A survey block in `studies/epigame7`.** Only `studies/epigame-debug` carries one. That is a
+   bundle edit, not code, and it should be written with the actual research questions rather than
+   placeholders.
+
+## Verification
+
+27 tests in `packages/epidemica_survey`, plus contract tests for the instrument definition with the
+usual fixture rules. Exercised end to end on `studies/epigame-debug`, where the scheduled check-in
+appears and arrives server-side `validated: true`.
+
+---
+
+*Everything below is the original task as filed, kept for the reasoning.*
 
 ## What is wanted
 
@@ -90,9 +133,10 @@ Two options, and the wrong one is subtly broken.
 *On the device.* The bundle carries `schedule.starts_at`, so the app can compute the study day
 itself. Works offline and needs nothing new — but it is a **second implementation of "which day is
 it"**, and the server already has one in `Studies.day_at/3`. That is exactly the class of bug in
-[`0001`](0001-configurable-tick-interval.md) item 2, where a study with a short tick computed one
-day in one place and a different day in another. If the device computes it, it must use the study's
-`tick_interval_seconds` and the `DeviceClock` offset, not `DateTime.now()` and a hardcoded day.
+[`0001`](../backlog/0001-configurable-tick-interval.md) item 2, where a study with a short tick
+computed one day in one place and a different day in another. If the device computes it, it must use
+the study's `tick_interval_seconds` and the `DeviceClock` offset, not `DateTime.now()` and a
+hardcoded day.
 
 *On the server.* The state channel already delivers a per-participant document; a `surveys_due`
 field would make the server authoritative, and it already knows the day exactly. The cost is that
@@ -103,9 +147,10 @@ it only updates when something recomputes state — currently a tick — and it 
 **There is no notification dependency anywhere in the repository.** Without one, a survey is only
 seen when the participant next opens the app, which for a study running over days means "eventually,
 maybe". Local notifications are OS-scheduled, so unlike upload they do *not* depend on
-[`0006`](0006-no-background-sync.md) — but they need a package, permissions on both platforms,
-and a sentence in the consent screen. Response *upload* is unaffected either way: a participant
-answering a survey is by definition in the foreground, so the outbox drains on the spot.
+[`0006`](../backlog/0006-no-background-sync.md) — but they need a package, permissions on both
+platforms, and a sentence in the consent screen. Response *upload* is unaffected either way:
+a participant answering a survey is by definition in the foreground, so the outbox drains on the
+spot.
 
 ### What a survey module reports as its status
 

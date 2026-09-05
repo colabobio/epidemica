@@ -1,5 +1,14 @@
 # M2 — Epigames as a digital twin
 
+> **Status:** built and field-tested in compressed form; acceptance run not yet performed. The whole
+> game runs — sensing, reconciliation, tick, settlement, scoring, protection, surveys and arms — and
+> §2 criteria 2, 3 and 4 hold by construction and are covered by tests. Criterion 4 has been
+> demonstrated directly: the same binary given the `contactlog` bundle collects contacts and shows
+> no game. What remains is criterion 1 at scale: twenty participants over seven **real** days.
+> Debugging was done on [`studies/epigame-debug`](../../studies/epigame-debug), which compresses the
+> week into ~35 minutes and therefore does not exercise the 24-hour rhythm, background execution, or
+> app termination and relaunch.
+
 ## 1. Goal
 
 A seven-day game in which participants carry a phone, choose whether to protect themselves, and

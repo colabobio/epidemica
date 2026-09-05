@@ -1,6 +1,11 @@
 # Milestone 1 — Contact logging end to end
 
-> **Status:** planned. Two decisions (§3) must be settled before W1 or W5 start.
+> **Status:** built and field-tested; acceptance run not yet performed. Every layer named in §1
+> exists and the slice closes end to end on real devices. The §2 acceptance run — five devices for
+> one hour, exported, validated, and loaded into `EpidemicaNetwork` — has been done with **two**
+> devices over shorter windows, so the criterion is met in mechanism but not at its stated scale.
+> Both §3 decisions are settled. The §3.1 warning still stands: the pseudonym is broadcast in the
+> clear, so this remains lab-pilot-only until rotating identifiers exist.
 
 ## 1. Goal
 

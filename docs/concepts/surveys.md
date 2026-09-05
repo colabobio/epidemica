@@ -296,5 +296,7 @@ answers so scoring can be recomputed if the algorithm is later corrected. Nothin
 - [epigames](epigame.md) — the study this was first built for
 - [arms](arms.md) — a study that randomises its rules across participants, which surveys can then
   measure
-- [`tasks/backlog/0008`](../../tasks/backlog/0008-survey-module.md) — the task this came from,
+- [`tasks/done/0008`](../../tasks/done/0008-survey-module.md) — the task this came from,
   including the decisions taken and why
+- [`tasks/backlog/0010`](../../tasks/backlog/0010-local-notifications.md) — telling the participant
+  an instrument is due, which is not yet built
