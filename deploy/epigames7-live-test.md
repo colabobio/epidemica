@@ -140,7 +140,36 @@ A day that has not ticked when it should have is a scheduler problem; check sect
 first. A day that ticked with mostly `not_sensing` is a sync problem, not a scheduler problem —
 check that participants' phones are actually uploading before concluding the scheduler is at fault.
 
-## 7. What is deliberately not covered here
+## 7. Running alongside the open-ended demo
+
+The seven-day study and the open-ended demo can run on the same server, and they do not conflict.
+Each study's days are derived from its own bundle's `starts_at` and `tick_interval_seconds`, and the
+scheduler checks each open study independently — a day due for one is a day due for one, not a day
+that somehow belongs to both. `Twin.Worker`'s idempotency (a day already run returns
+`already_run` and is treated as success) is the guarantee that running both at once is safe, not a
+courtesy.
+
+Register the demo the same way, with its own join code:
+
+```sh
+docker compose cp ../../studies/epigame-demo/bundle.json server:/tmp/demo-bundle.json
+
+docker compose exec server /app/bin/epidemica_server eval '
+  bundle = File.read!("/tmp/demo-bundle.json") |> Jason.decode!()
+  bundle = put_in(bundle["schedule"]["starts_at"], "2026-09-08T04:00:00Z")
+  source = Jason.encode!(bundle)
+  {:ok, study} = EpidemicaServer.Studies.create_study_from_bundle("Epigame demo", source)
+  {:ok, _} = EpidemicaServer.Studies.add_join_code(study, "EPIGAME-DEMO")
+  IO.puts("demo study #{study.id} code EPIGAME-DEMO")
+'
+```
+
+One thing to know: the demo's `tick_interval_seconds` is the same as the seven-day game's (a day),
+so both tick on the same daily boundary, just offset by their own `starts_at`. They do not need to
+line up, and they do not need to not line up — they are simply two studies answering two different
+questions at two different cadences on the same server.
+
+## 8. What is deliberately not covered here
 
 The overnight two-phone test from [`tasks/done/0006`](../tasks/done/0006-no-background-sync.md)
 — whether iOS background wakes deliver enough upload opportunities in practice — has not been run on

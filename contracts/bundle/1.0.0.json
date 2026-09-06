@@ -136,6 +136,16 @@
               "description": "Which agents may be chosen. `virtual` keeps the lottery away from real people: a participant infected on day one loses days of play for no reason they can see or influence, and every real infection then has a contact behind it rather than an unexplainable start. `participants` and `any` are available for studies that want the index case to be a player, and should be chosen deliberately."
             }
           }
+        },
+        "turnover_after_days": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "How many days a virtual agent lives before being retired and replaced. Zero means never retire, which is the default."
+        },
+        "finished_grace_days": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "How many days a participant stays in the simulation after reaching a final state (recovered or dead). Absent or zero means they are removed immediately."
         }
       }
     },
@@ -191,11 +201,10 @@
     "schedule": {
       "type": "object",
       "required": [
-        "starts_at",
-        "days"
+        "starts_at"
       ],
       "additionalProperties": false,
-      "description": "When the study runs. Required by anything that ticks: without it the first day would be anchored to whenever the study happened to be registered, so re-registering would silently move every boundary and a participant's 'day 3' would mean nothing. Absent for open-ended collection, which has no days to number.",
+      "description": "When the study runs. Required by anything that ticks: without it the first day would be anchored to whenever the study happened to be registered, so re-registering would silently move every boundary and a participant's 'day 3' would mean nothing. `days` may be absent for a study that never ends, which is exactly what an open-ended Epigame is.",
       "properties": {
         "starts_at": {
           "type": "string",
@@ -205,7 +214,7 @@
         "days": {
           "type": "integer",
           "minimum": 1,
-          "description": "How many days the study runs. Also the end: there is no day after this one, and a server asked for one refuses rather than extending the study by accident."
+          "description": "How many days the study runs. Also the end: there is no day after this one, and a server asked for one refuses rather than extending the study by accident. Absent for an open-ended study, which runs until an admin shuts it down."
         }
       }
     }

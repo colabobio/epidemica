@@ -420,4 +420,79 @@ defmodule EpidemicaServer.TwinTest do
       assert alice["recovers_on_day"] == 7
     end
   end
+
+  # -- turnover --------------------------------------------------------------------------------
+
+  describe "turnover" do
+    test "a virtual agent past its declared lifetime is retired and its slot refilled" do
+      s = study(%{"population" => 4, "turnover_after_days" => 2})
+      participant(s, "alice-0001")
+
+      {:ok, first} = run(s, 1)
+      assert length(first.inputs["agents"]) == 4
+
+      {:ok, third} = run(s, 3)
+      assert length(third.inputs["agents"]) == 4
+
+      # The virtual agents that started on day 0 are retired by day 2; their slots are refilled.
+      retired = Enum.filter(Twin.agents(s.id), &(not &1.active))
+      assert retired != []
+      assert Enum.all?(retired, & &1.virtual)
+    end
+
+    test "a dead agent is removed immediately and its slot refilled" do
+      s = study(%{"population" => 4})
+      participant(s, "alice-0001")
+      EpidemicaServer.Epigame.publish_initial(s.id, "alice-0001")
+
+      {:ok, first} = run(s, 1, runner: stub(infect: [0]))
+      assert length(first.inputs["agents"]) == 4
+
+      # Kill the infected agent outright rather than waiting for a model that never produces one.
+      # The roster is the thing under test here, not the disease.
+      {:ok, _tick} = run(s, 2, runner: stub(infect: [0]))
+      alice = Enum.find(Twin.agents(s.id), &(&1.subject == "alice-0001"))
+      Repo.update!(Agent.changeset(alice, %{state: "dead", dies_on_day: 2}))
+
+      {:ok, third} = run(s, 3)
+      assert length(third.inputs["agents"]) == 4
+
+      # Alice is inactive; her slot is held by somebody else.
+      assert not Enum.any?(Twin.agents(s.id), &(&1.subject == "alice-0001" and &1.active))
+      assert Enum.count(Twin.agents(s.id), & &1.active) == 4
+
+      # And she was told, before she was removed.
+      {:ok, state} = EpidemicaServer.ParticipantState.fetch(s.id, "alice-0001")
+      assert state.state["epi_state"] == "dead"
+      assert state.state["days_total"] == 3
+    end
+
+    test "turnover_after_days absent means virtual agents are never retired" do
+      s = study(%{"population" => 4})
+      participant(s, "alice-0001")
+
+      {:ok, first} = run(s, 1)
+      assert length(first.inputs["agents"]) == 4
+
+      {:ok, tenth} = run(s, 10)
+      assert length(tenth.inputs["agents"]) == 4
+      assert Enum.all?(Twin.agents(s.id), & &1.active)
+    end
+
+    test "a participant whose phone has gone quiet is removed" do
+      s = study(%{"population" => 4, "min_interval_seconds" => 900})
+      participant(s, "alice-0001")
+      EpidemicaServer.Epigame.publish_initial(s.id, "alice-0001")
+
+      {:ok, first} = run(s, 1)
+      assert length(first.inputs["agents"]) == 4
+
+      # Alice's phone has not spoken in longer than four sync windows. The roster is the thing
+      # under test here, not the disease.
+      {:ok, _tick} = run(s, 5)
+
+      assert not Enum.any?(Twin.agents(s.id), &(&1.subject == "alice-0001" and &1.active))
+      assert Enum.count(Twin.agents(s.id), & &1.active) == 4
+    end
+  end
 end

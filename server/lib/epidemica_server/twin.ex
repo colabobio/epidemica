@@ -12,8 +12,9 @@ defmodule EpidemicaServer.Twin do
 
   import Ecto.Query
 
-  alias EpidemicaServer.{Health, Projections, Reconciliation, Repo, Studies}
+  alias EpidemicaServer.{Epigame, Health, Projections, Reconciliation, Repo, Studies}
   alias EpidemicaServer.Enrollment.Participant
+  alias EpidemicaServer.Studies.Study
   alias EpidemicaServer.Twin.{Agent, Runner, Tick}
 
   @default_coverage_threshold 0.5
@@ -156,6 +157,7 @@ defmodule EpidemicaServer.Twin do
     Repo.transaction(fn ->
       existing = agents(study_id)
       existing = enrol_newcomers(study_id, day, existing)
+      existing = remove_finished(study_id, twin, day, existing)
       existing = fill_population(study_id, twin, day, existing)
       existing = seed_outbreak(study_id, twin, day, existing)
       Enum.sort_by(existing, & &1.slot)
@@ -183,28 +185,60 @@ defmodule EpidemicaServer.Twin do
     count = Map.get(seed, "infections", 0)
     already_seeded? = Enum.any?(existing, &(&1.infected_on_day != nil))
 
-    if count == 0 or already_seeded? or
-         Repo.exists?(from t in Tick, where: t.study_id == type(^study_id, :binary_id)) do
-      existing
-    else
-      chosen =
+    cond do
+      count == 0 ->
         existing
-        |> Enum.filter(&(&1.active and eligible?(&1, Map.get(seed, "among", "virtual"))))
-        |> Enum.sort_by(&:erlang.phash2({study_id, &1.slot}))
-        |> Enum.take(count)
-        |> Enum.map(& &1.id)
-        |> MapSet.new()
 
-      Enum.map(existing, fn agent ->
-        if MapSet.member?(chosen, agent.id) do
-          # Infected the day before the study opens, so they are already infectious when day one
-          # runs. The recovery deadline is left for the engine to draw.
-          Repo.update!(Agent.changeset(agent, %{state: "infected", infected_on_day: day - 1}))
-        else
-          agent
-        end
-      end)
+      # First tick: seed the index cases once, before anything has run.
+      not already_seeded? ->
+        seed_agents(study_id, day, existing, count, Map.get(seed, "among", "virtual"))
+
+      # An open-ended study whose outbreak has died out is not a study at all — it is a contact
+      # log with a simulation attached that is simulating nothing. Re-seed it rather than letting
+      # it run to completion having produced an empty epidemic.
+      reseed_outbreak?(study_id, day, existing) ->
+        seed_agents(study_id, day, existing, count, Map.get(seed, "among", "virtual"))
+
+      true ->
+        existing
     end
+  end
+
+  # Whether the outbreak has died out and needs re-seeding. A study with a last day never reaches
+  # this: its epidemic is allowed to burn out, because that is the answer to the question the study
+  # exists to ask. A study with no last day cannot afford that answer, because it would then run
+  # forever having simulated nothing.
+  defp reseed_outbreak?(study_id, day, existing) do
+    days = Studies.scheduled_days(Repo.get!(Study, study_id))
+    open_ended = days == nil
+
+    open_ended and no_active_infections(existing) and ticks_exist?(study_id, day)
+  end
+
+  defp no_active_infections(existing) do
+    Enum.all?(existing, &(&1.state in ["susceptible", "recovered"] or not &1.active))
+  end
+
+  defp ticks_exist?(study_id, _day) do
+    Repo.exists?(from t in Tick, where: t.study_id == type(^study_id, :binary_id))
+  end
+
+  defp seed_agents(study_id, day, existing, count, among) do
+    chosen =
+      existing
+      |> Enum.filter(&(&1.active and eligible?(&1, among)))
+      |> Enum.sort_by(&:erlang.phash2({study_id, &1.slot}))
+      |> Enum.take(count)
+      |> Enum.map(& &1.id)
+      |> MapSet.new()
+
+    Enum.map(existing, fn agent ->
+      if MapSet.member?(chosen, agent.id) do
+        Repo.update!(Agent.changeset(agent, %{state: "infected", infected_on_day: day - 1}))
+      else
+        agent
+      end
+    end)
   end
 
   defp eligible?(_agent, "any"), do: true
@@ -229,6 +263,88 @@ defmodule EpidemicaServer.Twin do
 
       [agent | acc]
     end)
+  end
+
+  # A dead agent is gone, and a virtual agent past its declared lifetime is retired. Both free a
+  # slot that fill_population will refill on the same tick. A real participant is never removed
+  # this way — their leaving is their own decision, not the model's.
+  defp remove_finished(study_id, twin, day, existing) do
+    turnover = Map.get(twin, "turnover_after_days")
+    grace = Map.get(twin, "finished_grace_days")
+
+    doomed =
+      existing
+      |> Enum.filter(& &1.active)
+      |> Enum.filter(fn agent ->
+        cond do
+          # A dead agent is gone now, regardless of what it was.
+          agent.state == "dead" -> true
+          # A virtual agent retired by age. turnover_after_days is the study's declared lifetime;
+          # absent or zero means never retire.
+          agent.virtual and turnover != nil and turnover > 0 and
+              day - agent.joined_on_day >= turnover -> true
+          # A real participant whose grace period has elapsed after reaching a final state.
+          not agent.virtual and grace != nil and grace > 0 and
+            agent.state in ["recovered", "dead"] and
+            day - (agent.recovers_on_day || agent.dies_on_day || day) >= grace -> true
+          # A real participant whose phone has gone quiet: no observation in
+          # `sync.min_interval_seconds` × 4. The study's way of not keeping a slot for someone
+          # who uninstalled the app and is definitely not coming back.
+          not agent.virtual and quiet?(study_id, agent.subject, twin) -> true
+          true -> false
+        end
+      end)
+      |> Enum.map(& &1.id)
+      |> MapSet.new()
+
+    if MapSet.size(doomed) == 0 do
+      existing
+    else
+      # Tell the participant before removing them: a study with no last day never finishes, so
+      # without this their app would keep showing a running game to someone who is no longer in it.
+      for agent <- existing, MapSet.member?(doomed, agent.id), not agent.virtual do
+        publish_finished(study_id, agent.subject, day, agent.state)
+      end
+
+      Enum.map(existing, fn agent ->
+        if MapSet.member?(doomed, agent.id) do
+          Repo.update!(Agent.changeset(agent, %{active: false}))
+        else
+          agent
+        end
+      end)
+    end
+  end
+
+  # A participant who has not uploaded anything in the study's sync window is not playing.
+  defp quiet?(study_id, subject, twin) do
+    interval = Map.get(twin, "min_interval_seconds")
+    # No declared sync interval means no way to say what "quiet" is — a study that never said how
+    # often it expected to hear from a phone cannot be used to conclude one has stopped.
+    if interval == nil or interval <= 0 do
+      false
+    else
+      window_seconds = interval * 4
+      since = DateTime.add(DateTime.utc_now(), -window_seconds, :second)
+
+      not Repo.exists?(
+        from o in EpidemicaServer.Ingest.Observation,
+          where:
+            o.study_id == type(^study_id, :binary_id) and
+              o.subject == ^subject and
+              o.received_at > ^since
+      )
+    end
+  end
+
+  # The study is still running; only this participant's part in it has ended. `days_total` is the
+  # day their game ended rather than the study's own, which is the one the app needs to render
+  # "Finished" against.
+  defp publish_finished(study_id, subject, day, final_state) do
+    case Epigame.publish_finished(study_id, subject, day, final_state) do
+      {:ok, _} -> :ok
+      {:error, reason} -> Repo.rollback({:could_not_publish_finished, subject, reason})
+    end
   end
 
   defp fill_population(study_id, twin, day, existing) do

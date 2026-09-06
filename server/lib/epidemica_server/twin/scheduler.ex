@@ -83,7 +83,13 @@ defmodule EpidemicaServer.Twin.Scheduler do
       twin_block(study) == :error ->
         []
 
-      # No schedule means no days to count.
+      # No schedule, and a twin that wants one: run forever, one day per tick interval, starting
+      # from the study's own declared start. `starts_at` is still required even though `days` is
+      # not — a study with no anchor has no first day to number from.
+      days == nil and Studies.starts_at(study) != nil ->
+        open_ended_days(study, at)
+
+      # No schedule and no start: a study that collects only, or a bundle missing its anchor.
       days == nil ->
         []
 
@@ -107,10 +113,30 @@ defmodule EpidemicaServer.Twin.Scheduler do
     end
   end
 
-  # A study without a twin block is never simulated. Refusing here rather than defaulting keeps a
+  # A study with no twin block is never simulated. Refusing here rather than defaulting keeps a
   # collection-only study from quietly acquiring a model nobody asked for.
   defp twin_block(%Study{protocol: %{"twin" => twin}}) when is_map(twin), do: {:ok, twin}
   defp twin_block(_study), do: :error
+
+  # Days of an open-ended study that are due now: every day from 1 up to the one that ends at the
+  # next tick interval boundary, minus any already ticked, with the same buffer as a finite study.
+  defp open_ended_days(study, at) do
+    starts_at = Studies.starts_at(study)
+    interval = Studies.tick_interval(study)
+    buffer = buffer_seconds(study)
+
+    # Which tick-interval boundary has passed, counting from the study's start. Zero before the
+    # first full interval has elapsed, so a study that started ten minutes ago has no day due yet.
+    current = div(DateTime.diff(at, starts_at, :second), interval)
+
+    1..current
+    |> Enum.filter(fn day ->
+      period_end = DateTime.add(starts_at, day * interval, :second)
+      DateTime.compare(DateTime.add(period_end, buffer, :second), at) != :gt
+    end)
+    |> Enum.reject(fn day -> ticked?(study.id, day) end)
+    |> Enum.map(fn day -> {study.id, day} end)
+  end
 
   # Every day of a study that has ended. Nothing to filter by buffer: every one of them is over.
   defp all_days(study, days) do

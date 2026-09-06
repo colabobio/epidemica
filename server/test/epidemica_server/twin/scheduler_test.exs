@@ -26,6 +26,18 @@ defmodule EpidemicaServer.Twin.SchedulerTest do
     })
   end
 
+  # A study with no last day: same bundle, minus the `days` ceiling.
+  defp open_bundle(twin, sync) do
+    Jason.encode!(%{
+      "bundle_version" => "1.0",
+      "study_id" => Ecto.UUID.generate(),
+      "modules" => %{"proximity" => %{}},
+      "schedule" => %{"starts_at" => DateTime.to_iso8601(@day_start)},
+      "sync" => sync,
+      "twin" => twin
+    })
+  end
+
   defp study(twin \\ %{}, sync \\ %{}) do
     twin =
       Map.merge(
@@ -38,6 +50,21 @@ defmodule EpidemicaServer.Twin.SchedulerTest do
       )
 
     {:ok, study} = Studies.create_study_from_bundle("scheduler study", bundle(twin, sync))
+    study
+  end
+
+  defp open_study(twin \\ %{}, sync \\ %{}) do
+    twin =
+      Map.merge(
+        %{
+          "engine" => "starsim",
+          "state_uri" => "https://schemas.epidemica.info/state/epigame/1.0.0.json",
+          "population" => 4
+        },
+        twin
+      )
+
+    {:ok, study} = Studies.create_study_from_bundle("open study", open_bundle(twin, sync))
     study
   end
 
@@ -130,6 +157,48 @@ defmodule EpidemicaServer.Twin.SchedulerTest do
       assert [] = Scheduler.due_ticks(~U[2026-09-03 00:30:00Z])
       assert [{id, 1}] = Scheduler.due_ticks(~U[2026-09-03 01:00:00Z])
       assert id == s.id
+    end
+  end
+
+  describe "open-ended studies" do
+    test "a study with no days ceiling offers a day per tick interval, forever" do
+      s = open_study()
+
+      # Day 1 ends at 2026-09-03 00:00; buffer is 30 minutes. Day 1 is due, day 2 is not.
+      assert [{id, 1}] = Scheduler.due_ticks(~U[2026-09-03 00:30:00Z])
+      assert id == s.id
+
+      # Ten days later: day 1 is ticked, days 2-10 are due.
+      tick(s, 1)
+      due = Scheduler.due_ticks(~U[2026-09-12 00:30:00Z])
+      assert length(due) == 9
+      assert Enum.map(due, &elem(&1, 1)) == Enum.to_list(2..10)
+    end
+
+    test "a study with no days ceiling and no starts_at is never scheduled" do
+      {:ok, _s} =
+        Studies.create_study_from_bundle(
+          "no anchor",
+          Jason.encode!(%{
+            "bundle_version" => "1.0",
+            "study_id" => Ecto.UUID.generate(),
+            "modules" => %{"proximity" => %{}},
+            "twin" => %{
+              "engine" => "starsim",
+              "state_uri" => "https://schemas.epidemica.info/state/epigame/1.0.0.json",
+              "population" => 4
+            }
+          })
+        )
+
+      assert [] = Scheduler.due_ticks(~U[2026-09-12 00:00:00Z])
+    end
+
+    test "an open-ended study with a tick already run does not re-offer it" do
+      s = open_study()
+      tick(s, 1)
+
+      assert [] = Scheduler.due_ticks(~U[2026-09-03 00:30:00Z])
     end
   end
 

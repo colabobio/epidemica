@@ -63,6 +63,48 @@ defmodule EpidemicaServer.Epigame do
   defp put_population(state, _study), do: state
 
   @doc """
+  Tell a participant whose grace period has elapsed that their part in an open-ended study is over.
+
+  A study with no last day never finishes, so nothing else would ever tell them. `days_total` is
+  set to the day they actually finished rather than the study's own (which is null here), so the
+  app's existing "Finished" rendering works unchanged.
+  """
+  def publish_finished(study_id, subject, day, final_state) do
+    with {:ok, study} <- fetch_study(study_id) do
+      existing = case ParticipantState.fetch(study_id, subject) do
+        {:ok, existing} -> existing.state
+        {:error, :not_found} ->
+          # A participant who never got an initial state — a scored study that was never settled,
+          # or one that was removed before its first tick — has no document to merge against.
+          # Build the minimum that makes the finished state readable rather than failing on a
+          # participant whose whole record of being told is what this call is for.
+          %{
+            "day" => 0,
+            "days_total" => Studies.scheduled_days(study),
+            "epi_state" => "susceptible",
+            "points" => 0,
+            "protected_until" => nil,
+            "protection_source" => nil,
+            "pending_contacts" => 0,
+            "total_cases" => 0
+          }
+      end
+
+      state =
+        existing
+        |> Map.merge(%{
+          "day" => day,
+          "days_total" => day,
+          "epi_state" => final_state
+        })
+
+      ParticipantState.put(study_id, subject, @state_uri, state)
+    else
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @doc """
   Settle one study-day for every enrolled participant.
 
   Requires the day's tick, because a participant's epidemiological state is what the tick published
