@@ -47,7 +47,7 @@
   "twin": {
     "engine": "starsim",
     "state_uri": "https://schemas.epidemica.info/state/epigame/1.0.0.json",
-    "tick_interval_seconds": 60,
+    "tick_interval_seconds": 150,
     "population": 60,
     "seed": {
       "infections": 3,
@@ -82,7 +82,7 @@
       "infected_points": 0,
       "protection_cost": 1,
       "contact_points": 2,
-      "contact_min_seconds": 40,
+      "contact_min_seconds": 60,
       "contact_cooldown_days": 1,
       "contact_points_while_infected": false,
       "protection_window_seconds": 60,
