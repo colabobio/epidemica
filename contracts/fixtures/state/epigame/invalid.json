@@ -50,7 +50,7 @@
   },
   {
     "case": "a day before the game starts",
-    "why": "Day counts forward from enrolment. A negative day would mean a tick ran for a period the study did not cover.",
+    "why": "Day counts forward from enrollment. A negative day would mean a tick ran for a period the study did not cover.",
     "instance": {
       "day": -1,
       "days_total": 7,

@@ -38,14 +38,14 @@ platform plumbing and a consent change rather than design.
 1. **Licence-check the transitive tree**, notably `timezone`. ADR-0009 applies to the whole tree, and
    a dependency is not checked until its dependencies are.
 2. **Permissions.** iOS `UNUserNotificationCenter`, Android 13+ `POST_NOTIFICATIONS`. Asked when a
-   study first schedules something, not at enrolment — see the ADR.
+   study first schedules something, not at enrollment — see the ADR.
 3. **Consent text** on the information screen, before joining.
 
 ## Traps
 
 **A denied iOS authorisation cannot be re-prompted from inside the app.** Asking at the wrong moment
 permanently costs that participant's reminders, which is why the ADR moves the prompt away from the
-enrolment sequence. Treat the denial as a durable state and render the schedule in-app instead.
+enrollment sequence. Treat the denial as a durable state and render the schedule in-app instead.
 
 **Notifications must be rescheduled on launch, idempotently.** OS-scheduled notifications do not
 survive reinstall, and a naive reschedule-on-every-launch produces duplicates. Cancel by a
@@ -61,7 +61,7 @@ receiving study reminders is the worst version of this bug.
 inexact delivery is appropriate here and the schedule should not assume minute precision.
 
 **The schedule is in absolute instants, the notification is in local time.** `dueAt` returns an
-instant derived from the study start or enrolment. Converting through the device's current zone is
+instant derived from the study start or enrollment. Converting through the device's current zone is
 correct, but a participant who crosses zones mid-study must not have already-scheduled reminders
 silently shift relative to the study day.
 

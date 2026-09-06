@@ -44,7 +44,7 @@ defmodule EpidemicaServer.Enrollment do
             subject: participant.subject,
             study_id: join_code.study_id,
             arm: participant.arm,
-            # When this participant joined, so anything scheduled from enrolment rather than from
+            # When this participant joined, so anything scheduled from enrollment rather than from
             # the study's start has a moment to be measured against. A first survey that is about
             # the participant belongs to them, not to the calendar.
             enrolled_at: participant.enrolled_at,
@@ -69,7 +69,7 @@ defmodule EpidemicaServer.Enrollment do
   # before the first tick rather than a blank screen that reads as a broken study. A study with no
   # rules has no state to publish.
   #
-  # Never fails an enrolment: being unable to publish an opening screen is not a reason to refuse
+  # Never fails an enrollment: being unable to publish an opening screen is not a reason to refuse
   # someone entry to the study. It is logged rather than dropped, because a study whose state
   # contract has drifted would otherwise show every participant a blank screen and report nothing.
   defp publish_initial_state(

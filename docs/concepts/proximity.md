@@ -296,8 +296,8 @@ Alice for 19; the truth is the *union* of the intervals, not the sum and not eit
 No location, ever — on either platform, by construction rather than by policy. No device addresses.
 No peer identity beyond a study-scoped pseudonym. No raw detection stream leaves the device.
 
-The pseudonym is per-enrolment: withdrawing deletes it along with everything else held locally, so a
-later enrolment cannot be linked to an earlier one.
+The pseudonym is per-enrollment: withdrawing deletes it along with everything else held locally, so a
+later enrollment cannot be linked to an earlier one.
 
 ## See also
 

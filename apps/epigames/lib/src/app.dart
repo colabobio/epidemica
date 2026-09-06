@@ -122,7 +122,7 @@ class _HomeState extends State<_Home> {
     // Joining before the study opens is normal — codes go out in advance — so the app says when
     // play starts rather than leaving a participant to wonder whether something is broken. Decided
     // by the clock rather than by whether a state document exists, because the server publishes a
-    // starting state at enrolment and that must not be mistaken for the game having begun.
+    // starting state at enrollment and that must not be mistaken for the game having begun.
     if (startsAt != null && DateTime.now().toUtc().isBefore(startsAt)) {
       return _WaitingScreen(
         startsAt: startsAt,
@@ -611,7 +611,7 @@ class _JoinScreen extends StatelessWidget {
               const SizedBox(height: 16),
               FilledButton(
                 onPressed: () async {
-                  // Consent before enrolment, and before any permission prompt: a participant
+                  // Consent before enrollment, and before any permission prompt: a participant
                   // cannot agree to a study whose rules they have not been shown.
                   final agreed = await Navigator.of(context).push<bool>(
                     MaterialPageRoute(builder: (_) => const InfoScreen(asConsent: true)),

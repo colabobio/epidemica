@@ -24,7 +24,7 @@ directory fails, because the image needs `contracts/` and `models/` as well as `
 
 ## Why Python is in here
 
-The twin runs Starsim as a subprocess. Without it the server starts, serves enrolment, ingests
+The twin runs Starsim as a subprocess. Without it the server starts, serves enrollment, ingests
 observations, and fails every tick with `{:engine_unavailable, ...}` — a study that collects
 data and simulates nothing.
 
@@ -51,7 +51,7 @@ Read at runtime, so one image serves any deployment.
 | `TWIN_COMMAND`, `TWIN_ARGS` | How to invoke the engine |
 
 `PHX_HOST` is the one that bites. The server hands devices an absolute URL built from it, and the
-app fetches that URL directly — so a wrong value produces successful enrolments followed by failed
+app fetches that URL directly — so a wrong value produces successful enrollments followed by failed
 bundle fetches, with nothing logged server-side.
 
 ## Checking the twin can run

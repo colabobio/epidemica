@@ -14,7 +14,7 @@ defmodule EpidemicaServerWeb.ProtocolController do
 
   def show(conn, %{"id" => id}) do
     # Scoped to the token's own study. A bundle can carry the study's join code, so letting one
-    # study's device read another's would hand out the means to enrol in it.
+    # study's device read another's would hand out the means to enroll in it.
     if conn.assigns.auth.study_id != id do
       Problem.send(conn, 403, "forbidden", "This token is not enrolled in that study.")
     else

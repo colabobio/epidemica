@@ -29,10 +29,10 @@ Worse, the contract's description of the field claims two things, both false:
 > "The study these observations belong to. Also the seed for the proximity service UUID, so devices
 > in different studies never discover one another."
 
-Observations carry the *server's* id: the app stores `body['study_id']` from the enrolment response
+Observations carry the *server's* id: the app stores `body['study_id']` from the enrollment response
 into `Enrollment.studyId`, and that is what is stamped on every envelope. The service UUID is
 derived from the same value — `studyServiceUuid(context.studyId)` in `proximity_module.dart`, where
-`context.studyId` is the enrolment's, not the bundle's. Nothing reads the authored field at all.
+`context.studyId` is the enrollment's, not the bundle's. Nothing reads the authored field at all.
 
 ## How it showed up
 

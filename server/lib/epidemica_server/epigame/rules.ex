@@ -85,7 +85,7 @@ defmodule EpidemicaServer.Epigame.Rules do
   def arms(_), do: nil
 
   @doc """
-  Which arm a new enrolment lands in, drawn by weight.
+  Which arm a new enrollment lands in, drawn by weight.
 
   Weighted rather than blocked on purpose. Blocking balances small groups but makes the assignment
   depend on join order, which two phones joining at once can disagree about. A weighted draw is

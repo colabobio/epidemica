@@ -26,7 +26,7 @@ services:
     environment:
       DATABASE_URL: ecto://epidemica:${POSTGRES_PASSWORD}@db/epidemica_server
       SECRET_KEY_BASE: ${SECRET_KEY_BASE:?set SECRET_KEY_BASE in .env}
-      # The absolute URL handed to devices inside protocol_url. Wrong here and enrolment succeeds
+      # The absolute URL handed to devices inside protocol_url. Wrong here and enrollment succeeds
       # while the bundle fetch fails, with nothing logged server-side.
       PHX_HOST: ${PHX_HOST:?set PHX_HOST in .env}
       PORT: 4000

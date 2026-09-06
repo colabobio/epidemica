@@ -43,10 +43,10 @@ order of how hard they are to debug if you skip them:
    `protocol_url` it hands to a phone. Changing it after devices have enrolled means they can no
    longer fetch their protocol — not a redeploy, a new study.
 2. **`PHX_HOST` must be the public DNS name exactly as the app was built to reach it.** If the app
-   reaches the server by one name and is told to fetch its protocol from another, enrolment succeeds
+   reaches the server by one name and is told to fetch its protocol from another, enrollment succeeds
    and the bundle fetch fails with nothing logged server-side. This is the single most common way a
    deployment appears to work and does not.
-3. **The twin smoke test is not optional.** The server builds, starts, and serves enrolment without
+3. **The twin smoke test is not optional.** The server builds, starts, and serves enrollment without
    Python — and then fails every tick with `{:engine_unavailable, ...}`, which on a participant's
    phone looks like a study where nothing ever happens. Run the smoke test in section 3 of
    `../aws/README.md` before registering anything.
@@ -104,7 +104,7 @@ this is the check that tells you before the cohort does.
 ## 5. Install and enrol
 
 Each participant installs the APK from step 1, opens it, and types the join code from step 3. The
-enrolment screen is the one place to confirm the two things that can silently go wrong:
+enrollment screen is the one place to confirm the two things that can silently go wrong:
 
 - The app shows the study's title and start date from the bundle. If it shows nothing, or shows a
   network error, `PHX_HOST` and the app's `EPIDEMICA_SERVER` do not agree — see step 2, item 2.

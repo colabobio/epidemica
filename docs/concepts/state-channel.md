@@ -3,7 +3,7 @@
 How the server tells a device something about the person carrying it.
 
 Epidemica was one-directional for its first milestone: observations flowed up through the outbox, and
-the only thing that came back was the protocol bundle, fetched once at enrolment. A device could tell
+the only thing that came back was the protocol bundle, fetched once at enrollment. A device could tell
 the server what happened, and the server could tell a device what to collect, but it could not tell a
 device anything about the participant.
 
@@ -140,7 +140,7 @@ connection, so `refresh()` compares revisions and keeps the newer. This is what 
 the client; the server uses it for concurrency.
 
 **A cached document is bound to its subject.** `current(expectedSubject: ...)` returns null if the
-cached document belongs to a previous enrolment on the same device. Withdrawing clears it outright.
+cached document belongs to a previous enrollment on the same device. Withdrawing clears it outright.
 
 **Failures are distinguishable.** A 404 keeps the cache — after a document has been seen, a 404 is far
 more likely to be a routing or deployment problem than a real deletion. A 401 raises
@@ -207,7 +207,7 @@ already there.
 | `{:error, :no_such_participant}` | Writing for a subject that withdrew, or a study/subject mismatch |
 | `{:error, {:invalid_state, _}}` | The state does not match its contract — read `error` for the failing path |
 | State never changes on the phone | Polling stopped, or every response is an older revision |
-| Cached state from a previous enrolment | Should be impossible: the subject binding rejects it. If seen, that binding is broken |
+| Cached state from a previous enrollment | Should be impossible: the subject binding rejects it. If seen, that binding is broken |
 | A field the app expects is missing | The contract permits it. Required fields belong in `required` |
 
 ## See also

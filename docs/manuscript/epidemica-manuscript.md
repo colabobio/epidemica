@@ -187,7 +187,7 @@ were protected days ago, using today's protection state rather than the one that
 Two extensions built on the same reference application illustrate how a study author varies a
 platform-provided mechanism without touching platform code. **Arms** let a study randomise its
 economics — different point values, cooldowns, or protection costs — across participants drawn by a
-weighted, deterministic assignment at enrolment, with every rule resolved through one function that
+weighted, deterministic assignment at enrollment, with every rule resolved through one function that
 folds a study's defaults, its declared parameters, and a participant's arm into the parameters that
 actually govern their day; no scoring path is allowed a second, competing notion of what a
 participant's rules are. **Scheduled surveys**, added as the platform's second module after the first
@@ -337,7 +337,7 @@ individual behavioural choices aggregate into population-level transmission outc
 questions that need both signals together, not either alone.
 
 Further out, the architecture's roadmap anticipates channels beyond an installed app — SMS, voice, and
-plain mobile web — on the position that enrolment, consent, and instruments should not require a
+plain mobile web — on the position that enrollment, consent, and instruments should not require a
 smartphone app even where sensing modules do, which matters directly for reaching participants in
 lower-resource settings where continuous app usage cannot be assumed. It also anticipates connectors
 to research-data infrastructure already in wide use — REDCap [@harris2009] and HL7 FHIR [@fhir] among

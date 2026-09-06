@@ -27,7 +27,7 @@ Two rules for the value:
   laptop-and-LAN-address flow in [`../local`](../local) works only in debug builds.
 - **It must match the server's `PHX_HOST` exactly.** The server hands the app an absolute
   `protocol_url` built from `PHX_HOST`; if the app reaches the server by one name and is told to
-  fetch its protocol from another, enrolment succeeds and the bundle fetch fails with nothing
+  fetch its protocol from another, enrollment succeeds and the bundle fetch fails with nothing
   logged server-side.
 
 Include the trailing `/v1/`.
@@ -199,7 +199,7 @@ screen, which already discloses the simulated participants.
 ## Before handing phones out
 
 - [ ] The app reaches the server over HTTPS on a cellular connection, not just campus wifi
-- [ ] Enrolment with the real join code succeeds **and** the protocol bundle downloads —
+- [ ] enrollment with the real join code succeeds **and** the protocol bundle downloads —
       the second is what catches a `PHX_HOST` mismatch
 - [ ] The permission prompts appear and their text reads sensibly
 - [ ] Two phones discover each other and produce contact episodes in both directions; an asymmetry

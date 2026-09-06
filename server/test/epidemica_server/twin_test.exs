@@ -162,7 +162,7 @@ defmodule EpidemicaServer.TwinTest do
       assert Enum.count(agents, &(not &1.virtual)) == 2
     end
 
-    test "real participants take slots in enrolment order" do
+    test "real participants take slots in enrollment order" do
       s = study()
       participant(s, "second-0001", DateTime.add(@day_start, 60, :second))
       participant(s, "first-0001", @day_start)
@@ -227,7 +227,7 @@ defmodule EpidemicaServer.TwinTest do
       assert Enum.count(agents, & &1.active) == 3
     end
 
-    test "enrolment beyond the protocol's population is not truncated" do
+    test "enrollment beyond the protocol's population is not truncated" do
       s = study(%{"population" => 2})
       for i <- 1..4, do: participant(s, "p-000#{i}", DateTime.add(@day_start, i, :second))
 

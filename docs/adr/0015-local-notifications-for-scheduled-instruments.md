@@ -31,7 +31,7 @@ already consented to see.
 
 We will deliver scheduled instruments with **OS-scheduled local notifications**, using
 `flutter_local_notifications`, and we will ask for the permission at the moment the study first
-schedules something rather than at enrolment.
+schedules something rather than at enrollment.
 
 **Licence.** `flutter_local_notifications` is **BSD-3-Clause** (verified on pub.dev, v22.3.0,
 verified publisher, Flutter Favorite). BSD-3-Clause is permissive and one-way compatible with
@@ -46,7 +46,7 @@ tree is.
 | iOS | `UNUserNotificationCenter` authorisation. Denied by default; a denied request cannot be re-prompted from inside the app. |
 | Android 13+ | `POST_NOTIFICATIONS` runtime permission. Older releases grant it at install. |
 
-**When we ask.** Not at enrolment, alongside Bluetooth. A participant joining a study is already
+**When we ask.** Not at enrollment, alongside Bluetooth. A participant joining a study is already
 being asked for a radio permission and a consent screen; adding a third prompt to that sequence
 buries it. We ask the first time a study actually schedules an instrument, with a sentence saying
 what the notification is for.

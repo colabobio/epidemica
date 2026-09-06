@@ -237,7 +237,7 @@ record alone.
   history.
 - **Virtual agents fill the remainder** up to `twin.population`. With two real players and a
   declared population of 60, 58 agents are simulated.
-- **Retiring is highest-slot-first** — arbitrary, but fixed, so the same enrolment always produces
+- **Retiring is highest-slot-first** — arbitrary, but fixed, so the same enrollment always produces
   the same population.
 
 `seed_outbreak/4` runs exactly once, before the study's first tick, and only if no agent is already
@@ -456,7 +456,7 @@ a participant looking at a blank or stale screen cannot tell a quiet study from 
 
 | When | What changes | Why not wait for the tick |
 |---|---|---|
-| Enrolment | `day: 0`, `points: 0`, `epi_state: "susceptible"` | Otherwise nothing renders until the first tick — for a whole day. `susceptible` is not a guess: seeding runs at the first tick, so nobody is infected before one has happened. |
+| enrollment | `day: 0`, `points: 0`, `epi_state: "susceptible"` | Otherwise nothing renders until the first tick — for a whole day. `susceptible` is not a guess: seeding runs at the first tick, so nobody is infected before one has happened. |
 | `protect` / `release` | `protected_until` | The contract carries it as an instant *"so the app can count down and expire it locally without waiting for the next tick"*. A tap with no visible effect until tomorrow severs the act from its consequence. |
 | Observations arriving | `pending_contacts` | Says something is coming without keeping a second ledger. Written only when the number changes, so a 60 s poll does not churn the revision. |
 

@@ -146,16 +146,16 @@ ModuleRegistry({for (final m in modules) m.id})
 Never hand-maintained. A hand-written list is a second source of truth that can claim a module the
 binary does not contain — which would defeat the check it exists to support.
 
-At enrolment, `epidemica_core` compares the bundle's module set against that registry and refuses
+At enrollment, `epidemica_core` compares the bundle's module set against that registry and refuses
 a study this binary cannot service. The message is participant-facing: *"This study needs a newer
 version of the app."*
 
 The failure being prevented is specific and expensive. Enrolling anyway looks completely healthy:
-the participant sees a normal app, the server sees a normal enrolment, and nothing reveals the
+the participant sees a normal app, the server sees a normal enrollment, and nothing reveals the
 problem until analysis, by which time the collection window has closed.
 
-There is one honest gap. The bundle's location is only known once enrolment returns it, so the check
-necessarily runs *after* the server has recorded the enrolment. The client refuses to activate and
+There is one honest gap. The bundle's location is only known once enrollment returns it, so the check
+necessarily runs *after* the server has recorded the enrollment. The client refuses to activate and
 stores nothing, but the server keeps a record that will never produce data. Closing that needs a way
 to withdraw, which the ingest contract does not yet have.
 
@@ -169,7 +169,7 @@ to withdraw, which the ingest contract does not yet have.
 - **Invent data.** The proximity module credits observation time only where a sighting vouches for
   it; a silence is bridged but credited to nothing. Whatever the equivalent is for your signal,
   find it before writing the aggregation.
-- **Fail silently.** A module that cannot do its job should say so loudly enough to stop enrolment.
+- **Fail silently.** A module that cannot do its job should say so loudly enough to stop enrollment.
 
 ## What the server needs from a new module
 

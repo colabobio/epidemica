@@ -1,7 +1,7 @@
 [
   {
     "case": "a bundle that names no modules",
-    "why": "A study that activates nothing collects nothing. It would enrol successfully, show a healthy app, and produce an empty dataset that is only noticed at analysis.",
+    "why": "A study that activates nothing collects nothing. It would enroll successfully, show a healthy app, and produce an empty dataset that is only noticed at analysis.",
     "instance": {
       "bundle_version": "1.0",
       "study_id": "11111111-2222-4333-8444-555555555555",
@@ -347,7 +347,7 @@
   },
   {
     "case": "an empty arms array",
-    "why": "Declaring arms asks for a draw at enrolment; an empty array asks for a draw with nothing to draw, so no participant could be assigned.",
+    "why": "Declaring arms asks for a draw at enrollment; an empty array asks for a draw with nothing to draw, so no participant could be assigned.",
     "instance": {
       "bundle_version": "1.0",
       "study_id": "77777777-8888-4999-8aaa-bbbbbbbbbbbb",

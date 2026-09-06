@@ -20,7 +20,7 @@
       "pattern": "^[A-Za-z0-9_-]+$",
       "minLength": 8,
       "maxLength": 128,
-      "description": "The pseudonym this state belongs to. Present so a cached document cannot be shown to the wrong participant after a re-enrolment on the same device."
+      "description": "The pseudonym this state belongs to. Present so a cached document cannot be shown to the wrong participant after a re-enrollment on the same device."
     },
     "state_uri": {
       "type": "string",

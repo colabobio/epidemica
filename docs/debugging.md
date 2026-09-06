@@ -45,7 +45,7 @@ For a real device, paste the LAN URL the task printed, **including the trailing 
 
 > **The single most common mistake.** `EPIDEMICA_SERVER` is a compile-time constant
 > (`String.fromEnvironment`). Launch without it and the app silently uses `http://10.0.2.2:4000/v1/`,
-> which on a physical phone is nothing at all. Symptom: enrolment fails with "no connection" while
+> which on a physical phone is nothing at all. Symptom: enrollment fails with "no connection" while
 > the server logs absolutely nothing.
 >
 > The prompt is deliberately not remembered between launches — a stale hardcoded IP that used to work

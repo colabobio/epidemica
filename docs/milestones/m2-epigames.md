@@ -103,7 +103,7 @@ Tier 1 claim.
 
 ## 4. What is new, and what is not
 
-**Reused unchanged:** `epidemica_proximity`, `epidemica_core`'s outbox, sync, enrolment and identity,
+**Reused unchanged:** `epidemica_proximity`, `epidemica_core`'s outbox, sync, enrollment and identity,
 the ingest API, the bundle mechanism, `ContactNetwork` in `models/`.
 
 **New platform capability — useful well beyond this game:**
@@ -292,7 +292,7 @@ moved `EmbeddedModule` in W2, arriving on schedule the moment there were two app
       **POINTS n** centred and a shield when protected
 - [x] Total cases so far, from the state document
 - [x] Buttons to take and release protection, and to leave the study
-- [x] An information screen at enrolment covering the rules **and the presence of simulated
+- [x] An information screen at enrollment covering the rules **and the presence of simulated
       participants**
 - [x] Visible staleness — the participant is told their state is from the last daily update, not now
 - [x] The app contains no epidemiology: it renders a state document and posts actions

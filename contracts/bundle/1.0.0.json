@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://schemas.epidemica.info/bundle/1.0.0.json",
   "title": "Study protocol bundle",
-  "description": "The document that turns a generic Epidemica binary into a specific study. It names the modules the study uses and configures each of them, and it is the only artefact a researcher authors for a Tier 1 study: no application code is written, compiled or signed. The bundle is fetched after enrolment and verified against the `protocol_hash` returned there, and that hash is stamped on every observation so a dataset always says which configuration produced it.",
+  "description": "The document that turns a generic Epidemica binary into a specific study. It names the modules the study uses and configures each of them, and it is the only artefact a researcher authors for a Tier 1 study: no application code is written, compiled or signed. The bundle is fetched after enrollment and verified against the `protocol_hash` returned there, and that hash is stamped on every observation so a dataset always says which configuration produced it.",
   "type": "object",
   "required": [
     "bundle_version",
@@ -107,7 +107,7 @@
         "population": {
           "type": "integer",
           "minimum": 1,
-          "description": "Total simulated population, enrolled participants included. Where it exceeds enrolment the remainder are virtual participants, whose presence the study must disclose."
+          "description": "Total simulated population, enrolled participants included. Where it exceeds enrollment the remainder are virtual participants, whose presence the study must disclose."
         },
         "pars": {
           "type": "object",
@@ -169,7 +169,7 @@
         "arms": {
           "type": "array",
           "minItems": 1,
-          "description": "Randomised arms, when participants are assigned different economics. A study that declares arms assigns one at enrolment, by weight, and the arm stays with the participant. Absent, everyone plays by the same `pars`. Shared by every arm: the disease, the population, the schedule. Arm-specific: only the scoring, never the simulation.",
+          "description": "Randomised arms, when participants are assigned different economics. A study that declares arms assigns one at enrollment, by weight, and the arm stays with the participant. Absent, everyone plays by the same `pars`. Shared by every arm: the disease, the population, the schedule. Arm-specific: only the scoring, never the simulation.",
           "items": {
             "type": "object",
             "required": [
@@ -187,7 +187,7 @@
               "weight": {
                 "type": "integer",
                 "minimum": 1,
-                "description": "Relative share of new enrolments. Two arms of weight 1 split evenly; 2 against 1 gives the first two-thirds."
+                "description": "Relative share of new enrollments. Two arms of weight 1 split evenly; 2 against 1 gives the first two-thirds."
               },
               "pars": {
                 "type": "object",

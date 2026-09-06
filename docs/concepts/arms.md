@@ -44,7 +44,7 @@ about it. The only defensible reading when they do is to charge each by the rule
 
 ## The draw
 
-An arm is assigned once, at enrolment, and kept. `Rules.assign_arm/3` hashes `{study_id, subject}`
+An arm is assigned once, at enrollment, and kept. `Rules.assign_arm/3` hashes `{study_id, subject}`
 into a weighted bucket, so the assignment is reproducible from the record — an audit can re-derive
 the split — and rejoining with the same pseudonym returns the same arm rather than redrawing it.
 
@@ -65,7 +65,7 @@ experiment, answered by who you handed which code to. A study with `arms` random
 
 Nothing, and that is the point.
 
-The arm is in the enrolment response, so the app's scoring mirror can read it
+The arm is in the enrollment response, so the app's scoring mirror can read it
 (`RulePars.forArm(bundle.rules, enrollment.arm)`), and it is on the participant's row for analysis.
 It is **not** in the state document, and the app does not render it. A participant who can see
 their protection cost differs from another's is a different study from one who cannot — one where
@@ -83,7 +83,7 @@ arms see the same number. A leaderboard would be misleading across arms and ther
 new study. Set them at launch; they are not tuned live. An RCT whose groups move mid-study is not
 an RCT.
 
-**3. Join.** Every new enrolment draws an arm and the response carries it. Confirm the split is
+**3. Join.** Every new enrollment draws an arm and the response carries it. Confirm the split is
 roughly what you expected before recruiting further:
 
 ```sh
@@ -96,7 +96,7 @@ ledger, the awards and the contact record are all attributable to it.
 
 ## Where the arm lives
 
-On the participant row, and nowhere else. `participants.arm` is a column, set once at enrolment and
+On the participant row, and nowhere else. `participants.arm` is a column, set once at enrollment and
 never changed; every other table — ledger entries, awards, observations — joins back to it through
 `subject`. That is the one source of truth, and the reason it is not also stamped on each
 observation: two copies of the same answer would eventually disagree, and a researcher would have to
@@ -112,7 +112,7 @@ WHERE study_id = '<study-id>'
 ORDER BY arm;
 ```
 
-The enrolment response carries the arm too, so the app can score against it, but that is the
+The enrollment response carries the arm too, so the app can score against it, but that is the
 participant-facing channel. Whether a player should see their own arm is the blinding question
 above, not something the platform answers.
 

@@ -19,7 +19,7 @@ mean nothing. The instant is absolute rather than a local date, so a study spann
 daylight-saving change keeps its days a fixed length.
 
 **`twin`** says a model runs against this study's data and where its output is contracted. The
-population is 60 against a much smaller enrolment: the remainder are simulated participants, whose
+population is 60 against a much smaller enrollment: the remainder are simulated participants, whose
 presence the app's information screen discloses. Without them a class-sized group would rarely
 produce an outbreak at all, and there would be no game.
 

@@ -1,6 +1,6 @@
 ---
 name: run-debug-study
-description: Exercise the Epigames pipeline end to end using the compressed epigame-debug study — enrolment, sensing, ticks, settlement, scoring and publication in one sitting. Use when field-testing the app, reproducing a reported study bug, or verifying a change to the twin, scoring or state channel.
+description: Exercise the Epigames pipeline end to end using the compressed epigame-debug study — enrollment, sensing, ticks, settlement, scoring and publication in one sitting. Use when field-testing the app, reproducing a reported study bug, or verifying a change to the twin, scoring or state channel.
 ---
 
 # Run the debug study

@@ -28,7 +28,7 @@ Build the app against it:
   cd $repo/apps/template
   flutter run --dart-define=EPIDEMICA_SERVER=http://$lan_ip:4000/v1/
 
-Every phone must be on the same network as this machine. If enrolment fails but the
+Every phone must be on the same network as this machine. If enrollment fails but the
 server logs nothing, that is almost always the reason.
 
 EOF

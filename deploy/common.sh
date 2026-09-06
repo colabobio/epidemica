@@ -4,7 +4,7 @@
 #
 # Phones cannot reach "localhost", so this binds to every interface and hands out absolute URLs
 # containing this machine's LAN address. That address ends up inside protocol_url, which the app
-# fetches directly — getting it wrong is the usual reason a field trial fails at enrolment.
+# fetches directly — getting it wrong is the usual reason a field trial fails at enrollment.
 
 set -euo pipefail
 

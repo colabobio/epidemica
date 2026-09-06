@@ -164,7 +164,7 @@ reports the resulting 404 as "That code did not match an open study"
 ([task 0004](../../tasks/backlog/0004-distinguish-missing-route-from-refusal.md)).
 
 Join both phones with `EPIGAME-DEBUG`. Both should show the waiting screen with a countdown, which
-is the confirmation that enrolment worked and the schedule was read.
+is the confirmation that enrollment worked and the schedule was read.
 
 ## 3. Let it collect before you tick anything
 

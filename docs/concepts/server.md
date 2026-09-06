@@ -31,7 +31,7 @@ sequenceDiagram
 Three things are load-bearing here.
 
 **The client generates its own pseudonym.** The `subject` is created on the device and presented at
-enrolment; the server binds a token to it. This is what allows a study to hold no participant
+enrollment; the server binds a token to it. This is what allows a study to hold no participant
 identifier at all — there is nothing to link the pseudonym back to a person because nothing was ever
 collected.
 
@@ -50,7 +50,7 @@ A study is a configuration document, not code. The server stores the bundle's **
 serves them back verbatim.
 
 That matters more than it looks. The client hashes what it receives and compares it against the
-`protocol_hash` enrolment promised, and two JSON documents that parse identically can serialise
+`protocol_hash` enrollment promised, and two JSON documents that parse identically can serialise
 differently — so serving a re-encoding of a decoded map would produce mismatches that appear only on
 the device. Storing the source also means the hash identifies the *authored artefact*, so two
 institutions running the same study stamp the same `protocol_hash` and their datasets pool.

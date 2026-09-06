@@ -23,7 +23,7 @@ keep working rather than two that drift.
 Phones cannot reach `localhost`, and they will not accept plain HTTP outside a debug build.
 
 The server hands the app an absolute `protocol_url` pointing at itself, and the app fetches that
-URL directly. If the server advertises a name the phone cannot resolve, enrolment **succeeds**, the
+URL directly. If the server advertises a name the phone cannot resolve, enrollment **succeeds**, the
 bundle fetch fails, and the app refuses the study without the server ever logging an error. Locally
 this is why `up.sh` derives the LAN address from the routing table; in a deployment it is why
 `PHX_HOST` must be the public DNS name exactly as the app was built to reach it.

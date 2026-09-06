@@ -2,7 +2,7 @@
 #
 # The unusual part: this image contains a Python environment as well as an Elixir release. The twin
 # runs Starsim as a subprocess (`uv run python -m starsim_epidemica.twin`), so a server without
-# Python compiles, boots, serves enrolments, ingests observations — and fails every tick with
+# Python compiles, boots, serves enrollments, ingests observations — and fails every tick with
 # `{:engine_unavailable, ...}`. That failure surfaces as a study where nothing ever happens, so it
 # is worth getting right before the first deployment rather than after.
 #

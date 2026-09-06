@@ -5,7 +5,7 @@
 ## Context
 
 Until now Epidemica has been one-directional. Observations flow up through the outbox; the only
-thing that comes back is the protocol bundle, fetched once at enrolment. A device can tell the
+thing that comes back is the protocol bundle, fetched once at enrollment. A device can tell the
 server what happened, and the server can tell a device what to collect, but the server cannot tell a
 device anything about the person carrying it.
 

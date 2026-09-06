@@ -28,7 +28,7 @@ cd server && mix ecto.reset && cd .. && deploy/local/epigames/up.sh
 ## The one thing that catches people out
 
 Phones cannot reach `localhost`. The server hands the app an absolute `protocol_url` pointing at
-itself, and the app fetches that URL directly — so if the server advertises `localhost`, enrolment
+itself, and the app fetches that URL directly — so if the server advertises `localhost`, enrollment
 succeeds, the bundle fetch fails, and the app refuses the study without the server ever logging an
 error. `up.sh` works out this machine's LAN address from the routing table and binds to every
 interface to avoid exactly that.

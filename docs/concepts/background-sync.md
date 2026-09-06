@@ -107,7 +107,7 @@ criterion, not a nicety:
 Whether iOS delivers enough background wakes to be useful in practice is an empirical question this
 code deliberately does not claim to answer. The task file's own "Worth deciding at the same time" —
 whether a participant should be told that force-quitting the app degrades their dataset — is answered
-yes: a sentence has been added to the enrolment info screen saying so, and its exact wording is a
+yes: a sentence has been added to the enrollment info screen saying so, and its exact wording is a
 review question for the PI rather than a settled claim.
 
 ## Where things live

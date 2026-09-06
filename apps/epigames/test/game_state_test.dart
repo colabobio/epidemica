@@ -228,7 +228,7 @@ void main() {
       expect(game.finished, isFalse);
     });
 
-    test('the aggregate is the population, not the enrolment', () {
+    test('the aggregate is the population, not the enrollment', () {
       final game = GameState.from(document(healthy));
 
       // `population` includes the simulated participants, which is why the information screen has

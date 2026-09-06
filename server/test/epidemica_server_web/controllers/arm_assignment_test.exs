@@ -2,7 +2,7 @@ defmodule EpidemicaServerWeb.ArmAssignmentTest do
   @moduledoc """
   Assigning a participant to an arm when they join.
 
-  The draw is the whole experiment, so the thing that matters here is that it happens at enrolment,
+  The draw is the whole experiment, so the thing that matters here is that it happens at enrollment,
   once, and that the answer is in the response the app will score against. A participant who is
   never assigned plays the default; one reassigned later is a different measurement.
   """

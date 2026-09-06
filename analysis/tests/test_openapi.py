@@ -134,7 +134,7 @@ def test_observations_endpoint_requires_auth(spec):
 
 
 def test_subject_pattern_matches_the_envelope_contract(spec):
-    """Enrollment and the envelope must agree on what a pseudonym is, or a client can enrol with a
+    """Enrollment and the envelope must agree on what a pseudonym is, or a client can enroll with a
     subject it can never use."""
     enrollment = spec["components"]["schemas"]["EnrollmentRequest"]["properties"]["subject"]
     envelope = contracts.load_schema(

@@ -40,7 +40,7 @@ never shortens either.
    as one. This is the load-bearing remaining work.
 2. **Telling the participant.** The task asked whether a study should tell a participant their
    dataset depends on the phone not being force-quit. Chosen: yes, and a sentence has been added to
-   the enrolment info screen — but the sentence's wording, and whether it belongs in a separate
+   the enrollment info screen — but the sentence's wording, and whether it belongs in a separate
    consent step rather than info, is a review question for the PI, not a claim that is settled here.
 
 ---
@@ -167,5 +167,5 @@ Device tests, which are the ones that actually decide it:
 ## Worth deciding at the same time
 
 Whether a participant should be *told*. A study that depends on background upload has an interest
-in the phone not being force-quit, and saying so once at enrolment is more honest than silently
+in the phone not being force-quit, and saying so once at enrollment is more honest than silently
 producing a worse dataset for the participants who tidy their app switcher.

@@ -18,7 +18,7 @@ signs nothing** — which means no app store review, no build infrastructure, an
 That is the difference between a study taking a week and taking a quarter.
 
 The constraint is that Tier 1 only reaches as far as the module set already compiled into the binary
-you are using. A study needing a module that binary lacks is refused at enrolment, deliberately and
+you are using. A study needing a module that binary lacks is refused at enrollment, deliberately and
 loudly.
 
 ## Tier 1, end to end
@@ -91,7 +91,7 @@ sequenceDiagram
   A->>A: start the modules the bundle names
 ```
 
-If the binary lacks a module the bundle names, enrolment is refused with *"This study needs a newer
+If the binary lacks a module the bundle names, enrollment is refused with *"This study needs a newer
 version of the app"* — and the participant is never left enrolled in a study that collects nothing.
 
 ### 4. Collection runs
@@ -165,8 +165,8 @@ Worth knowing before planning around them:
   collection unsuitable for a study facing a European DPIA or a cohort review.
 - **There is no query API yet.** Retrieval is SQL against Postgres. Fine for one institution;
   inadequate for a multi-site study.
-- **A refused enrolment leaves a server-side record.** The bundle's location is only known after
+- **A refused enrollment leaves a server-side record.** The bundle's location is only known after
   enrolling, so the module check necessarily runs afterwards. The device activates nothing and
-  stores nothing, but there is no way to withdraw the enrolment.
+  stores nothing, but there is no way to withdraw the enrollment.
 - **Background sync is not scheduled.** Uploads happen while the app is in use. Nothing is lost
   offline, but a phone left untouched for days will not deliver until it is opened.

@@ -74,7 +74,7 @@ class StudyTokens {
   );
 }
 
-/// Raised when the refresh token is gone or revoked and the device must enrol again.
+/// Raised when the refresh token is gone or revoked and the device must enroll again.
 class ReEnrollmentRequired implements Exception {
   const ReEnrollmentRequired(this.message);
   final String message;

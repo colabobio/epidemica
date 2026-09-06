@@ -147,7 +147,7 @@ defmodule EpidemicaServer.Twin do
   # -- roster ---------------------------------------------------------------------------------
 
   @doc """
-  Bring a study's population up to date: enrol newcomers, and fill the rest with virtual agents.
+  Bring a study's population up to date: enroll newcomers, and fill the rest with virtual agents.
 
   Slots are permanent. A participant joining on day four takes a slot no one has ever held, and a
   virtual agent is retired to keep the population at the size the protocol declared -- rather than
@@ -156,7 +156,7 @@ defmodule EpidemicaServer.Twin do
   def reconcile_roster(study_id, twin, day) do
     Repo.transaction(fn ->
       existing = agents(study_id)
-      existing = enrol_newcomers(study_id, day, existing)
+      existing = enroll_newcomers(study_id, day, existing)
       existing = remove_finished(study_id, twin, day, existing)
       existing = fill_population(study_id, twin, day, existing)
       existing = seed_outbreak(study_id, twin, day, existing)
@@ -245,7 +245,7 @@ defmodule EpidemicaServer.Twin do
   defp eligible?(agent, "participants"), do: not agent.virtual
   defp eligible?(agent, _virtual), do: agent.virtual
 
-  defp enrol_newcomers(study_id, day, existing) do
+  defp enroll_newcomers(study_id, day, existing) do
     known = existing |> Enum.map(& &1.subject) |> MapSet.new()
 
     enrolled_subjects(study_id)
@@ -375,7 +375,7 @@ defmodule EpidemicaServer.Twin do
     end)
   end
 
-  # Retiring highest slot first is arbitrary but fixed, so the same enrolment produces the same
+  # Retiring highest slot first is arbitrary but fixed, so the same enrollment produces the same
   # population every time.
   defp retire_virtual(existing, count) do
     doomed =

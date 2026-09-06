@@ -32,7 +32,7 @@ episode into a timestep.
 ## Deploying it
 
 The bundle is served over HTTPS at a stable URL and registered with the server against a join code.
-Enrolment returns that URL together with the bundle's `sha256`, the app verifies the bytes it
+enrollment returns that URL together with the bundle's `sha256`, the app verifies the bytes it
 fetches against that hash, and the hash is stamped on every observation — so a dataset always says
 which configuration produced it.
 

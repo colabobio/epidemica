@@ -16,13 +16,13 @@ The ECS path is at the bottom for teams with existing AWS practice.
 ## What makes this server unusual
 
 **It contains a Python interpreter.** The twin runs Starsim as a subprocess. A server built without
-it starts cleanly, serves enrolment, accepts observations, and then fails every tick with
+it starts cleanly, serves enrollment, accepts observations, and then fails every tick with
 `{:engine_unavailable, ...}` — which on a participant's phone looks like a study where nothing ever
 happens. [`../docker/Dockerfile`](../docker/Dockerfile) installs both halves; a buildpack or a
 stock `phx.gen.release` image will not.
 
 **It hands devices an absolute URL.** `protocol_url` is built from `PHX_HOST`, and the app fetches
-that URL directly. Get it wrong and enrolment *succeeds*, the bundle fetch fails, and the app
+that URL directly. Get it wrong and enrollment *succeeds*, the bundle fetch fails, and the app
 refuses the study with nothing logged server-side. This is the single most common way a deployment
 appears to work and does not.
 

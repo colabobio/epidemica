@@ -45,7 +45,7 @@ gets a study id, a protocol hash and instructions, and only discovers the study 
 the first participant cannot join — typically in a room with people waiting.
 
 It is also a data-integrity problem rather than only an inconvenience. Devices that join with that
-code enrol in the *older* study, so observations land against a protocol nobody meant to be running,
+code enroll in the *older* study, so observations land against a protocol nobody meant to be running,
 and the two studies are only distinguishable afterwards by inspecting `protocol_hash`.
 
 ## What is already in place

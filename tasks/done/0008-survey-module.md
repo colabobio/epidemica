@@ -22,7 +22,7 @@ The four open decisions were resolved as follows.
   so a study stays reproducible without its hash changing when a typo is fixed.
 - **Who decides it is day 3** — the device, via `SurveySchedule.dueAt`, using the study's own
   interval rather than a hardcoded day. Schedules anchor to either the study start or the
-  participant's enrolment, which the server-side option could not express per-participant.
+  participant's enrollment, which the server-side option could not express per-participant.
 - **What a survey module reports as its status** — `ModuleState` was *not* extended. The module
   reports `stopped` with a `detail` of `'every instrument is done'`. A new state would have been a
   `module_status` contract change to describe something no coverage calculation reads.
@@ -88,7 +88,7 @@ the evidence that [ADR-0001](../../docs/adr/0001-monorepo-and-package-boundaries
 - **`modules` in the bundle contract is open by design** — *"adding a module must not require a
   change to this schema"* — so an `instruments` block needs no bundle schema change.
 - **`EmbeddedModule` is a three-method interface** (`start`, `stop`, `status`) and `ModuleContext`
-  already hands a module its own config block and an `ObservationRecorder`. Enrolment already
+  already hands a module its own config block and an `ObservationRecorder`. enrollment already
   refuses a bundle naming a module the binary lacks.
 
 ## What actually needs building
@@ -118,7 +118,7 @@ which is the more considered position and worth honouring rather than quietly co
 Putting the questions inline in the bundle is simpler — one document, already hash-verified,
 already on the device, works offline. But it couples `instrument_version` to the protocol hash, and
 **a study's identity is its bundle**: fixing a typo in one question changes the hash, which creates
-a *new study* that participants must re-enrol into. That is not hypothetical; it is the same
+a *new study* that participants must re-enroll into. That is not hypothetical; it is the same
 constraint that makes parameter tuning require a re-join.
 
 Fetching definitions separately, versioned on their own, avoids that at the cost of another
