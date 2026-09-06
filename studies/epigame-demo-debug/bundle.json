@@ -75,7 +75,7 @@
       "contact_min_seconds": 120,
       "contact_cooldown_days": 1,
       "contact_points_while_infected": false,
-      "protection_window_seconds": 300,
+      "protection_window_seconds": 180,
       "carry_over_days": 3
     }
   }
