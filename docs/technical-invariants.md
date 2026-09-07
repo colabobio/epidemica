@@ -618,13 +618,13 @@ Counts are test declarations, not assertions.
 | `StudyController` | `study_controller_test.dart` (24) | base-URI normalisation, **same binary + different bundles**, withdrawal, module status | ✅ |
 | Bundle isolation | `bundle_isolation_test.dart` (~12) | health defaults, twin presence/absence, schedule reading | ✅ |
 | Module health | `module_health_test.dart` (9) | abutting windows, never-started modules, flush, radio-off | ⚠ nothing tests the suspension over-claim (task 0007) |
-| Episode aggregator | `episode_aggregator_test.dart` (18) | truncation, bridging, `band_seconds ≤ elapsed`, determinism, bundle config, **process-death recovery via `InMemoryOpenEpisodeStore`** | ⚠ the recovery path tested is not the one production uses — production wires no store |
+| Episode aggregator | `episode_aggregator_test.dart` (18) | truncation, bridging, `band_seconds ≤ elapsed`, determinism, bundle config, process-death recovery via `InMemoryOpenEpisodeStore` | ✅ |
+| **Proximity module glue** | `proximity_module_test.dart` (8) | restore-before-listen, recovery across a simulated process death, no double-record, snapshot cleared on stop, unreadable snapshot tolerated, previous-enrolment snapshot discarded | ✅ |
 | Distance estimator | `distance_estimator_test.dart` (10) | per-platform thresholds, outlier rejection, snapshot/restore | ✅ |
 | Fixture reproduction | `fixture_reproduction_test.dart` (4) | the committed `contact_episode` fixtures are regenerated from scenarios | ✅ — the strongest producer↔contract link in the repo |
 | Survey | `survey_test.dart` (23) | definition parsing, due windows, digest verification, refused vs not-reached, restart | ✅ for logic |
 | Epigame rules (app) | `rules_test.dart` | **the shared vectors file** | ✅ |
 | Epigame UI state | `game_state_test.dart` (~28) | no invention, colours, protection expiry, finished, open-ended | ✅ |
-| **Proximity module glue** | — | **nothing** | ❌ `ProximityModule` has no test file at all |
 | **Permissions** | — | nothing | ❌ |
 
 ### Kotlin / Swift
@@ -708,14 +708,25 @@ ingested by the Elixir server.
 
 ### Ordering
 
-**F1 — In-flight episodes are lost on process death.**
-`ProximityModule.start` builds the aggregator without a `store:`; `checkpoint()`/`restore()` are never
-called in production; no SQLite `OpenEpisodeStore` exists (`open_episode_store.dart` says the
-implementation "arrives with `epidemica_core`" — it did not). The loss is **not random**: it falls on
-the longest open encounters, exactly the tail of the contact-duration distribution the study exists
-to measure. `context.store` is supplied and unused.
-*Enforced?* No. The test that covers recovery injects `InMemoryOpenEpisodeStore` by hand.
-*Likelihood?* Certain on Android (`START_STICKY` restarts) and on iOS relaunch.
+**F1 — ~~In-flight episodes are lost on process death.~~ FIXED 2026-09-06.**
+`ProximityModule` now builds the aggregator with a `ModuleStoreEpisodeStore` over `context.store`,
+restores before subscribing to events, and checkpoints on a one-minute `sweep()` and immediately
+whenever an episode is closed. The loss was **not random**: it fell on the longest open encounters,
+exactly the tail of the contact-duration distribution the study exists to measure.
+
+The ordering is load-bearing and is what the tests pin:
+
+- `restore()` runs **before** `_platform.events.listen`, because `applySnapshot` clears the whole
+  in-flight set — a sighting that arrived first would be discarded by the snapshot behind it.
+- Anything closed by a sweep reaches the outbox **before** the snapshot is rewritten, and an
+  episode closed by `add()` triggers an immediate checkpoint. An episode present in both the outbox
+  and the snapshot would be recorded twice, and the server cannot absorb that: it is a second
+  observation with its own `seq`, not a retry. Reconciliation sums a reporter's episodes before
+  choosing the better-observed side, so a duplicate inflates that pair's dose.
+- `stop()` flushes what is open and then **clears** the store, for the same reason.
+
+*Remaining gap:* neither app observes `AppLifecycleState`, so on iOS the loss window is still up to
+one sweep interval. `ProximityModule.sweep()` is public for a host that wants to close it.
 
 **F2 — Ingest must project before anything reads the network.**
 `Ingest.submit` calls `Projections.project_contacts(study_id, only: ids)` synchronously, and
@@ -861,7 +872,7 @@ no confirmation and no study scoping by default.
 | # | Doc says | Code does | Which is right | Matters? |
 |---|---|---|---|---|
 | **D1** | `docs/concepts/building-a-study.md`: "The bundle is validated against `contracts/bundle/1.0.0.json`" | **FIXED 2026-09-06.** `Studies.create_study_from_bundle/2` now validates against the compiled schema before inserting, so the doc's claim is true of the runtime as well as of CI. Still unvalidated: `ProtocolBundle.parse` on the device (reads 5 keys), and `Studies.create_study/1` used directly | Now agree | Was yes; resolved |
-| **D2** | `docs/milestones/m1`, `docs/concepts/proximity.md`: "Detections in-flight persisted to survive process death — `OpenEpisodeStore` with a SQLite implementation" | Interface + in-memory test double only. `ProximityModule` wires neither | **Code.** The persistence is designed, tested in isolation, and not connected | **Yes.** §5-F1: biased loss on the longest encounters |
+| **D2** | `docs/milestones/m1`, `docs/concepts/proximity.md`: "Detections in-flight persisted to survive process death — `OpenEpisodeStore` with a SQLite implementation" | **FIXED 2026-09-06.** `ModuleStoreEpisodeStore` in `epidemica_proximity_module` implements it over `context.store`, which is SQLite-backed via `DatabaseModuleStore`. The adapter lives in the glue package because it is the only one allowed to see both `epidemica_core` and `epidemica_proximity` | Now agree | Was yes; resolved |
 | **D3** | ADR-0001 rule 2 and `docs/concepts/modules.md`: "A module does not depend on `epidemica_core`" | `epidemica_survey` depends on `epidemica_core`, implements `EmbeddedModule`, and ships UI | **The doc** — this is a real violation, not an outdated rule. The proximity two-package split is the pattern to follow | **Yes.** It is the boundary the next agent will copy |
 | **D4** | ADR-0012: "`EpidemicaNetwork(ss.Network)` materialises contact episodes as a dynamic edge list"; the M2 docs describe it as the bridge | Two independent bridges exist. `models/network.py:ContactNetwork` (+ `cohort.py:OpenCohort`) does per-timestep apportionment and `max`/`mean`/`sum` reconciliation; **production `twin.py` uses `ss.StaticNet()` and overwrites `net.edges` directly**, taking already-reconciled edges from Elixir. `twin.py` imports nothing from `network.py` except the shared weights | **Code**, for the runtime. `ContactNetwork` is the analysis/spike bridge and remains valid for offline work | **Yes.** `test_network.py` (12 tests) defends a path production never runs; reading it as coverage of the tick is a mistake |
 | **D5** | ADR-0001 rule 5 / M1: "Tier 2 test: `apps/template` copied outside the workspace must build" — listed as implemented at M1 | No such test, script or CI job exists | **The doc** describes the right check; it is absent | Moderate — path-based workspace deps would fail exactly this way |
@@ -900,13 +911,14 @@ ones that are only aspirational.
     ticks.
 12. There is exactly one coverage threshold, `twin.coverage_threshold`, reached through
     `Studies.coverage_threshold/1`.
+13. In-flight encounters are checkpointed to the module's own store and restored on start. An
+    episode is never in both the outbox and the snapshot.
 
 **Believed but not enforced — do not rely on these without adding the check.**
 
-13. A module must not depend on `epidemica_core` (`epidemica_survey` already breaks it).
-14. Bundles are schema-valid **on the device** (`ProtocolBundle.parse` reads five keys and trusts
+14. A module must not depend on `epidemica_core` (`epidemica_survey` already breaks it).
+15. Bundles are schema-valid **on the device** (`ProtocolBundle.parse` reads five keys and trusts
     the rest), and for studies inserted through `Studies.create_study/1` rather than from a bundle.
-15. In-flight episodes survive process death (they do not).
 16. A failed tick leaves no state (it leaves roster and seeding).
 17. Settlement is reproducible from the stored tick (coverage is recomputed live).
 18. Ticks run by themselves (nothing enqueues them).
@@ -914,6 +926,9 @@ ones that are only aspirational.
 20. A test fixture's dates stay meaningful (two carry-over tests silently stopped testing anything
     on 2026-09-06, because they defaulted an observation's arrival to `utc_now()` and carry-over
     only reaches back `carry_over_days`). Prefer stated instants over the wall clock.
+21. The process gets a warning before it dies. It does not: neither app observes
+    `AppLifecycleState`, so up to one sweep interval of in-flight state is still lost on iOS
+    suspension. Call `ProximityModule.sweep()` from a lifecycle observer to close that window.
 
 **Before adding a module**, copy the proximity two-package split: a pure package with no
 `epidemica_core` dependency and no UI, plus a thin glue package implementing `EmbeddedModule`.

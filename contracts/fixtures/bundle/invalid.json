@@ -296,5 +296,23 @@
         }
       }
     }
+  },
+  {
+    "case": "a twin demanding coverage of the whole period",
+    "why": "The window in progress has not been reported yet, so a period is never fully covered. A threshold of 1 would mark every participant unobserved for the length of the study, and the epidemic would never spread.",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "c0badf00-1111-4222-8333-444455556666",
+      "title": "Epigame",
+      "modules": {
+        "proximity": {}
+      },
+      "twin": {
+        "engine": "starsim",
+        "state_uri": "https://schemas.epidemica.info/state/epigame/1.0.0.json",
+        "coverage_threshold": 1,
+        "population": 50
+      }
+    }
   }
 ]

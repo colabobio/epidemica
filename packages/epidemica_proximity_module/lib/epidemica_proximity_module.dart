@@ -5,5 +5,6 @@
 /// interface and must not depend on any implementation of it.
 library;
 
+export 'src/module_store_episode_store.dart';
 export 'src/permissions.dart';
 export 'src/proximity_module.dart';

@@ -109,6 +109,13 @@
           "minimum": 1,
           "description": "Total simulated population, enrolled participants included. Where it exceeds enrolment the remainder are virtual participants, whose presence the study must disclose."
         },
+        "coverage_threshold": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMaximum": 1,
+          "default": 0.5,
+          "description": "How much of a tick period a device must have reported itself sensing for before the study treats that participant as observed. Below it they are modelled as protected and scored as `not_sensing`, because a period nobody can attest must not be read as a participant who met nobody.\n\nDeclared here rather than under `rules` because the same number decides both what the model may transmit through and what the rules may score. Two copies would let a participant be exposed in the simulation and unscored in the ledger, which is a disagreement no output makes visible. Cannot be 1: the window in progress has not closed yet, so complete coverage of a period is never claimable."
+        },
         "pars": {
           "type": "object",
           "description": "Engine-specific parameters, opaque to the platform. Interpreted only by the named engine."

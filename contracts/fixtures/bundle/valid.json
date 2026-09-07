@@ -233,5 +233,27 @@
         }
       }
     }
+  },
+  {
+    "case": "a study that states how much coverage it needs",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "c0badf00-1111-4222-8333-444455556666",
+      "title": "Epigame, strict about coverage",
+      "modules": {
+        "proximity": {}
+      },
+      "health": {
+        "enabled": true,
+        "interval_seconds": 600
+      },
+      "twin": {
+        "engine": "starsim",
+        "state_uri": "https://schemas.epidemica.info/state/epigame/1.0.0.json",
+        "tick_interval_seconds": 86400,
+        "coverage_threshold": 0.75,
+        "population": 50
+      }
+    }
   }
 ]
