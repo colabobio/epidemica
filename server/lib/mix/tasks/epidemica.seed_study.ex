@@ -48,9 +48,14 @@ defmodule Mix.Tasks.Epidemica.SeedStudy do
     study =
       case Repo.get_by(Study, protocol_hash: hash) do
         nil ->
-          {:ok, study} = Studies.create_study_from_bundle(name, source)
-          Mix.shell().info("Created study #{study.id}")
-          study
+          case Studies.create_study_from_bundle(name, source) do
+            {:ok, study} ->
+              Mix.shell().info("Created study #{study.id}")
+              study
+
+            {:error, reason} ->
+              Mix.raise(explain(path, reason))
+          end
 
         existing ->
           Mix.shell().info("Study #{existing.id} already registered with this bundle")
@@ -76,6 +81,54 @@ defmodule Mix.Tasks.Epidemica.SeedStudy do
       flutter run --dart-define=EPIDEMICA_SERVER=#{EpidemicaServerWeb.Endpoint.url()}/v1/
     """)
   end
+
+  # Every one of these is a study that would have registered, run, and produced nothing usable. The
+  # message has to name the file and the key, because the author is looking at JSON and not at this.
+  defp explain(path, {:invalid_bundle, error}) do
+    """
+    #{path} is not a valid study protocol bundle.
+
+      #{describe(error)}
+
+    The bundle schema is closed at the top level, so an unrecognised key is a mistyped one. See
+    contracts/bundle/1.0.0.json.
+    """
+  end
+
+  defp explain(path, {:coverage_not_reported, _tick}) do
+    """
+    #{path} runs a twin but switches health reporting off.
+
+    Coverage is only ever claimed by module_status observations. With none, every participant is
+    below the coverage threshold on every day, which the twin reads as protected: nobody would
+    transmit, nobody would score, and nothing would report an error.
+
+    Either remove the `twin` block or set `health.enabled` to true.
+    """
+  end
+
+  defp explain(path, {:health_interval_too_long, interval, maximum}) do
+    """
+    #{path} closes a coverage window every #{interval}s, which is too slow for how often it ticks.
+
+      health.interval_seconds:  #{interval}
+      largest that can work:    #{maximum}
+
+    The window in progress has not been reported yet, so at most one health interval of every tick
+    period is ever uncovered. Above #{maximum}s no device can reach the coverage threshold, so every
+    round would be scored `not_sensing` and the epidemic would not spread — silently.
+    """
+  end
+
+  defp explain(path, reason), do: "#{path} could not be registered: #{inspect(reason)}"
+
+  defp describe(error) when is_list(error) do
+    error
+    |> Keyword.take([:instance_location, :absolute_keyword_location])
+    |> Enum.map_join(", ", fn {k, v} -> "#{k}=#{inspect(v)}" end)
+  end
+
+  defp describe(other), do: inspect(other)
 
   # Instrument definitions live beside the bundle rather than inside it, because a reworded
   # question must not change the protocol hash and re-register the study.

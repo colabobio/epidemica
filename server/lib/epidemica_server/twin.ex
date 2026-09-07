@@ -16,7 +16,6 @@ defmodule EpidemicaServer.Twin do
   alias EpidemicaServer.Enrollment.Participant
   alias EpidemicaServer.Twin.{Agent, Runner, Tick}
 
-  @default_coverage_threshold 0.5
   @proximity_module "proximity"
 
   @doc """
@@ -306,7 +305,7 @@ defmodule EpidemicaServer.Twin do
     slot_to_index = active |> Enum.with_index() |> Map.new(fn {a, i} -> {a.slot, i} end)
     subject_to_index = index_by_subject(active, slot_to_index)
 
-    protection = protection_levels(study, active, period_start, period_end, twin)
+    protection = protection_levels(study, active, period_start, period_end)
 
     %{
       "study_id" => study_id,
@@ -378,9 +377,9 @@ defmodule EpidemicaServer.Twin do
   # no part of their day can be attested, so letting the model transmit through any of it would be
   # a claim the data does not support. A chosen protection is different — it is known exactly, to
   # the second, and applies for as much of the day as it actually covered.
-  defp protection_levels(study, active, from, to, twin) do
+  defp protection_levels(study, active, from, to) do
     subjects = active |> Enum.map(& &1.subject) |> Enum.reject(&is_nil/1)
-    threshold = Map.get(twin, "coverage_threshold", @default_coverage_threshold)
+    threshold = Studies.coverage_threshold(study)
 
     unobserved =
       Health.insufficiently_observed(study.id, @proximity_module, from, to, threshold, subjects)

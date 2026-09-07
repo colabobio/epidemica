@@ -29,6 +29,17 @@ defmodule EpidemicaServerWeb.ProtocolApiTest do
     {:ok, conn: conn, study: study, source: source, enrolled: enrolled}
   end
 
+  # A second study to hold a token that must not work here. Minimal, but a real bundle: registration
+  # validates, so a placeholder that is not one would fail for the wrong reason.
+  defp other_bundle(title) do
+    Jason.encode!(%{
+      "bundle_version" => "1.0",
+      "study_id" => Ecto.UUID.generate(),
+      "title" => title,
+      "modules" => %{"proximity" => %{}}
+    })
+  end
+
   defp authed(conn, %{access_token: token}),
     do: put_req_header(conn, "authorization", "Bearer #{token}")
 
@@ -51,7 +62,7 @@ defmodule EpidemicaServerWeb.ProtocolApiTest do
   end
 
   test "a token from another study cannot read this bundle", ctx do
-    {:ok, other} = Studies.create_study_from_bundle("Other study", ~s({"modules":{}}))
+    {:ok, other} = Studies.create_study_from_bundle("Other study", other_bundle("Other study"))
     {:ok, _} = Studies.add_join_code(other, "OTHER-1")
 
     {:ok, outsider} =

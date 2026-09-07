@@ -14,6 +14,7 @@ defmodule EpidemicaServer.Contracts do
   # Paths are written as literals relative to the Mix project root. Exonerate's
   # `function_from_file/3` reads the file during macro expansion and does not expand module
   # attributes or function calls, so a computed path cannot be used here.
+  @external_resource "../contracts/bundle/1.0.0.json"
   @external_resource "../contracts/observations/envelope/1.0.0.json"
   @external_resource "../contracts/observations/proximity/contact_episode/1.0.0.json"
   @external_resource "../contracts/observations/location/location_fix/1.0.0.json"
@@ -21,6 +22,15 @@ defmodule EpidemicaServer.Contracts do
   @external_resource "../contracts/observations/health/module_status/1.0.0.json"
   @external_resource "../contracts/state/participant_state/1.0.0.json"
   @external_resource "../contracts/state/epigame/1.0.0.json"
+
+  # Checked when a study is registered rather than when it is served. The bundle schema is closed at
+  # the top level, so a mistyped key is a study that quietly collects the wrong thing for its whole
+  # run; catching it at registration is the only moment anyone is still watching.
+  Exonerate.function_from_file(
+    :def,
+    :validate_bundle,
+    "../contracts/bundle/1.0.0.json"
+  )
 
   Exonerate.function_from_file(
     :def,

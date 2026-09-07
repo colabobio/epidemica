@@ -44,6 +44,7 @@ defmodule EpidemicaServer.TwinEngineTest do
       Jason.encode!(%{
         "bundle_version" => "1.0",
         "study_id" => Ecto.UUID.generate(),
+        "title" => "Engine study",
         "modules" => %{"proximity" => %{}},
         "twin" => twin
       })

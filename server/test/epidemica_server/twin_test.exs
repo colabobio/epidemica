@@ -24,6 +24,7 @@ defmodule EpidemicaServer.TwinTest do
     Jason.encode!(%{
       "bundle_version" => "1.0",
       "study_id" => Ecto.UUID.generate(),
+      "title" => "Twin test",
       "modules" => %{"proximity" => %{}},
       "twin" => twin
     })
@@ -130,6 +131,7 @@ defmodule EpidemicaServer.TwinTest do
           Jason.encode!(%{
             "bundle_version" => "1.0",
             "study_id" => Ecto.UUID.generate(),
+            "title" => "Collection only",
             "modules" => %{"proximity" => %{}}
           })
         )
@@ -401,6 +403,23 @@ defmodule EpidemicaServer.TwinTest do
       virtual = Enum.filter(tick.inputs["agents"], & &1["virtual"])
       assert virtual != []
       assert Enum.all?(virtual, &(&1["protection"] == 0.0))
+    end
+
+    test "how much coverage is enough comes from the bundle" do
+      # Half a day of sensing. The same participant is exposed or protected depending on nothing
+      # but this number, so it has to be the study's to set -- and there has to be one of it: the
+      # rules read the same value when they decide whether the day may be scored at all.
+      lenient = study(%{"coverage_threshold" => 0.25})
+      strict = study(%{"coverage_threshold" => 0.75, "tick_interval_seconds" => 86_400})
+
+      for {s, expected} <- [{lenient, 0.0}, {strict, 1.0}] do
+        participant(s, "alice-0001")
+        sensing(s, "alice-0001", @day_start, DateTime.add(@day_start, 43_200, :second))
+
+        {:ok, tick} = run(s)
+        alice = Enum.find(tick.inputs["agents"], &(&1["subject"] == "alice-0001"))
+        assert alice["protection"] == expected
+      end
     end
   end
 

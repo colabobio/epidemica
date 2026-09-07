@@ -3,10 +3,13 @@ defmodule EpidemicaServer.Studies do
 
   import Ecto.Query
 
+  alias EpidemicaServer.Contracts
   alias EpidemicaServer.Repo
   alias EpidemicaServer.Studies.{JoinCode, Study}
 
   @default_interval 86_400
+  @default_coverage_threshold 0.5
+  @default_health_interval 3600
 
   def create_study(attrs) do
     %Study{} |> Study.changeset(attrs) |> Repo.insert()
@@ -17,9 +20,18 @@ defmodule EpidemicaServer.Studies do
 
   The hash is derived here rather than supplied, so a study cannot be created whose stated hash
   describes something other than what it will serve.
+
+  The bundle is checked against its contract first. Registration is the last moment anyone is
+  watching: the schema is closed at the top level, so a mistyped key is not a validation error at
+  run time but a setting that silently keeps its default for the length of the study.
+
+  Returns `{:error, {:invalid_bundle, error}}`, `{:error, {:coverage_not_reported, seconds}}` or
+  `{:error, {:health_interval_too_long, interval, maximum}}` for a bundle that would run but could
+  never observe anybody.
   """
   def create_study_from_bundle(name, source) when is_binary(source) do
-    with {:ok, decoded} <- Jason.decode(source) do
+    with {:ok, decoded} <- Jason.decode(source),
+         :ok <- validate_bundle(decoded) do
       create_study(%{
         name: name,
         protocol_source: source,
@@ -28,6 +40,56 @@ defmodule EpidemicaServer.Studies do
       })
     end
   end
+
+  @doc """
+  Check an authored bundle against its contract, and against what the twin needs to run.
+
+  The cross-field checks exist because the schema cannot express them and their failure mode is
+  silent: a study whose devices cannot report enough coverage does not error, it runs to completion
+  with every participant treated as protected and no transmission at all, which on screen is
+  indistinguishable from a disease that failed to spread.
+  """
+  def validate_bundle(decoded) when is_map(decoded) do
+    with :ok <- schema(decoded) do
+      coverage_reportable(decoded)
+    end
+  end
+
+  defp schema(decoded) do
+    case Contracts.validate_bundle(decoded) do
+      :ok -> :ok
+      {:error, error} -> {:error, {:invalid_bundle, error}}
+    end
+  end
+
+  # A tick treats anyone below `coverage_threshold` as protected, and coverage is only ever claimed
+  # by `module_status` observations. A study that reports none, or reports them more slowly than it
+  # ticks, can never clear the threshold for anybody.
+  defp coverage_reportable(%{"twin" => twin} = decoded) when is_map(twin) do
+    health = Map.get(decoded, "health") || %{}
+    interval = Map.get(health, "interval_seconds", @default_health_interval)
+
+    tick = Map.get(twin, "tick_interval_seconds", @default_interval)
+    threshold = Map.get(twin, "coverage_threshold", @default_coverage_threshold)
+
+    # The window in progress has not been reported yet, so at most one interval of every tick period
+    # is uncovered however well the device behaves. Coverage therefore cannot exceed
+    # `1 - interval/tick`, and a study needing more than that is asking for something unreachable.
+    maximum = trunc(tick * (1 - threshold))
+
+    cond do
+      Map.get(health, "enabled", true) == false ->
+        {:error, {:coverage_not_reported, tick}}
+
+      interval > maximum ->
+        {:error, {:health_interval_too_long, interval, maximum}}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp coverage_reportable(_decoded), do: :ok
 
   @doc "The bytes to serve for a study, byte-identical to what was registered."
   def fetch_protocol_source(id) do
@@ -80,6 +142,21 @@ defmodule EpidemicaServer.Studies do
       do: seconds
 
   def tick_interval(_study), do: @default_interval
+
+  @doc """
+  How much of a period a device must have reported itself sensing for before the study treats that
+  participant as observed.
+
+  Read from the twin block by everything that needs it. The model uses it to decide what it may
+  transmit through and the rules use it to decide what may be scored, and those two must be the
+  same number: a participant exposed in the simulation but unscored in the ledger is a disagreement
+  no output makes visible.
+  """
+  def coverage_threshold(%Study{protocol: %{"twin" => %{"coverage_threshold" => threshold}}})
+      when is_number(threshold) and threshold >= 0 and threshold < 1,
+      do: threshold
+
+  def coverage_threshold(_study), do: @default_coverage_threshold
 
   @doc "Whether `at` falls inside the study's run. Always true for a study that declares no schedule."
   def running?(%Study{} = study, at \\ DateTime.utc_now()) do

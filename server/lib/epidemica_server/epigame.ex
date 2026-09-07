@@ -77,7 +77,7 @@ defmodule EpidemicaServer.Epigame do
 
       subjects = participants_in(tick)
       shown = states_shown_during(study_id, day, subjects)
-      observed = observed_subjects(study_id, tick, subjects, pars)
+      observed = observed_subjects(study, tick, subjects)
       chosen = chosen_protection(study_id, tick.period_start, tick.period_end)
 
       awards = award_day(study_id, day, tick, pars, chosen, observed)
@@ -402,16 +402,14 @@ defmodule EpidemicaServer.Epigame do
     end
   end
 
-  defp observed_subjects(study_id, tick, subjects, pars) do
-    threshold = Map.get(pars, "coverage_threshold", 0.5)
-
+  defp observed_subjects(study, tick, subjects) do
     unobserved =
       Health.insufficiently_observed(
-        study_id,
+        study.id,
         @proximity_module,
         tick.period_start,
         tick.period_end,
-        threshold,
+        Studies.coverage_threshold(study),
         subjects
       )
       |> MapSet.new()
@@ -458,7 +456,7 @@ defmodule EpidemicaServer.Epigame do
           # now for a contact they made while protected refunds a cost they agreed to -- and the
           # mirror case would deny someone contacts they earned before protecting.
           chosen_then = chosen_protection(study_id, past.period_start, past.period_end)
-          observed_then = observed_subjects(study_id, past, participants_in(past), pars)
+          observed_then = observed_subjects(study, past, participants_in(past))
 
           counts =
             record_awards(study_id, earlier, day, network, pars, chosen_then, observed_then)

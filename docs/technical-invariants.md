@@ -649,6 +649,7 @@ Counts are test declarations, not assertions.
 | `Epigame` | `epigame_test.exs` (50) — the one-day lag, carry-over with historical facts, cooldown, fractional protection, pending contacts | ✅ |
 | `Rules` | `rules_test.exs` — the shared vectors + arithmetic invariants | ✅ |
 | Schedule | `schedule_test.exs` (24) — day boundaries, short-tick studies, catch-up | ✅ |
+| Study registration | `study_registration_test.exs` (14) — every bundle in `studies/` registers, closed-schema typos refused, coverage-reportability cross-checks, threshold accessor | ✅ |
 | Seeding | `seeding_test.exs` (10) | ✅ |
 | `ParticipantState` | `participant_state_test.exs` (12) — concurrent revisions, contract validation, token scoping | ✅ |
 | `reset_study` | `reset_study_test.exs` (7) | ✅ |
@@ -733,12 +734,12 @@ rows are absent.
 *Enforced?* Partially: `seed_outbreak` is idempotent (`already_seeded?` + "no ticks exist" guard),
 and slots are never reused. *Likelihood?* Every engine failure.
 
-**F4 — Two coverage thresholds, one of them unreachable.**
-`Twin` reads `twin.coverage_threshold`; `Epigame` reads `rules.pars.coverage_threshold`. The bundle
-schema's `twin` block is `additionalProperties: false` and has no such key, so **a schema-valid
-bundle cannot set the twin-side threshold**. Configure the Epigame side and the model treats someone
-as observed while the ledger calls them `not_sensing`, or vice versa.
-*Enforced?* Nothing. *Likelihood?* High the first time anyone tunes it.
+**F4 — ~~Two coverage thresholds, one of them unreachable.~~ FIXED 2026-09-06.**
+There is now one: `twin.coverage_threshold`, declared in the bundle schema and read by both sides
+through `Studies.coverage_threshold/1`. `Epigame` no longer reads `rules.pars`. The schema forbids
+a threshold of 1, which was never satisfiable.
+*Enforced?* By the single accessor, by `study_registration_test.exs`, and by the twin test *"how
+much coverage is enough comes from the bundle"*.
 
 **F5 — Settlement is not a pure function of the stored tick.**
 `Epigame.observed_subjects/4` recomputes coverage over `[period_start, period_end)` **without**
@@ -750,12 +751,17 @@ settlement that has not run yet — while the twin's view of the same day is fro
 
 ### Timing
 
-**F6 — `health.interval_seconds` must be well below `twin.tick_interval_seconds`.**
-The first coverage window closes one full interval after collection starts. With the default 3600 s
-health interval and a 300 s tick, **every** round closes before any coverage report exists, every
-participant scores `not_sensing`, the epidemic cannot spread, and nothing logs an error.
-*Enforced?* Nothing — not the bundle schema, not the server, not a test. Documented only in
-`studies/epigame-debug/README.md`. *Likelihood?* This has already happened once in the field.
+**F6 — ~~`health.interval_seconds` must be well below `twin.tick_interval_seconds`.~~ ENFORCED
+2026-09-06.**
+The first coverage window closes one full interval after collection starts, so at most one interval
+of every tick period is ever uncovered and coverage can never exceed `1 - interval/tick`. With the
+default 3600 s health interval and a 300 s tick, **every** round used to close before any coverage
+report existed: every participant scored `not_sensing`, the epidemic could not spread, and nothing
+logged an error. This had already happened once in the field.
+`Studies.create_study_from_bundle/2` now refuses such a bundle at registration with
+`{:health_interval_too_long, interval, maximum}`, and refuses a twin study with `health.enabled:
+false` with `{:coverage_not_reported, tick}`.
+*Enforced?* At registration only — a study inserted through `Studies.create_study/1` bypasses it.
 
 **F7 — A study without a `proximity` module cannot run a twin.**
 `@proximity_module "proximity"` is hardcoded in both `Twin` and `Epigame`. A survey-only study with a
@@ -854,14 +860,15 @@ no confirmation and no study scoping by default.
 
 | # | Doc says | Code does | Which is right | Matters? |
 |---|---|---|---|---|
-| **D1** | `docs/concepts/building-a-study.md`: "The bundle is validated against `contracts/bundle/1.0.0.json`" | **Nothing validates a bundle at runtime.** Not `Studies.create_study_from_bundle` (Jason decode + hash only), not `ProtocolBundle.parse` (reads 5 keys), not `Contracts` (bundle is not among the seven compiled schemas). Only `analysis/tests/test_studies.py` validates, and only for bundles committed under `studies/` | **Code.** The claim is true of the authoring workflow, false of the runtime | **Yes.** A hand-edited or deploy-script-generated bundle can carry a typo'd key that reaches production. The "closed at the top level, so a typo is a loud failure" property only holds in CI |
+| **D1** | `docs/concepts/building-a-study.md`: "The bundle is validated against `contracts/bundle/1.0.0.json`" | **FIXED 2026-09-06.** `Studies.create_study_from_bundle/2` now validates against the compiled schema before inserting, so the doc's claim is true of the runtime as well as of CI. Still unvalidated: `ProtocolBundle.parse` on the device (reads 5 keys), and `Studies.create_study/1` used directly | Now agree | Was yes; resolved |
 | **D2** | `docs/milestones/m1`, `docs/concepts/proximity.md`: "Detections in-flight persisted to survive process death — `OpenEpisodeStore` with a SQLite implementation" | Interface + in-memory test double only. `ProximityModule` wires neither | **Code.** The persistence is designed, tested in isolation, and not connected | **Yes.** §5-F1: biased loss on the longest encounters |
 | **D3** | ADR-0001 rule 2 and `docs/concepts/modules.md`: "A module does not depend on `epidemica_core`" | `epidemica_survey` depends on `epidemica_core`, implements `EmbeddedModule`, and ships UI | **The doc** — this is a real violation, not an outdated rule. The proximity two-package split is the pattern to follow | **Yes.** It is the boundary the next agent will copy |
 | **D4** | ADR-0012: "`EpidemicaNetwork(ss.Network)` materialises contact episodes as a dynamic edge list"; the M2 docs describe it as the bridge | Two independent bridges exist. `models/network.py:ContactNetwork` (+ `cohort.py:OpenCohort`) does per-timestep apportionment and `max`/`mean`/`sum` reconciliation; **production `twin.py` uses `ss.StaticNet()` and overwrites `net.edges` directly**, taking already-reconciled edges from Elixir. `twin.py` imports nothing from `network.py` except the shared weights | **Code**, for the runtime. `ContactNetwork` is the analysis/spike bridge and remains valid for offline work | **Yes.** `test_network.py` (12 tests) defends a path production never runs; reading it as coverage of the tick is a mistake |
 | **D5** | ADR-0001 rule 5 / M1: "Tier 2 test: `apps/template` copied outside the workspace must build" — listed as implemented at M1 | No such test, script or CI job exists | **The doc** describes the right check; it is absent | Moderate — path-based workspace deps would fail exactly this way |
 | **D6** | M2 milestone: "A tick that fails leaves no partial state" | True of `twin_ticks`; **false of `twin_agents`** (§5-F3) | **Code** | Moderate — self-healing in practice because seeding and slot allocation are idempotent |
 | **D7** | ADR-0012 / M2: "Cross-language determinism: fixture + injected stream → bit-identical trajectories between a Dart edge runtime and Starsim" | There is no Dart edge runtime. The plan was superseded by server-side reconciliation, which the M2 doc itself records as a reversal | **Code**, and the M2 doc already says so | No — but the ADR still reads as current |
-| **D8** | `studies/epigame-debug/README.md`: "Coverage… the twin requires coverage of at least `coverage_threshold` (0.5)" | Two thresholds from two config paths, one unsettable (§5-F4) | **Code** | **Yes** |
+| **D8** | `studies/epigame-debug/README.md`: "Coverage… the twin requires coverage of at least `coverage_threshold` (0.5)" | **FIXED 2026-09-06.** One threshold, in the twin block, default 0.5 (§5-F4) | Now agree | Was yes; resolved |
+| **D15** | `contracts/bundle/1.0.0.json` requires `schedule.days`, with an explicit negative fixture *"a schedule with no end"*, and the schedule description says open-ended means omitting `schedule` entirely | The server supports a **scheduled but endless** study: `Studies.scheduled_days/1` returns nil for an absent key, `days_to_catch_up/2` counts past any declared length, `Twin.ensure_in_schedule/2` allows `days == nil`, and `state/epigame`'s `days_total` is nullable so the app renders it. That shape is not expressible in a valid bundle | **Undecided — needs a call.** Either the schema should let `days` be omitted, or the server should stop supporting the shape. Not resolved here, because reversing a deliberate contract decision as a side effect of another change is how the drift this document exists to prevent happens | Moderate. Today it is unreachable through registration, so it is latent rather than active. The test that covers it now builds the study through `Studies.create_study/1` and says so |
 | **D9** | M1: "Rejected observations moved to a local dead-letter store, **surfaced**, never silently deleted" | The store, `surfaced` column and `markSurfaced` all exist. `StudyController` exposes `deadLetterCount`; **no UI in either app displays it** | **Code** — stored and inspectable, not surfaced | Low |
 | **D10** | ADR-0002 / M1: "`GET /observations/ack` returns the highest contiguous seq" | Always `null` for real clients (§5-F13), and nothing calls it | **Code** | Low today, high once pruning depends on it |
 | **D11** | M2 acceptance: "No participant's score ever changes retroactively" | True while a study runs. `mix epidemica.reset_study` deletes ledger, awards, ticks and published state, and a replay can score differently (§5-F5) | Both — the task is explicitly not-for-production and says so | No |
@@ -888,18 +895,25 @@ ones that are only aspirational.
 8. Points use the state the participant was **shown** (the previous tick's outputs).
 9. Tick inputs and outputs use **string keys**, always.
 10. Bundle bytes are stored and served verbatim. Never re-encode.
+11. A bundle is validated against its contract at registration, including two cross-field checks the
+    schema cannot express: a twin study must report coverage, and must report it faster than it
+    ticks.
+12. There is exactly one coverage threshold, `twin.coverage_threshold`, reached through
+    `Studies.coverage_threshold/1`.
 
 **Believed but not enforced — do not rely on these without adding the check.**
 
-11. A module must not depend on `epidemica_core` (`epidemica_survey` already breaks it).
-12. `health.interval_seconds` ≪ `twin.tick_interval_seconds` (nothing validates it; it has already
-    caused a lost field test).
-13. Bundles are schema-valid at runtime (they are not validated anywhere outside CI).
-14. In-flight episodes survive process death (they do not).
-15. A failed tick leaves no state (it leaves roster and seeding).
-16. Settlement is reproducible from the stored tick (coverage is recomputed live).
-17. Ticks run by themselves (nothing enqueues them).
-18. `seq` starts at 0 (Dart starts it at 1).
+13. A module must not depend on `epidemica_core` (`epidemica_survey` already breaks it).
+14. Bundles are schema-valid **on the device** (`ProtocolBundle.parse` reads five keys and trusts
+    the rest), and for studies inserted through `Studies.create_study/1` rather than from a bundle.
+15. In-flight episodes survive process death (they do not).
+16. A failed tick leaves no state (it leaves roster and seeding).
+17. Settlement is reproducible from the stored tick (coverage is recomputed live).
+18. Ticks run by themselves (nothing enqueues them).
+19. `seq` starts at 0 (Dart starts it at 1).
+20. A test fixture's dates stay meaningful (two carry-over tests silently stopped testing anything
+    on 2026-09-06, because they defaulted an observation's arrival to `utc_now()` and carry-over
+    only reaches back `carry_over_days`). Prefer stated instants over the wall clock.
 
 **Before adding a module**, copy the proximity two-package split: a pure package with no
 `epidemica_core` dependency and no UI, plus a thin glue package implementing `EmbeddedModule`.

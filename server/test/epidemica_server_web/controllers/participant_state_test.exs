@@ -28,6 +28,17 @@ defmodule EpidemicaServerWeb.ParticipantStateTest do
     {:ok, conn: conn, study: study, enrolled: enrolled}
   end
 
+  # A second study to hold a token that must not work here. Minimal, but a real bundle: registration
+  # validates, so a placeholder that is not one would fail for the wrong reason.
+  defp other_bundle(title) do
+    Jason.encode!(%{
+      "bundle_version" => "1.0",
+      "study_id" => Ecto.UUID.generate(),
+      "title" => title,
+      "modules" => %{"proximity" => %{}}
+    })
+  end
+
   defp authed(conn, %{access_token: token}),
     do: put_req_header(conn, "authorization", "Bearer #{token}")
 
@@ -128,7 +139,7 @@ defmodule EpidemicaServerWeb.ParticipantStateTest do
   end
 
   test "state is scoped to the token, not to a path parameter", ctx do
-    {:ok, other} = Studies.create_study_from_bundle("Other", ~s({"modules":{}}))
+    {:ok, other} = Studies.create_study_from_bundle("Other", other_bundle("Other"))
     {:ok, _} = Studies.add_join_code(other, "OTHER-1")
 
     {:ok, outsider} =

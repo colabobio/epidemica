@@ -79,6 +79,12 @@ defmodule EpidemicaServer.EpigameTest do
     })
   end
 
+  # After `day` was settled, but still inside the window carry-over reaches back over.
+  defp arrived_late(day) do
+    {_, ended} = day_window(day)
+    DateTime.add(ended, 3600, :second)
+  end
+
   defp episode(study, reporter, peer, day, minutes, opts \\ []) do
     {from, _} = day_window(day)
     ended = DateTime.add(from, minutes * 60, :second)
@@ -383,8 +389,10 @@ defmodule EpidemicaServer.EpigameTest do
     {:ok, _} = settle(s, 1)
     assert Epigame.balance(s.id, "alice-0001") == 2
 
-    # Only now does the episode arrive, after day one was settled.
-    episode(s, "alice-0001", "bob-0001", 1, 30)
+    # Only now does the episode arrive, after day one was settled. The arrival time is stated rather
+    # than taken from the clock: carry-over only reaches back `carry_over_days`, so a default of
+    # "now" would quietly stop testing anything once the wall clock passed the fixture's dates.
+    episode(s, "alice-0001", "bob-0001", 1, 30, received_at: arrived_late(1))
 
     tick(s, 2)
     {:ok, _} = settle(s, 2)
@@ -444,7 +452,7 @@ defmodule EpidemicaServer.EpigameTest do
     tick(s, 1)
     {:ok, _} = settle(s, 1)
 
-    episode(s, "alice-0001", "bob-0001", 1, 30)
+    episode(s, "alice-0001", "bob-0001", 1, 30, received_at: arrived_late(1))
 
     {day_two, _} = day_window(2)
     {:ok, _} = Epigame.protect(s.id, "alice-0001", day_two)

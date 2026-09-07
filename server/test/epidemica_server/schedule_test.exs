@@ -114,6 +114,8 @@ defmodule EpidemicaServer.ScheduleTest do
         "title" => "Short",
         "modules" => %{"proximity" => %{}},
         "schedule" => %{"starts_at" => "2026-09-07T06:00:00Z", "days" => 7},
+        # Coverage windows have to close faster than the study ticks, or no round is ever observed.
+        "health" => %{"interval_seconds" => 60},
         "twin" => %{
           "engine" => "starsim",
           "state_uri" => "https://schemas.epidemica.info/state/epigame/1.0.0.json",
@@ -200,7 +202,22 @@ defmodule EpidemicaServer.ScheduleTest do
     end
 
     test "an open-ended study counts on past its declared length, because it has none" do
-      s = study(%{"starts_at" => "2020-01-01T00:00:00Z", "days" => nil})
+      # Built without going through the bundle: `schedule.days` is required by the contract, so a
+      # start with no end is a shape only a study registered some other way can have. The code
+      # handles it, and this pins that behaviour until the two are reconciled.
+      source =
+        Jason.encode!(%{
+          "modules" => %{"proximity" => %{}},
+          "schedule" => %{"starts_at" => "2020-01-01T00:00:00Z"}
+        })
+
+      {:ok, s} =
+        Studies.create_study(%{
+          name: "endless",
+          protocol_source: source,
+          protocol: Jason.decode!(source),
+          protocol_hash: EpidemicaServer.Studies.Study.hash_of(source)
+        })
 
       assert {:ok, days} = Studies.days_to_catch_up(s, ~U[2020-01-05 00:00:00Z])
       assert days == [1, 2, 3, 4, 5]

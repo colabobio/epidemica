@@ -24,6 +24,8 @@ defmodule EpidemicaServer.ResetStudyTest do
       "title" => "Resettable",
       "modules" => %{"proximity" => %{}},
       "schedule" => %{"starts_at" => "2020-01-01T00:00:00Z", "days" => 7},
+      # A five-minute day needs coverage windows to match, or every round scores `not_sensing`.
+      "health" => %{"interval_seconds" => 60},
       "twin" => %{
         "engine" => "starsim",
         "state_uri" => "https://schemas.epidemica.info/state/epigame/1.0.0.json",
