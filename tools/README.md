@@ -14,8 +14,6 @@ Checks the repository's own source for embedded license text or SPDX identifiers
 in an Apache-2.0 project — most importantly, anything from the GPL/AGPL/LGPL family, which would mean
 a snippet (human- or agent-written) was pulled in from a copyleft-licensed source without anyone
 noticing. It is a text-matching check against known license text, not a guarantee of non-infringement
-— read ADR-0016 before trusting a clean run more than that. Run it by hand; it is deliberately not a
-CI job — see [ADR-0017](../docs/adr/0017-manual-license-scan-not-ci.md) for why.
 
 ### One-time setup
 
@@ -56,10 +54,7 @@ only on a REJECT — see below.
 
 ### When to run it
 
-There is no CI job for this — see [ADR-0017](../docs/adr/0017-manual-license-scan-not-ci.md). It was
-tried on every push and pull request and removed after a real run took over five minutes and failed a
-merge on a confirmed false positive, holding up outgoing changes for over an hour before the failure
-was traced back to something already known to be benign. Running this is a manual step for now, which
+Running this is a manual step for now, which
 means it only catches something if someone actually runs it. Run it:
 
 - **Before opening a pull request that adds a new third-party dependency**, or that came out of a
