@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 340" font-family="Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#333"/>
+    </marker>
+  </defs>
+
+  <style>
+    .box { fill: #f5f7fa; stroke: #333; stroke-width: 1.2; rx: 6; }
+    .lbl { font-size: 12px; fill: #111; }
+    .sub { font-size: 10.5px; fill: #444; }
+    .cap { font-size: 10.5px; fill: #333; }
+    .edge { stroke: #333; stroke-width: 1.2; fill: none; marker-end: url(#arrow); }
+    .edge-dashed { stroke: #333; stroke-width: 1.2; fill: none; stroke-dasharray: 4 3; marker-end: url(#arrow); }
+  </style>
+
+  <!-- Box 1: device -->
+  <rect class="box" x="10" y="30" width="160" height="80"/>
+  <text class="lbl" x="20" y="50">Study app</text>
+  <text class="sub" x="20" y="66">proximity, survey modules</text>
+  <text class="sub" x="20" y="80">→ outbox (SQLite, WAL)</text>
+  <text class="sub" x="20" y="98">→ sync service</text>
+
+  <!-- Box 2: ingest -->
+  <rect class="box" x="220" y="30" width="160" height="80"/>
+  <text class="lbl" x="230" y="50">Ingest</text>
+  <text class="sub" x="230" y="66">Phoenix, REST</text>
+  <text class="sub" x="230" y="80">batched, idempotent,</text>
+  <text class="sub" x="230" y="94">device-bound tokens</text>
+
+  <!-- Box 3: observations -->
+  <rect class="box" x="430" y="30" width="190" height="80"/>
+  <text class="lbl" x="440" y="50">observations</text>
+  <text class="sub" x="440" y="66">PostgreSQL, append-only</text>
+  <text class="sub" x="440" y="80">system of record;</text>
+  <text class="sub" x="440" y="94">projections rebuild from it</text>
+
+  <!-- Box 4: projections + twin -->
+  <rect class="box" x="660" y="30" width="220" height="80"/>
+  <text class="lbl" x="670" y="50">Projections + Twin</text>
+  <text class="sub" x="670" y="66">contacts, coverage</text>
+  <text class="sub" x="670" y="80">Twin.run_tick/3</text>
+  <text class="sub" x="670" y="94">(immutable per study day)</text>
+
+  <!-- Box 5: starsim subprocess -->
+  <rect class="box" x="660" y="160" width="220" height="70"/>
+  <text class="lbl" x="670" y="180">Starsim subprocess</text>
+  <text class="sub" x="670" y="196">one tick = one JSON document</text>
+  <text class="sub" x="670" y="210">in, one document out</text>
+
+  <!-- Box 6: settle + ledger -->
+  <rect class="box" x="430" y="160" width="190" height="70"/>
+  <text class="lbl" x="440" y="180">Settle + score</text>
+  <text class="sub" x="440" y="196">Epigame.settle_day/3</text>
+  <text class="sub" x="440" y="210">→ ledger, participant_state</text>
+
+  <!-- Arrows across the top row -->
+  <line class="edge" x1="170" y1="70" x2="218" y2="70"/>
+  <line class="edge" x1="380" y1="70" x2="428" y2="70"/>
+  <line class="edge" x1="620" y1="70" x2="658" y2="70"/>
+
+  <!-- Twin <-> Starsim, dashed, one process per tick -->
+  <line class="edge-dashed" x1="770" y1="112" x2="770" y2="158"/>
+  <text class="cap" x="782" y="140">one tick,</text>
+  <text class="cap" x="782" y="152">one process</text>
+
+  <!-- Twin -> settle -->
+  <line class="edge" x1="660" y1="130" x2="622" y2="158"/>
+
+  <!-- Feedback: settle back to device via state channel -->
+  <path class="edge-dashed" d="M 430 190 C 250 260, 90 260, 90 112"/>
+  <text class="cap" x="150" y="285">state channel — GET /v1/participants/me/state</text>
+
+  <text class="cap" x="10" y="20" font-style="italic">Figure 1. One observation's path from a phone to a published conclusion and back.</text>
+</svg>
