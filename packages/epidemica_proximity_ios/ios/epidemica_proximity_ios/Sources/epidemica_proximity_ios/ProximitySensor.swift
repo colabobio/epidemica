@@ -22,6 +22,11 @@ final class ProximitySensor: NSObject, SensorDelegate {
     /// flag is what tells a genuine cold start apart from a restart.
     private var hasStartedThisSession = false
 
+    /// Native floor on how often a wake is offered to Dart. Dart applies its own on top.
+    private static let wakeIntervalSeconds: TimeInterval = 60
+
+    private var lastWakeOfferedAt: TimeInterval = 0
+
     var isRunning: Bool { sensorArray != nil }
 
     /// Last Bluetooth state Herald reported.
@@ -106,6 +111,23 @@ final class ProximitySensor: NSObject, SensorDelegate {
         ]
         event["peer_device_class"] = decoded.deviceClass
         ProximityEvents.shared.emit(event)
+        offerWake()
+    }
+
+    /// Tell Dart it is running, at most once a minute.
+    ///
+    /// A background BLE wake is the only execution time this app gets with the screen off: iOS
+    /// suspends the process between wakes, so a Dart timer does not fire at all. That makes the
+    /// detection callback the only place this can come from, and upload frequency on iOS therefore
+    /// depends on how many participants are nearby rather than on a schedule.
+    ///
+    /// Throttled here as well as in Dart because a crowded room produces detections several times a
+    /// second, and every one of those would otherwise cross the channel to be discarded.
+    private func offerWake() {
+        let now = Date().timeIntervalSince1970
+        guard now - lastWakeOfferedAt >= Self.wakeIntervalSeconds else { return }
+        lastWakeOfferedAt = now
+        ProximityEvents.shared.offer(["type": "wake"])
     }
 
     func sensor(_ sensor: SensorType, didDetect: TargetIdentifier) {}

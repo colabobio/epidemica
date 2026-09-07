@@ -48,6 +48,8 @@ Explanations of how the platform works, as opposed to why decisions were made:
 
 - [The Observation Envelope](docs/concepts/observation-envelope.md) — how every module's data
   reaches the server, exactly once, with enough context to interpret it years later.
+- [Background sync](docs/concepts/background-sync.md) — how observations leave the device when
+  nobody is looking at the screen, why that differs by platform, and what it does not yet solve.
 
 ## Milestones
 

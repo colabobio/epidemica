@@ -126,6 +126,7 @@ without the two-package pattern the proximity stack established.
 | `ModuleContext` (what a module receives) | `config` (that module's block **only**), `studyId`, `subject`, `studyStartsAt`, `record` (an `ObservationRecorder`), `store` (a namespaced `ModuleStore`) | **The whole bundle.** `configFor(module)` returns only `raw['modules'][module]`. Another module's config. The outbox itself. Tokens. The HTTP client | `studyStartsAt` is parsed from `schedule.starts_at` and must be the *same instant* the server anchors days on (`Studies.starts_at/1`). Both parse the same ISO-8601 string; nothing tests that they agree |
 | `ObservationRecorder` (module → outbox) | `({required String schemaUri, required DateTime observedAt, required Map payload}) → int` | A module never supplies `study_id`, `protocol_hash`, `subject`, `device_id`, `module`, `seq` or `clock_offset_ms`. `recorderFor` binds all of them | `observedAt` is expected UTC; nothing coerces it. `Outbox._iso` calls `.toUtc()` so a local-time `DateTime` is silently converted rather than rejected |
 | `ModuleStore` | `read/write/delete(String)` | Not a second outbox. Not for observations. Cleared on withdrawal | `DatabaseModuleStore` namespaces by `moduleId`; two modules with the same `id` would collide silently |
+| `ModuleContext.requestSync` (module → host) | `void Function()` | A module must not learn whether an upload happened, or that one exists. It applies no rate limit of its own — a second floor invisible from the host is worse than one that is occasionally generous | Defaults to a no-op, so a host that forgets to wire it is silently unchanged rather than broken. `StudyController` always supplies it |
 | `ModuleStatus` | `ModuleState` ∈ {`sensing`, `stopped`, `permissionDenied`, `radioOff`} + optional `detail` | `detail` must never carry participant data (comment-enforced only) | `ModuleState.toJson()` must match the `state` enum in `observations/health/module_status/1.0.0.json`. It does; nothing tests it |
 
 ### 1.2 `epidemica_proximity` ↔ `epidemica_proximity_module`
@@ -612,7 +613,8 @@ Counts are test declarations, not assertions.
 | Area | Files | Covers | Rating |
 |---|---|---|---|
 | Outbox | `outbox_test.dart` (20) | seq allocation from 1, no reuse after drain, two isolates concurrently, claim/release/reclaim, dead letters, WAL, migration idempotence | ✅ |
-| Sync | `sync_test.dart` (23) | all four outcome classes, the accepted-omitted-from-exceptions inversion, 413/429/5xx/401, 24 h offline, clock midpoint, jittered backoff | ✅ |
+| Sync | `sync_test.dart` (25) | all four outcome classes, the accepted-omitted-from-exceptions inversion, 413/429/5xx/401, 24 h offline, clock midpoint, jittered backoff, watermark null vs zero | ✅ |
+| Sync throttle | `sync_throttle_test.dart` (10) | the floor, the boundary, a flood of offers, study floor in both directions, a failed run spending the interval | ✅ |
 | Enrolment / tokens | `identity_enrollment_test.dart` (~20) | hash mismatch, module refusal, registry sorting, token refresh and revocation | ✅ |
 | State channel | `state_channel_test.dart` (18) | revision monotonicity, subject binding, 404-keeps-cache, staleness, opacity of `state` | ✅ |
 | `StudyController` | `study_controller_test.dart` (24) | base-URI normalisation, **same binary + different bundles**, withdrawal, module status | ✅ |
@@ -633,7 +635,8 @@ Counts are test declarations, not assertions.
 |---|---|---|
 | `ProximityPayloadTest.kt`, `ProximityPayloadTests.swift` | Both load `contracts/wire/proximity_payload/1.0.0.vectors.json`: 4 round-trips, 2 decode-only (trailing bytes, unknown class), 5 rejections | ✅ genuinely shared |
 | `DetectionBufferTest.kt` (5) | hold/drain, overflow with drop counting, reset, 8 threads × 500 events | ✅ |
-| iOS `ProximityEvents` buffer | — | ❌ no Swift test; Kotlin is tested, Swift is not, for identical logic |
+| `ProximityEventsTest.kt` (3) | a wake is delivered only to a listener and never buffered, so it cannot evict a detection | ✅ |
+| iOS `ProximityEvents` buffer and `offer` | — | ❌ no Swift test; the Kotlin equivalent is tested, the identical Swift logic is not |
 | `ProximityService` / `ProximitySensor` lifecycle | — | ❌ |
 
 ### Elixir (≈205 tests)
@@ -843,9 +846,22 @@ throws. That is the single best-designed guard in the codebase.
 background mode and quietly collecting location in ones that have it — breaking the study's privacy
 promise. Android has no equivalent. *Enforced?* One line, one comment, no test.
 
-**F18 — No background sync.** Task 0006. Coverage claims are honest; the *uploads* backing them are
-not timely, so a tick can run before observations for its own day have arrived
-(`edges: 0` with data in the database).
+**F18 — Background sync: partly fixed 2026-09-06, and the remaining half is the important one.**
+A `ProximityWake` now travels from native to `ModuleContext.requestSync()` to
+`StudyController.syncThrottled()`, behind a five-minute platform floor extended by the bundle's
+`sync.min_interval_seconds` — the first thing ever to read that field.
+
+**It only works while a Dart isolate is attached.** On Android, `stopWithTask="false"` keeps the
+foreground *service* alive when the app is swiped away, but `onDetachedFromEngine` detaches the
+event sink and the engine is gone: sensing continues, the outbox fills, and the wake is offered to
+nobody. Closing that needs a Dart entrypoint hosted by the service. On iOS the mechanism is real,
+because a BLE wake resumes a suspended process — but upload frequency there is a function of how
+many participants are nearby, not of a schedule.
+
+Nothing has been verified on hardware, which is why task 0006 is still in `backlog`.
+*Consequence while it stands:* a tick can still run before observations for its own day have
+arrived (`edges: 0` with data in the database), and a phone that slept through the night is still
+scored `not_sensing`.
 
 ### Single-writer
 
@@ -919,19 +935,24 @@ ones that are only aspirational.
     episode is never in both the outbox and the snapshot.
 14. A device's `seq` stream may begin at 0 or 1. Nothing may assume which — the server accepts
     either and refuses to guess at anything higher.
+15. A wake is not an observation. It is delivered only to an attached listener and never buffered,
+    because buffering it would evict a detection and the record reports that as lost data.
+16. Only `StudyController` decides whether a sync happens. A module asks; it does not schedule.
 
 **Believed but not enforced — do not rely on these without adding the check.**
 
-15. A module must not depend on `epidemica_core` (`epidemica_survey` already breaks it).
-16. Bundles are schema-valid **on the device** (`ProtocolBundle.parse` reads five keys and trusts
+17. A module must not depend on `epidemica_core` (`epidemica_survey` already breaks it).
+18. Bundles are schema-valid **on the device** (`ProtocolBundle.parse` reads five keys and trusts
     the rest), and for studies inserted through `Studies.create_study/1` rather than from a bundle.
-17. A failed tick leaves no state (it leaves roster and seeding).
-18. Settlement is reproducible from the stored tick (coverage is recomputed live).
-19. Ticks run by themselves (nothing enqueues them).
-20. A test fixture's dates stay meaningful (two carry-over tests silently stopped testing anything
+19. A failed tick leaves no state (it leaves roster and seeding).
+20. Settlement is reproducible from the stored tick (coverage is recomputed live).
+21. Ticks run by themselves (nothing enqueues them).
+22. Observations reach the server without anyone opening the app. On Android with the app swiped
+    away they still do not: there is no Dart isolate to act on the wake (§5-F18).
+23. A test fixture's dates stay meaningful (two carry-over tests silently stopped testing anything
     on 2026-09-06, because they defaulted an observation's arrival to `utc_now()` and carry-over
     only reaches back `carry_over_days`). Prefer stated instants over the wall clock.
-21. The process gets a warning before it dies. It does not: neither app observes
+24. The process gets a warning before it dies. It does not: neither app observes
     `AppLifecycleState`, so up to one sweep interval of in-flight state is still lost on iOS
     suspension. Call `ProximityModule.sweep()` from a lifecycle observer to close that window.
 

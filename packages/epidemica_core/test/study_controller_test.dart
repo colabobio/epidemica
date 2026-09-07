@@ -40,12 +40,14 @@ String bundleJson({
   required Map<String, Object?> modules,
   String title = 'Contact logging pilot',
   Map<String, Object?>? health,
+  Map<String, Object?>? sync,
 }) => jsonEncode({
   'bundle_version': '1.0',
   'study_id': _studyId,
   'title': title,
   'modules': modules,
   'health': ?health,
+  'sync': ?sync,
 });
 
 void main() {
@@ -64,38 +66,40 @@ void main() {
     dir.deleteSync(recursive: true);
   });
 
-  http.Client serverServing(String bundle, {int enrollStatus = 201}) => MockClient((request) async {
-    if (request.url.toString() == _bundleUrl) return http.Response(bundle, 200);
-    if (request.url.path.endsWith('/observations')) {
-      return http.Response(
-        jsonEncode({
-          'received': 0,
-          'accepted': 0,
-          'duplicate': 0,
-          'quarantined': 0,
-          'rejected': 0,
-          'exceptions': [],
-          'server_time': '2026-09-02T12:00:00Z',
-        }),
-        200,
-      );
-    }
-    if (enrollStatus != 201) return http.Response('{}', enrollStatus);
-    return http.Response(
-      jsonEncode({
-        'subject': Identity(db).subject,
-        'study_id': _studyId,
-        'protocol_hash': ProtocolBundle.hashOf(utf8.encode(bundle)),
-        'protocol_url': _bundleUrl,
-        'access_token': 'access-1',
-        'token_type': 'Bearer',
-        'expires_in': 3600,
-        'refresh_token': 'refresh-1',
-        'server_time': '2026-09-02T12:00:00Z',
-      }),
-      201,
-    );
-  });
+  http.Client serverServing(String bundle, {int enrollStatus = 201, List<String>? log}) =>
+      MockClient((request) async {
+        log?.add(request.url.path);
+        if (request.url.toString() == _bundleUrl) return http.Response(bundle, 200);
+        if (request.url.path.endsWith('/observations')) {
+          return http.Response(
+            jsonEncode({
+              'received': 0,
+              'accepted': 0,
+              'duplicate': 0,
+              'quarantined': 0,
+              'rejected': 0,
+              'exceptions': [],
+              'server_time': '2026-09-02T12:00:00Z',
+            }),
+            200,
+          );
+        }
+        if (enrollStatus != 201) return http.Response('{}', enrollStatus);
+        return http.Response(
+          jsonEncode({
+            'subject': Identity(db).subject,
+            'study_id': _studyId,
+            'protocol_hash': ProtocolBundle.hashOf(utf8.encode(bundle)),
+            'protocol_url': _bundleUrl,
+            'access_token': 'access-1',
+            'token_type': 'Bearer',
+            'expires_in': 3600,
+            'refresh_token': 'refresh-1',
+            'server_time': '2026-09-02T12:00:00Z',
+          }),
+          201,
+        );
+      });
 
   /// One binary. The module set is fixed here, exactly as it is fixed at build time.
   StudyController binaryWith(List<EmbeddedModule> modules, http.Client client) => StudyController(
@@ -296,6 +300,87 @@ void main() {
 
       expect(db.db.select('SELECT * FROM outbox').single['clock_offset_ms'], isNull);
       expect(controller.clockOffsetMs, isNull);
+    });
+  });
+
+  group('a module asking to upload', () {
+    Future<StudyController> joined(String bundle, _FakeModule module, List<String> log) async {
+      final controller = binaryWith([module], serverServing(bundle, log: log));
+      await controller.join('JOIN-1234');
+      return controller;
+    }
+
+    // An empty outbox never reaches the network, so a sync with nothing to send proves nothing.
+    void record(_FakeModule module) => module.startedWith!.record(
+      schemaUri: 'https://schemas.epidemica.info/x/1.0.0.json',
+      observedAt: DateTime.utc(2026, 9, 2, 12),
+      payload: const {},
+    );
+
+    test('reaches the controller, so no app has to wire it up', () async {
+      final module = _FakeModule('proximity');
+      final log = <String>[];
+      final controller = await joined(bundleJson(modules: {'proximity': {}}), module, log);
+      record(module);
+
+      // The module is handed this and knows nothing else about it. Before, a background trigger had
+      // to be wired per app, which is a rate limit and a policy decision copied per app.
+      module.startedWith!.requestSync();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(log.where((path) => path.endsWith('/observations')), hasLength(1));
+      controller.dispose();
+    });
+
+    test('uploads once however often it asks', () async {
+      final module = _FakeModule('proximity');
+      final log = <String>[];
+      final controller = await joined(bundleJson(modules: {'proximity': {}}), module, log);
+      record(module);
+
+      // A crowded room on iOS: a wake on every detection.
+      for (var i = 0; i < 10; i++) {
+        module.startedWith!.requestSync();
+      }
+      await Future<void>.delayed(Duration.zero);
+
+      expect(log.where((path) => path.endsWith('/observations')), hasLength(1));
+      expect(await controller.syncThrottled(), isFalse, reason: 'still inside the floor');
+      controller.dispose();
+    });
+
+    test('a study may ask for less frequent uploads and get them', () async {
+      final module = _FakeModule('proximity');
+      final controller = await joined(
+        bundleJson(modules: {'proximity': {}}, sync: {'min_interval_seconds': 3600}),
+        module,
+        [],
+      );
+
+      // `sync.min_interval_seconds` has been in the bundle contract since before anything read it.
+      expect(controller.effectiveSyncFloor, const Duration(hours: 1));
+      controller.dispose();
+    });
+
+    test('a study cannot ask for more frequent uploads than the platform allows', () async {
+      final module = _FakeModule('proximity');
+      final controller = await joined(
+        bundleJson(modules: {'proximity': {}}, sync: {'min_interval_seconds': 60}),
+        module,
+        [],
+      );
+
+      // How hard a phone may be worked is not the study's call.
+      expect(controller.effectiveSyncFloor, StudyController.syncFloor);
+      controller.dispose();
+    });
+
+    test('a study that says nothing gets the platform floor', () async {
+      final module = _FakeModule('proximity');
+      final controller = await joined(bundleJson(modules: {'proximity': {}}), module, []);
+
+      expect(controller.effectiveSyncFloor, StudyController.syncFloor);
+      controller.dispose();
     });
   });
 

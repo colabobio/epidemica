@@ -40,6 +40,7 @@ class ModuleContext {
     required this.record,
     required this.store,
     this.studyStartsAt,
+    this.requestSync = _ignoreSyncRequest,
   });
 
   /// This module's block from the bundle.
@@ -62,7 +63,20 @@ class ModuleContext {
 
   /// Somewhere to keep what the module must not forget when the process dies.
   final ModuleStore store;
+
+  /// Says that now would be a good moment to deliver what has been recorded.
+  ///
+  /// A module calls this when the platform hands it execution time it did not ask for — a
+  /// background wake, a service tick — and then forgets about it. It learns nothing about whether
+  /// an upload happened, or whether one exists at all: the host owns the outbox, the network and
+  /// the rate limit, and a module that knew about any of them would be a module that could not be
+  /// used in an app that syncs differently.
+  ///
+  /// A no-op by default, so a host with no opinion is unchanged rather than broken.
+  final void Function() requestSync;
 }
+
+void _ignoreSyncRequest() {}
 
 /// A module's own small, durable key-value store.
 ///
@@ -117,7 +131,8 @@ class ModuleStatus {
 
 /// Builds the recorder a module is given, binding the envelope fields a module has no business
 /// choosing for itself.
-ObservationRecorder recorderFor({  required Outbox outbox,
+ObservationRecorder recorderFor({
+  required Outbox outbox,
   required Enrollment enrollment,
   required DeviceClock clock,
   required String module,

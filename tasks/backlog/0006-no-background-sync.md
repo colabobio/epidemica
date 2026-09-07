@@ -1,10 +1,55 @@
 # 0006 — Nothing uploads unless a participant is looking at the screen
 
-**Status:** backlog
+**Status:** partly done — the trigger mechanism landed 2026-09-06; **stays in backlog** because
+neither the Android case that matters nor any device verification is done.
 **Filed:** 2026-09-03
 **Touches:** `packages/epidemica_core/lib/src/sync/`, `packages/epidemica_core/lib/src/study_controller.dart`,
 `packages/epidemica_proximity_android/android/src/main/kotlin/.../ProximityService.kt`,
 `packages/epidemica_proximity_ios/ios/.../ProximitySensor.swift`, `apps/epigames`, `apps/template`
+
+## What landed, 2026-09-06
+
+A trigger path from the platform to the outbox, described in
+[`docs/concepts/background-sync.md`](../../docs/concepts/background-sync.md).
+
+- Native emits a `ProximityWake` when the OS gives the process execution time: Android's foreground
+  service every five minutes, iOS on a BLE detection throttled to once a minute.
+- `ProximityModule` turns it into `ModuleContext.requestSync()` and applies no policy of its own.
+- `StudyController.syncThrottled()` decides whether to act, through `SyncThrottle`: a five-minute
+  platform floor a study cannot shorten, extended by `sync.min_interval_seconds` when the bundle
+  declares a longer one. **That field had never been read by anything until now.**
+- A wake goes through `ProximityEvents.offer`, not `emit`, so it is dropped rather than buffered
+  when nothing is listening. Buffering it would have cost a detection its place in a
+  fixed-capacity buffer whose overflow is reported as lost observation.
+
+## Why this is not done
+
+**1. The Android case that matters is not fixed.** `stopWithTask="false"` keeps the *service* alive
+when the app is swiped from recents, but `onDetachedFromEngine` detaches the event sink and the
+Flutter engine is gone. Sensing continues, the outbox fills, and nothing drains it because there is
+no Dart isolate to drain it — the wake is offered to nobody. What landed helps only while the engine
+is attached, which on Android largely overlaps with what the existing foreground timer already did.
+
+Closing this needs a Dart entrypoint the service can host: a background isolate via
+`DartExecutor` and a callback handle, or `WorkManager` with one. That is the remaining work, and it
+is most of the original problem.
+
+**2. iOS works, but only as often as there are people around.** The wake arrives on a BLE detection,
+so a participant who spends a day alone uploads nothing until they open the app. Acceptable — the
+signal of interest is contact, and contact is what wakes the device — but it is a property of the
+design rather than an implementation detail, and it should be stated in any methods section.
+
+**3. Nothing has been verified on hardware.** The acceptance criteria below are device tests. None
+has been run. Whether iOS delivers enough wakes to matter in practice is empirical and this code
+does not answer it.
+
+## Decided
+
+**Should a participant be told their dataset depends on not force-quitting the app?** Yes. A
+paragraph has been added to the Epigames info screen. Its wording, and whether it belongs in consent
+rather than in an info screen, is a review question for the PI.
+
+---
 
 ## The problem
 

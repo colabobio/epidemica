@@ -97,3 +97,21 @@ final class ProximityDetectionsDropped extends ProximityEvent {
   @override
   String toString() => 'ProximityDetectionsDropped($count)';
 }
+
+/// The platform has just given this process execution time in the background.
+///
+/// Named for what the native side actually knows, which is only that it is running. It does not
+/// mean a detection happened, and it does not mean anything should be uploaded — deciding that is
+/// the host's job, and the host is the only layer that knows an upload exists.
+///
+/// This is the one moment a backgrounded app gets on iOS, where the process is suspended between
+/// wakes and a Dart timer therefore does not fire. Unlike a detection it carries no evidence, so it
+/// is delivered only if something is listening and dropped otherwise; buffering it would cost a
+/// detection its place.
+@immutable
+final class ProximityWake extends ProximityEvent {
+  const ProximityWake();
+
+  @override
+  String toString() => 'ProximityWake()';
+}

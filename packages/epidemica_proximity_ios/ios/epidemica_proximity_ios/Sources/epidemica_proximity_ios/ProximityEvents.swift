@@ -80,6 +80,20 @@ final class ProximityEvents {
         flush()
     }
 
+    /// Deliver an event only if Dart is listening, and drop it otherwise.
+    ///
+    /// For events that carry no evidence, such as a background wake. Buffering one would cost a
+    /// detection its place in a fixed-capacity buffer, and an overflow there is reported as lost
+    /// observation -- so a stream of ephemeral notices would show up in the record as missing data.
+    /// A wake nobody is awake to hear is worth nothing anyway.
+    func offer(_ event: [String: Any]) {
+        guard sink != nil else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self, let sink = self.sink else { return }
+            sink(event)
+        }
+    }
+
     private func flush() {
         guard sink != nil else { return }
         DispatchQueue.main.async { [weak self] in

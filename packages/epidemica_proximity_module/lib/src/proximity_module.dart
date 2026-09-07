@@ -142,6 +142,11 @@ class ProximityModule implements EmbeddedModule {
         droppedDetections += count;
       case ProximitySensingStarted():
         break;
+      case ProximityWake():
+        // The platform has given the process execution time it did not ask for. On iOS this is the
+        // only such moment with the screen off, so it is the only chance to deliver anything. What
+        // that is worth, and how often it may be acted on, is the host's business.
+        _context?.requestSync();
     }
   }
 

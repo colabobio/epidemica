@@ -33,6 +33,22 @@ object ProximityEvents {
         flush()
     }
 
+    /**
+     * Deliver an event only if Dart is listening, and drop it otherwise.
+     *
+     * For events that carry no evidence, such as a background wake. Buffering one would cost a
+     * detection its place in a fixed-capacity buffer, and an overflow there is reported as lost
+     * observation -- so a stream of ephemeral notices would show up in the record as missing data.
+     * A wake nobody is awake to hear is worth nothing anyway.
+     */
+    fun offer(event: Map<String, Any?>) {
+        val target = sink ?: return
+        main.post {
+            if (sink !== target) return@post
+            target.success(event)
+        }
+    }
+
     private fun flush() {
         val target = sink ?: return
         main.post {
@@ -51,4 +67,9 @@ object ProximityEvents {
             for (event in drained.events) target.success(event)
         }
     }
+
+    /** What is waiting for a listener. Exists so a test can tell `emit` from `offer`. */
+    internal fun bufferedForTest(): Int = buffer.size()
+
+    internal fun drainForTest(): DetectionBuffer.Drained = buffer.drain()
 }

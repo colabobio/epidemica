@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:epidemica_core/epidemica_core.dart';
@@ -43,6 +44,7 @@ class StudyController extends ChangeNotifier {
       client: IngestClient(baseUri: this.baseUri, tokens: _tokens, httpClient: _http),
     );
     _states = StateChannel(baseUri: this.baseUri, db: _db, tokens: _tokens, httpClient: _http);
+    _throttle = SyncThrottle(floor: syncFloor);
   }
 
   /// Always ends in a slash.
@@ -68,6 +70,15 @@ class StudyController extends ChangeNotifier {
   late final EnrollmentService _enrollments;
   late final SyncService _sync;
   late final StateChannel _states;
+  late final SyncThrottle _throttle;
+
+  /// The shortest interval between syncs a platform trigger can produce, whatever a study asks.
+  ///
+  /// Background wakes are offers rather than a schedule, and on iOS they arrive on a BLE detection
+  /// — so in a crowded room they arrive constantly. A study's own `sync.min_interval_seconds` can
+  /// extend this but never shorten it: how hard a phone may be worked is a property of the device,
+  /// not of the research question.
+  static const Duration syncFloor = Duration(minutes: 5);
 
   Enrollment? _enrollment;
   final Set<String> _running = {};
@@ -223,6 +234,7 @@ class StudyController extends ChangeNotifier {
             ),
             store: DatabaseModuleStore(db: _db, moduleId: module.id),
             studyStartsAt: enrollment.bundle.startsAt,
+            requestSync: _requestSync,
           ),
         );
         _running.add(module.id);
@@ -256,6 +268,27 @@ class StudyController extends ChangeNotifier {
     if (report.error != null) _message = '${report.error}';
     notifyListeners();
     return report;
+  }
+
+  /// Syncs only if enough time has passed since the last one, and says whether it did.
+  ///
+  /// For triggers that fire when the platform decides rather than when anyone chose: a background
+  /// wake, a service tick. [sync] is for a schedule somebody owns; this is for everything that
+  /// could otherwise fire as fast as a device sees another device.
+  Future<bool> syncThrottled() => _throttle.run(sync, _enrollment?.bundle.minSyncInterval);
+
+  /// The shortest interval a platform trigger can currently produce a sync at.
+  ///
+  /// [syncFloor], extended by the study's own `sync.min_interval_seconds` when it declares a longer
+  /// one. Exposed so an interface can say how often a device actually uploads rather than implying
+  /// it is continuous.
+  Duration get effectiveSyncFloor => _throttle.effectiveFloor(_enrollment?.bundle.minSyncInterval);
+
+  /// What a module is handed. Nothing may propagate out of it: a module offering an upload
+  /// opportunity is not making a request that can fail, and a wake that arrives while the network
+  /// is down must not become an unhandled error in a stream callback.
+  void _requestSync() {
+    unawaited(syncThrottled().catchError((Object _) => false));
   }
 
   /// Stops collection and removes everything held locally.

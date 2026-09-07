@@ -10,7 +10,9 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
@@ -47,6 +49,15 @@ class ProximityService : Service() {
         const val EXTRA_CHANNEL_DESCRIPTION = "notification_channel_description"
 
         private val instance = AtomicReference<ProximityService?>()
+
+        /**
+         * How often a running service tells Dart it could upload now.
+         *
+         * A floor, not a schedule: this is posted to the main looper, which does not hold a
+         * wakelock, so under Doze it fires whenever the device next wakes rather than on time.
+         * Dart applies its own floor on top, and neither is under the study's control to shorten.
+         */
+        private const val WAKE_INTERVAL_MS = 5 * 60 * 1000L
 
         fun isRunning(): Boolean = instance.get()?.sensorArray != null
 
@@ -87,6 +98,7 @@ class ProximityService : Service() {
 
         if (!goToForeground(intent)) return START_NOT_STICKY
         startSensing(pseudonym, serviceUuid)
+        scheduleWakes()
 
         // START_STICKY so the system restarts sensing after killing us for memory. The restart
         // arrives with a null intent, which is why an unconfigured start stops rather than guesses.
@@ -95,8 +107,24 @@ class ProximityService : Service() {
 
     override fun onDestroy() {
         stopSensing()
+        main.removeCallbacks(wake)
         instance.compareAndSet(this, null)
         super.onDestroy()
+    }
+
+    private val main = Handler(Looper.getMainLooper())
+
+    private val wake = object : Runnable {
+        override fun run() {
+            ProximityEvents.offer(mapOf("type" to "wake"))
+            main.postDelayed(this, WAKE_INTERVAL_MS)
+        }
+    }
+
+    // A restart after the system killed us can arrive with the previous callback still pending.
+    private fun scheduleWakes() {
+        main.removeCallbacks(wake)
+        main.postDelayed(wake, WAKE_INTERVAL_MS)
     }
 
     private fun goToForeground(intent: Intent): Boolean {

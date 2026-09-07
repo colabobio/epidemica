@@ -18,11 +18,13 @@ void main() {
   late MemoryStore store;
   late List<Map<String, Object?>> recorded;
   late DateTime now;
+  late int syncRequests;
 
   setUp(() {
     platform = FakePlatform();
     store = MemoryStore();
     recorded = [];
+    syncRequests = 0;
     now = DateTime.now().toUtc();
   });
 
@@ -33,6 +35,7 @@ void main() {
     studyId: '2f1b8c4e-0000-4000-8000-000000000001',
     subject: subject,
     store: store,
+    requestSync: () => syncRequests++,
     record:
         ({
           required String schemaUri,
@@ -160,8 +163,57 @@ void main() {
     });
   });
 
-  group('the snapshot', () {
-    test('is written under one key, so a restart knows where to look', () async {
+  group('a background wake', () {
+    test('asks the host to sync, without deciding anything itself', () async {
+      final module = ProximityModule(platform: platform);
+      await module.start(context());
+
+      platform.emit(const ProximityWake());
+      await Future<void>.delayed(Duration.zero);
+
+      expect(syncRequests, 1);
+    });
+
+    test('is not an observation', () async {
+      final module = ProximityModule(platform: platform);
+      await module.start(context());
+
+      platform.emit(const ProximityWake());
+      await Future<void>.delayed(Duration.zero);
+
+      // A wake says the process is running, not that anything was seen. Recording one would put a
+      // fiction in the outbox, and it must not disturb an encounter in progress either.
+      expect(recorded, isEmpty);
+      expect(store.values, isEmpty);
+    });
+
+    test('every offer is passed on: the floor is the host\'s to apply, not the module\'s', () async {
+      final module = ProximityModule(platform: platform);
+      await module.start(context());
+
+      for (var i = 0; i < 5; i++) {
+        platform.emit(const ProximityWake());
+      }
+      await Future<void>.delayed(Duration.zero);
+
+      // Rate limiting here as well would be a second floor nobody could see from the host, and two
+      // limits that disagree are worse than one that is occasionally generous.
+      expect(syncRequests, 5);
+    });
+
+    test('after stop, a late wake asks for nothing', () async {
+      final module = ProximityModule(platform: platform);
+      await module.start(context());
+      await module.stop();
+
+      platform.emit(const ProximityWake());
+      await Future<void>.delayed(Duration.zero);
+
+      expect(syncRequests, 0);
+    });
+  });
+
+  group('the snapshot', () {    test('is written under one key, so a restart knows where to look', () async {
       final module = ProximityModule(platform: platform);
       await module.start(context());
       await observe([300, 240]);
