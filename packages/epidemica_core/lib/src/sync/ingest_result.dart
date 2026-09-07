@@ -130,11 +130,17 @@ class IngestResult {
 class IngestWatermark {
   const IngestWatermark({required this.highestContiguousSeq, required this.serverTime});
 
-  final int highestContiguousSeq;
+  /// Everything at or below this has been delivered, so it is safe to prune.
+  ///
+  /// Null when the server cannot vouch for an unbroken run from the start of this device's stream,
+  /// which is a different statement from zero: `seq` 0 is a real observation, and treating "cannot
+  /// say" as "the first one" is how a pruning client would delete something still owed.
+  final int? highestContiguousSeq;
+
   final DateTime serverTime;
 
   static IngestWatermark fromJson(Map<String, Object?> json) => IngestWatermark(
-    highestContiguousSeq: (json['highest_contiguous_seq'] as num?)?.toInt() ?? 0,
+    highestContiguousSeq: (json['highest_contiguous_seq'] as num?)?.toInt(),
     serverTime: DateTime.parse(json['server_time']! as String).toUtc(),
   );
 }

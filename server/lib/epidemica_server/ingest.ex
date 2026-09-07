@@ -328,15 +328,24 @@ defmodule EpidemicaServer.Ingest do
     }
   end
 
-  defp highest_contiguous([]), do: nil
-  defp highest_contiguous([first | _]) when first != 0, do: nil
+  # A device's stream begins at whatever `seq` it first allocated, which the server is never told.
+  # Both origins a fresh counter can have are accepted: the envelope permits 0, and the reference
+  # client's outbox is SQLite `AUTOINCREMENT`, whose first row is 1. Assuming one of them is how
+  # this endpoint came to answer `nil` for every real device.
+  #
+  # A run starting higher is refused rather than read as an already-pruned prefix. It cannot be
+  # told apart from a client whose earlier batch failed while a later one succeeded, and answering
+  # there would tell that client to discard observations it still owes.
+  @seq_origins [0, 1]
 
-  defp highest_contiguous(seqs) do
-    Enum.reduce_while(seqs, nil, fn seq, acc ->
+  defp highest_contiguous([]), do: nil
+  defp highest_contiguous([first | _]) when first not in @seq_origins, do: nil
+
+  defp highest_contiguous([first | rest]) do
+    Enum.reduce_while(rest, first, fn seq, acc ->
       cond do
-        acc == nil and seq == 0 -> {:cont, 0}
-        acc != nil and seq == acc + 1 -> {:cont, seq}
-        acc != nil and seq == acc -> {:cont, acc}
+        seq == acc + 1 -> {:cont, seq}
+        seq == acc -> {:cont, acc}
         true -> {:halt, acc}
       end
     end)

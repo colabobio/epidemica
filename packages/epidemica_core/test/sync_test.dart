@@ -6,6 +6,7 @@ import 'package:epidemica_core/src/db/database.dart';
 import 'package:epidemica_core/src/outbox.dart';
 import 'package:epidemica_core/src/sync/backoff.dart';
 import 'package:epidemica_core/src/sync/ingest_client.dart';
+import 'package:epidemica_core/src/sync/ingest_result.dart';
 import 'package:epidemica_core/src/sync/sync_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -382,6 +383,28 @@ void main() {
 
       expect(report.delivered, 500);
       expect(outbox.pendingCount(), 0);
+    });
+  });
+
+  group('the delivery watermark', () {
+    test('a server that cannot vouch for an unbroken run says so, rather than zero', () {
+      // Null and zero are different answers: seq 0 is a real observation, so a client that read
+      // "cannot say" as "the first one is safe" would prune something it still owes.
+      final mark = IngestWatermark.fromJson({
+        'highest_contiguous_seq': null,
+        'server_time': '2026-09-02T12:00:00Z',
+      });
+
+      expect(mark.highestContiguousSeq, isNull);
+    });
+
+    test('a stated mark is read as given', () {
+      final mark = IngestWatermark.fromJson({
+        'highest_contiguous_seq': 0,
+        'server_time': '2026-09-02T12:00:00Z',
+      });
+
+      expect(mark.highestContiguousSeq, 0);
     });
   });
 

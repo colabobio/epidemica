@@ -67,7 +67,8 @@
     "seq": {
       "type": "integer",
       "minimum": 0,
-      "description": "Monotonic counter per device install, allocated in the same transaction as the outbox insert. With device_id it forms the idempotency key. It does NOT reset per study, so a device in two studies produces one interleaved stream: max(seq) is not a per-study observation count, and within-study gaps are expected. Count rows; never infer counts from seq."
+      "description": "Monotonic counter per device install, allocated in the same transaction as the outbox insert. With device_id it forms the idempotency key. It does NOT reset per study, so a device in two studies produces one interleaved stream: max(seq) is not a per-study observation count, and within-study gaps are expected. Count rows; never infer counts from seq.",
+      "$comment": "The first value a device allocates may be 0 or 1, and nothing may assume which. The reference client's outbox is a SQLite AUTOINCREMENT column, whose first row is 1; the minimum here is a bound on the field, not a declaration of where a stream starts."
     },
     "payload": {
       "type": "object",

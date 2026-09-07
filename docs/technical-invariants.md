@@ -641,7 +641,7 @@ Counts are test declarations, not assertions.
 | Module | File | Rating |
 |---|---|---|
 | `Contracts` | `contracts_test.exs` (8) — every fixture, and every known URI resolves to a file on disk | ✅ |
-| `Ingest` | `ingest_test.exs` (17) + `ingest_api_test.exs` (14) — outcomes, idempotency incl. partial retry, batch binding on all three identifiers, gzip, watermark | ✅ |
+| `Ingest` | `ingest_test.exs` (21) + `ingest_api_test.exs` (14) — outcomes, idempotency incl. partial retry, batch binding on all three identifiers, gzip, watermark at both stream origins | ✅ |
 | `Projections` | `projections_test.exs` (7) — idempotence, rebuild equality, quarantine exclusion | ✅ |
 | `Reconciliation` | `reconciliation_test.exs` (12) — union not sum, better-observed side, tie-break, upload order, late arrival | ✅ |
 | `Health` | `health_test.exs` (11) — union, clipping, never-heard-from, wrong module | ✅ |
@@ -810,14 +810,18 @@ publishing concurrently with a protect tap can lose one of the two changes.
 *Enforced?* No. *Likelihood?* Low (single-digit participants, minute-scale polling), rising with
 cohort size.
 
-**F13 — `seq` origin disagrees across languages.**
+**F13 — ~~`seq` origin disagrees across languages.~~ FIXED 2026-09-06.**
 Dart's outbox is `INTEGER PRIMARY KEY AUTOINCREMENT`, so the first `seq` is **1**. Elixir's
-`Ingest.highest_contiguous/1` returns `nil` unless the first stored seq is **0**
-(`defp highest_contiguous([first | _]) when first != 0, do: nil`). Its test renumbers fixtures from
-0. So `GET /v1/observations/ack` returns `highest_contiguous_seq: null` for every real client.
-Currently harmless — `SyncService` never calls `watermark()`, and the Dart parser defaults the field
-to 0 — but it is a live cross-language mismatch and the exact failure class this audit exists to
-prevent.
+`Ingest.highest_contiguous/1` returned `nil` unless the first stored seq was **0**, and its test
+renumbered fixtures from 0 — so `GET /v1/observations/ack` answered `null` for every real client,
+and the test that was supposed to catch it agreed with the bug.
+
+The server no longer assumes an origin it was never told: `@seq_origins [0, 1]` accepts either, and
+refuses a run beginning higher rather than reading it as an already-pruned prefix, because that
+cannot be told apart from a client whose earlier batch failed while a later one succeeded.
+`IngestWatermark.highestContiguousSeq` is now `int?` instead of defaulting null to 0, which had
+conflated "cannot say" with "seq 0 is safe to prune".
+*Still latent:* nothing calls `watermark()`. The endpoint is now correct for when something does.
 
 ### Platform-specific
 
@@ -881,7 +885,7 @@ no confirmation and no study scoping by default.
 | **D8** | `studies/epigame-debug/README.md`: "Coverage… the twin requires coverage of at least `coverage_threshold` (0.5)" | **FIXED 2026-09-06.** One threshold, in the twin block, default 0.5 (§5-F4) | Now agree | Was yes; resolved |
 | **D15** | `contracts/bundle/1.0.0.json` requires `schedule.days`, with an explicit negative fixture *"a schedule with no end"*, and the schedule description says open-ended means omitting `schedule` entirely | The server supports a **scheduled but endless** study: `Studies.scheduled_days/1` returns nil for an absent key, `days_to_catch_up/2` counts past any declared length, `Twin.ensure_in_schedule/2` allows `days == nil`, and `state/epigame`'s `days_total` is nullable so the app renders it. That shape is not expressible in a valid bundle | **Undecided — needs a call.** Either the schema should let `days` be omitted, or the server should stop supporting the shape. Not resolved here, because reversing a deliberate contract decision as a side effect of another change is how the drift this document exists to prevent happens | Moderate. Today it is unreachable through registration, so it is latent rather than active. The test that covers it now builds the study through `Studies.create_study/1` and says so |
 | **D9** | M1: "Rejected observations moved to a local dead-letter store, **surfaced**, never silently deleted" | The store, `surfaced` column and `markSurfaced` all exist. `StudyController` exposes `deadLetterCount`; **no UI in either app displays it** | **Code** — stored and inspectable, not surfaced | Low |
-| **D10** | ADR-0002 / M1: "`GET /observations/ack` returns the highest contiguous seq" | Always `null` for real clients (§5-F13), and nothing calls it | **Code** | Low today, high once pruning depends on it |
+| **D10** | ADR-0002 / M1: "`GET /observations/ack` returns the highest contiguous seq"; the OpenAPI spec said "every `seq` from 0 to `s`" | **FIXED 2026-09-06.** The server accepts either origin a fresh counter can have, and both contracts now say that a stream may begin at 0 or 1 and nothing may assume which (§5-F13) | Now agree | Was low; resolved before anything depended on it |
 | **D11** | M2 acceptance: "No participant's score ever changes retroactively" | True while a study runs. `mix epidemica.reset_study` deletes ledger, awards, ticks and published state, and a replay can score differently (§5-F5) | Both — the task is explicitly not-for-production and says so | No |
 | **D12** | `docs/concepts/state-channel.md`: "`revision` is allocated by the database in the same statement as the write, so two writers cannot both see revision 4" | True — `insert_all` with `inc: [revision: 1]`. But the **`state` map** is read-modify-write in three places (§5-F12), which the doc does not mention | **Code** — the doc's claim is correct and narrower than it reads | Moderate |
 | **D13** | Task 0002: "Oban workers exist but nothing enqueues them" | Confirmed exactly. Recorded here because it is easy to mistake `Twin.Worker` for a live scheduler | Both agree | **Yes** — a deployment without `watch mix epidemica.tick` collects data and decides nothing |
@@ -913,16 +917,17 @@ ones that are only aspirational.
     `Studies.coverage_threshold/1`.
 13. In-flight encounters are checkpointed to the module's own store and restored on start. An
     episode is never in both the outbox and the snapshot.
+14. A device's `seq` stream may begin at 0 or 1. Nothing may assume which — the server accepts
+    either and refuses to guess at anything higher.
 
 **Believed but not enforced — do not rely on these without adding the check.**
 
-14. A module must not depend on `epidemica_core` (`epidemica_survey` already breaks it).
-15. Bundles are schema-valid **on the device** (`ProtocolBundle.parse` reads five keys and trusts
+15. A module must not depend on `epidemica_core` (`epidemica_survey` already breaks it).
+16. Bundles are schema-valid **on the device** (`ProtocolBundle.parse` reads five keys and trusts
     the rest), and for studies inserted through `Studies.create_study/1` rather than from a bundle.
-16. A failed tick leaves no state (it leaves roster and seeding).
-17. Settlement is reproducible from the stored tick (coverage is recomputed live).
-18. Ticks run by themselves (nothing enqueues them).
-19. `seq` starts at 0 (Dart starts it at 1).
+17. A failed tick leaves no state (it leaves roster and seeding).
+18. Settlement is reproducible from the stored tick (coverage is recomputed live).
+19. Ticks run by themselves (nothing enqueues them).
 20. A test fixture's dates stay meaningful (two carry-over tests silently stopped testing anything
     on 2026-09-06, because they defaulted an observation's arrival to `utc_now()` and carry-over
     only reaches back `carry_over_days`). Prefer stated instants over the wall clock.

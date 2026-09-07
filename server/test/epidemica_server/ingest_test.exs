@@ -30,9 +30,13 @@ defmodule EpidemicaServer.IngestTest do
 
   # Fixtures reuse the same seq, which is realistic for illustrating a schema but not for a batch,
   # where seq is the idempotency key. Renumbering keeps each fixture a distinct observation.
-  defp renumbered(envelopes) do
+  #
+  # `from:` because a device's stream may begin at 0 or 1 and nothing may assume which. Numbering
+  # every test from 0 is what let the watermark answer `nil` for every real client, whose outbox is
+  # a SQLite AUTOINCREMENT column and therefore starts at 1.
+  defp renumbered(envelopes, from \\ 0) do
     envelopes
-    |> Enum.with_index()
+    |> Enum.with_index(from)
     |> Enum.map(fn {envelope, i} ->
       if is_map(envelope), do: Map.put(envelope, "seq", i), else: envelope
     end)
@@ -202,6 +206,39 @@ defmodule EpidemicaServer.IngestTest do
 
       assert mark.highest_seq == 3
       assert mark.highest_contiguous_seq == 1
+    end
+
+    test "a stream that starts at one is answered, not refused" do
+      # The reference client's outbox is `INTEGER PRIMARY KEY AUTOINCREMENT`, whose first row is 1.
+      # A server anchored on 0 answers `nil` here, which is every real device.
+      envelopes = renumbered(fixtures("valid"), 1)
+
+      {:ok, _} = Ingest.submit(auth(), envelopes)
+      mark = Ingest.watermark(auth())
+
+      assert mark.highest_seq == length(envelopes)
+      assert mark.highest_contiguous_seq == length(envelopes)
+    end
+
+    test "a gap is honoured whichever origin the stream has" do
+      [a, b, _c, d] = renumbered(fixtures("valid"), 1)
+
+      # 1, 2 and 4 delivered; 3 never arrived.
+      {:ok, _} = Ingest.submit(auth(), [a, b, d])
+      mark = Ingest.watermark(auth())
+
+      assert mark.highest_seq == 4
+      assert mark.highest_contiguous_seq == 2
+    end
+
+    test "a run that starts higher than a counter can is refused rather than guessed at" do
+      # Indistinguishable from a client whose earlier batch failed while a later one succeeded.
+      # Answering would tell it to prune observations it still owes.
+      {:ok, _} = Ingest.submit(auth(), renumbered(fixtures("valid"), 5))
+      mark = Ingest.watermark(auth())
+
+      assert mark.highest_seq == 8
+      assert mark.highest_contiguous_seq == nil
     end
 
     test "is empty for a device that has sent nothing" do

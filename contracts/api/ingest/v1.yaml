@@ -314,9 +314,15 @@ components:
         highest_contiguous_seq:
           type: [integer, "null"]
           description: |
-            The largest `s` for which every `seq` from 0 to `s` has been received. This, not
-            `highest_seq`, is what a client may safely prune below: a gap means something in between
-            never arrived.
+            The largest `s` for which every `seq` from the start of this device's stream to `s` has
+            been received. This, not `highest_seq`, is what a client may safely prune below: a gap
+            means something in between never arrived.
+
+            Null when the server cannot vouch for an unbroken run from the start. A device's first
+            `seq` may be 0 or 1 and the server is never told which, so a run beginning any higher
+            is reported as null rather than assumed to be an already-pruned prefix — it cannot be
+            told apart from a client whose earlier batch failed while a later one succeeded, and
+            answering would tell that client to discard observations it still owes.
         highest_seq:
           type: [integer, "null"]
           description: Largest `seq` received, gaps included. A gap between this and
