@@ -17,6 +17,8 @@ dependencies:
     path: ../../packages/epidemica_proximity_module
   epidemica_survey:
     path: ../../packages/epidemica_survey
+  epidemica_survey_module:
+    path: ../../packages/epidemica_survey_module
   flutter:
     sdk: flutter
   http: ^1.2.2

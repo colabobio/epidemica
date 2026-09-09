@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:epidemica_core/epidemica_core.dart';
 import 'package:epidemica_proximity_module/epidemica_proximity_module.dart';
 import 'package:epidemica_survey/epidemica_survey.dart';
+import 'package:epidemica_survey_module/epidemica_survey_module.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';

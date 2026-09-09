@@ -1,0 +1,25 @@
+name: epidemica_survey_module
+description: >-
+  Scheduled instruments as an Epidemica app capability: decides when one is due, hands it to the
+  app to present, and records the response as an observation. The adapter between epidemica_survey
+  and the platform, kept separate so the instrument model stays usable without an outbox.
+version: 0.1.0
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.9.0
+  flutter: ">=3.29.0"
+
+dependencies:
+  epidemica_core:
+    path: ../epidemica_core
+  epidemica_survey:
+    path: ../epidemica_survey
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter

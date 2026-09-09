@@ -36,6 +36,16 @@ defmodule EpidemicaServer.ScheduleTest do
 
   defp seven_days, do: study(%{"starts_at" => "2026-09-07T06:00:00Z", "days" => 7})
 
+  # A study whose first day is still running, whenever the suite happens to be run. Stating the
+  # instant would only be true until that date passed, and the test would then assert nothing while
+  # still going green.
+  defp starting_soon do
+    study(%{
+      "starts_at" => DateTime.utc_now() |> DateTime.add(3600, :second) |> DateTime.to_iso8601(),
+      "days" => 7
+    })
+  end
+
   defp stub do
     fn inputs ->
       {:ok,
@@ -243,7 +253,7 @@ defmodule EpidemicaServer.ScheduleTest do
     end
 
     test "a day that has not finished yet is refused" do
-      s = seven_days()
+      s = starting_soon()
       Repo.insert!(%Participant{study_id: s.id, subject: "alice-0001", enrolled_at: @starts_at})
 
       # The schedule starts in the future, so day 1 has not happened. Ticking it would settle a day
@@ -253,7 +263,7 @@ defmodule EpidemicaServer.ScheduleTest do
     end
 
     test "a demonstration can tick an unfinished day on purpose" do
-      s = seven_days()
+      s = starting_soon()
       Repo.insert!(%Participant{study_id: s.id, subject: "alice-0001", enrolled_at: @starts_at})
 
       assert {:ok, _} = Twin.run_tick(s.id, 1, allow_incomplete: true, runner: stub())

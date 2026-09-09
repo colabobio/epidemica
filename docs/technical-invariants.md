@@ -91,7 +91,8 @@ graph TD
   prox[epidemica_proximity]
   core[epidemica_core]
   proxmod[epidemica_proximity_module]
-  surv["epidemica_survey ⚠"]
+  surv[epidemica_survey]
+  survmod[epidemica_survey_module]
   epigames[apps/epigames]
   template[apps/template]
 
@@ -99,24 +100,21 @@ graph TD
   ios --> pi
   prox --> pi & and & ios
   proxmod --> core & prox
-  surv --> core
-  epigames --> core & proxmod & surv
+  survmod --> core & surv
+  epigames --> core & proxmod & surv & survmod
   template --> core & proxmod
-
-  style surv fill:#ffe6e6,stroke:#c00
 ```
 
 `epidemica_core` depends on **no** Epidemica package. That is the load-bearing rule and it holds.
 
-**⚠ The one violation.** `docs/concepts/modules.md` ("What a module must not do") and ADR-0001 rule 2
-state that a module must not depend on `epidemica_core`. The proximity stack obeys this by splitting
-in two — `epidemica_proximity` (pure sensing, no core) plus `epidemica_proximity_module` (the glue
-that knows about `EmbeddedModule` and the outbox). **`epidemica_survey` does not split.** It is a
-single package that `implements EmbeddedModule`, depends on `epidemica_core`, and additionally ships
-Flutter UI (`lib/src/survey_screen.dart`). Nothing enforces the rule, so nothing caught it.
+**The two-package pattern.** Every capability is a pair: a package holding the domain logic that
+must not name `epidemica_core`, and a thin adapter that `implements EmbeddedModule` and may.
+ADR-0001 rule 2 permits a module to depend on core; the pattern narrows *where in a module* it may,
+so the epidemiologically load-bearing logic stays testable and adoptable without an outbox.
 
-This is the clearest instance of the drift described in the audit brief: the survey package was added
-without the two-package pattern the proximity stack established.
+`epidemica_survey` was a single package doing both until 2026-09-09; it is now split into
+`epidemica_survey` and `epidemica_survey_module`, matching proximity. All four rules above are now
+enforced by `analysis/tests/test_package_boundaries.py`.
 
 ### 1.1 `epidemica_core` ↔ a module
 
@@ -670,19 +668,25 @@ Counts are test declarations, not assertions.
 | `analysis/test_contracts.py` (15 parametrised over every schema) | schemas valid, `$id` matches path, objects closed, fixtures pass/fail with reasons | ✅ |
 | `analysis/test_openapi.py` (18) | the ingest spec's *semantics*, incl. subject-pattern agreement with the envelope | ✅ |
 | `analysis/test_studies.py` (4) | bundles validate; **`studies/` contains no code** (Tier 1, mechanically) | ✅ |
+| `analysis/test_package_boundaries.py` (27) | core depends on nothing; graph acyclic; no cross-package `src/` imports; workspace membership; no module shares a package with another; only glue packages name core | ✅ |
 
 ### What is not tested
 
-**Boundary invariants from §1 — ❌ essentially none.**
+**Boundary invariants from §1 — ✅ since 2026-09-09.**
+`analysis/tests/test_package_boundaries.py` enforces that `epidemica_core` depends on no Epidemica
+package, that the graph is acyclic and resolves within the workspace, that no package reaches into
+another's `src/` (ADR-0001 rule 5), that every package is a workspace member, that no two modules
+share a package (ADR-0001 rule 2), and that only a package implementing `EmbeddedModule` may name
+`epidemica_core`.
 
-- No test asserts `epidemica_core` depends on no module.
-- No test asserts a module does not depend on `epidemica_core` — which is why the
-  `epidemica_survey` violation is live.
+Still unenforced:
+
 - No test asserts `ModuleContext.config` is only that module's block.
 - No test asserts `ModuleState.toJson()` matches the `module_status` enum.
 - No test asserts the module `id` literals agree across Dart, the bundle and Elixir.
-- ADR-0001 rule 5 (an app copied outside the workspace still builds) is claimed as tested at M1;
-  **no such test exists in the tree.**
+- ADR-0001 rule 5's own suggested check — an app copied outside the workspace still builds — is
+  claimed as tested at M1; **no such test exists.** The `src/` check above is a cheaper proxy for
+  part of it.
 
 **State transitions from §2 — ⚠ mixed.** Enrolment, sync, tick and settlement are well covered.
 Untested: the orphaned-enrolment path after a module-check refusal; token revocation other than by
@@ -893,7 +897,7 @@ no confirmation and no study scoping by default.
 |---|---|---|---|---|
 | **D1** | `docs/concepts/building-a-study.md`: "The bundle is validated against `contracts/bundle/1.0.0.json`" | **FIXED 2026-09-06.** `Studies.create_study_from_bundle/2` now validates against the compiled schema before inserting, so the doc's claim is true of the runtime as well as of CI. Still unvalidated: `ProtocolBundle.parse` on the device (reads 5 keys), and `Studies.create_study/1` used directly | Now agree | Was yes; resolved |
 | **D2** | `docs/milestones/m1`, `docs/concepts/proximity.md`: "Detections in-flight persisted to survive process death — `OpenEpisodeStore` with a SQLite implementation" | **FIXED 2026-09-06.** `ModuleStoreEpisodeStore` in `epidemica_proximity_module` implements it over `context.store`, which is SQLite-backed via `DatabaseModuleStore`. The adapter lives in the glue package because it is the only one allowed to see both `epidemica_core` and `epidemica_proximity` | Now agree | Was yes; resolved |
-| **D3** | ADR-0001 rule 2 and `docs/concepts/modules.md`: "A module does not depend on `epidemica_core`" | `epidemica_survey` depends on `epidemica_core`, implements `EmbeddedModule`, and ships UI | **The doc** — this is a real violation, not an outdated rule. The proximity two-package split is the pattern to follow | **Yes.** It is the boundary the next agent will copy |
+| **D3** | ADR-0001 rule 2: "A module **may** depend on `epidemica_core` and on contracts; it may not depend on another sibling module." `docs/concepts/modules.md`: "What a module must not do: **Depend on `epidemica_core`**" — and "the adapter… lives in the **app**, not in the module package" | The code does neither. The adapter lives in a shared glue package (`epidemica_proximity_module`), which no document described: better than in the app, because a second app would otherwise copy it, and permitted by the ADR | **The ADR and the code.** `modules.md` was stale, and its rule also forbade what the proximity stack has always done. **FIXED 2026-09-09:** `modules.md` now documents the two-package pattern, and `epidemica_survey` has been split to match. My original audit entry called this a code violation; that was a misreading of a concept doc that contradicted the accepted ADR | Was moderate; resolved. The lesson is the one this document exists for: check the ADR before the prose |
 | **D4** | ADR-0012: "`EpidemicaNetwork(ss.Network)` materialises contact episodes as a dynamic edge list"; the M2 docs describe it as the bridge | Two independent bridges exist. `models/network.py:ContactNetwork` (+ `cohort.py:OpenCohort`) does per-timestep apportionment and `max`/`mean`/`sum` reconciliation; **production `twin.py` uses `ss.StaticNet()` and overwrites `net.edges` directly**, taking already-reconciled edges from Elixir. `twin.py` imports nothing from `network.py` except the shared weights | **Code**, for the runtime. `ContactNetwork` is the analysis/spike bridge and remains valid for offline work | **Yes.** `test_network.py` (12 tests) defends a path production never runs; reading it as coverage of the tick is a mistake |
 | **D5** | ADR-0001 rule 5 / M1: "Tier 2 test: `apps/template` copied outside the workspace must build" — listed as implemented at M1 | No such test, script or CI job exists | **The doc** describes the right check; it is absent | Moderate — path-based workspace deps would fail exactly this way |
 | **D6** | M2 milestone: "A tick that fails leaves no partial state" | True of `twin_ticks`; **false of `twin_agents`** (§5-F3) | **Code** | Moderate — self-healing in practice because seeding and slot allocation are idempotent |
@@ -938,10 +942,12 @@ ones that are only aspirational.
 15. A wake is not an observation. It is delivered only to an attached listener and never buffered,
     because buffering it would evict a detection and the record reports that as lost data.
 16. Only `StudyController` decides whether a sync happens. A module asks; it does not schedule.
+17. A capability package must not name `epidemica_core`; only its `EmbeddedModule` adapter may.
+    Enforced by `analysis/tests/test_package_boundaries.py`, along with the rest of ADR-0001's
+    package rules.
 
 **Believed but not enforced — do not rely on these without adding the check.**
 
-17. A module must not depend on `epidemica_core` (`epidemica_survey` already breaks it).
 18. Bundles are schema-valid **on the device** (`ProtocolBundle.parse` reads five keys and trusts
     the rest), and for studies inserted through `Studies.create_study/1` rather than from a bundle.
 19. A failed tick leaves no state (it leaves roster and seeding).
@@ -956,8 +962,9 @@ ones that are only aspirational.
     `AppLifecycleState`, so up to one sweep interval of in-flight state is still lost on iOS
     suspension. Call `ProximityModule.sweep()` from a lifecycle observer to close that window.
 
-**Before adding a module**, copy the proximity two-package split: a pure package with no
-`epidemica_core` dependency and no UI, plus a thin glue package implementing `EmbeddedModule`.
+**Before adding a module**, copy the proximity or survey two-package split: a capability package with
+no `epidemica_core` dependency and no adapter in it, plus a thin package implementing
+`EmbeddedModule`. The boundary suite will fail if you do not.
 
 **Before adding anything that reads the contact network**, call `Projections.project_contacts/2`
 first, and decide explicitly whether you want `received_before:` pinned.

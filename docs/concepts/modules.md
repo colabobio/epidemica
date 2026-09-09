@@ -132,8 +132,28 @@ bundle, the outbox, the tokens, or another module's settings.
 That narrowness is doing work. A module that can read the whole bundle grows opinions about other
 modules' configuration, and the coupling stays invisible until two studies disagree.
 
-The adapter that connects a module to `epidemica_core` lives in the **app**, not in the module
-package — a sensing package has no business depending on a storage package.
+## Two packages, not one
+
+A module is written as a pair, and the split is where the boundary actually lives:
+
+| | Holds | May name `epidemica_core` |
+|---|---|---|
+| **The capability** — `epidemica_proximity`, `epidemica_survey` | The domain logic: episode aggregation, distance banding, instrument parsing, scheduling, presentation | **No** |
+| **The adapter** — `epidemica_proximity_module`, `epidemica_survey_module` | `implements EmbeddedModule`, and nothing else: start, stop, status, and the call that puts a payload in the outbox | Yes |
+
+ADR-0001 rule 2 permits a module to depend on `epidemica_core`; this narrows *where in a module* it
+may. The reason is not tidiness. The capability package is where the epidemiologically load-bearing
+logic lives, and it needs to be readable, testable and adoptable with no outbox, no tokens and no
+database in the picture — a sensing library that drags in a storage library cannot be any of those.
+The adapter is where the subtle bugs live instead, and it stays small enough to inspect.
+
+`analysis/tests/test_package_boundaries.py` enforces this: a package that names `epidemica_core`
+without implementing `EmbeddedModule` fails the suite. It also enforces ADR-0001 rule 2 proper — two
+modules may not share a package — and rule 5, that nothing reaches into another package's `src/`.
+
+An earlier version of this document said a module must not depend on `epidemica_core` at all, and
+that the adapter belonged in the app. Both were wrong: the first contradicts ADR-0001, and the
+second would put the same adapter in every app that used the module.
 
 ## The registry, and the failure it prevents
 
@@ -161,8 +181,8 @@ to withdraw, which the ingest contract does not yet have.
 
 ## What a module must not do
 
-- **Depend on `epidemica_core`.** Modules produce observations; they do not know how those reach a
-  server. The adapter is the app's job.
+- **Let the capability package depend on `epidemica_core`.** The adapter may; the logic it fronts
+  may not. See *Two packages, not one* above.
 - **Depend on another module.** If two modules need to share something, it belongs in a package
   below both of them, or in a contract.
 - **Read the whole bundle.** Take your own block.

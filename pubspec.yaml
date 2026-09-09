@@ -16,4 +16,5 @@ workspace:
   - packages/epidemica_proximity_ios
   - packages/epidemica_proximity_module
   - packages/epidemica_survey
+  - packages/epidemica_survey_module
   - packages/epidemica_proximity/example

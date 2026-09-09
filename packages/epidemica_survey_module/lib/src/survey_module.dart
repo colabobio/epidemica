@@ -2,12 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:epidemica_core/epidemica_core.dart';
+import 'package:epidemica_survey/epidemica_survey.dart';
 import 'package:flutter/foundation.dart';
-
-import 'instrument.dart';
-import 'instrument_source.dart';
-import 'response.dart';
-import 'schedule.dart';
 
 /// Delivers a study's scheduled instruments.
 ///
