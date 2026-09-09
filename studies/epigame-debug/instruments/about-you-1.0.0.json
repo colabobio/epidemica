@@ -1,0 +1,53 @@
+{
+  "instrument_version": "1.0",
+  "instrument_id": "about_you",
+  "version": "1.0.0",
+  "title": "About you",
+  "description": "Four questions, asked once when you join. Answers are stored under your random code, never your name.",
+  "language": "en",
+  "items": [
+    {
+      "item_id": "age_band",
+      "type": "single_choice",
+      "prompt": "Which age group are you in?",
+      "required": true,
+      "options": [
+        { "value": 0, "label": "Under 18" },
+        { "value": 18, "label": "18 to 24" },
+        { "value": 25, "label": "25 to 34" },
+        { "value": 35, "label": "35 to 49" },
+        { "value": 50, "label": "50 or over" },
+        { "value": -1, "label": "Prefer not to say" }
+      ]
+    },
+    {
+      "item_id": "role",
+      "type": "single_choice",
+      "prompt": "What brings you to this study?",
+      "options": [
+        { "value": "student", "label": "I am a student" },
+        { "value": "staff", "label": "I work here" },
+        { "value": "visitor", "label": "I am visiting" },
+        { "value": "other", "label": "Something else" }
+      ]
+    },
+    {
+      "item_id": "hours_on_campus",
+      "type": "single_choice",
+      "prompt": "On a normal weekday, how long are you on campus?",
+      "help": "This helps us read your contact counts against how much of the day you were around.",
+      "options": [
+        { "value": 0, "label": "Not at all" },
+        { "value": 2, "label": "A couple of hours" },
+        { "value": 5, "label": "About half the day" },
+        { "value": 8, "label": "A full day or more" }
+      ]
+    },
+    {
+      "item_id": "outbreak_concern",
+      "type": "likert",
+      "prompt": "Before starting, how concerned were you about catching an infection from someone nearby?",
+      "scale": { "min": 1, "max": 5, "min_label": "not at all", "max_label": "very concerned" }
+    }
+  ]
+}

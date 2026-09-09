@@ -31,6 +31,9 @@ class SurveyModule extends ChangeNotifier implements EmbeddedModule {
   /// days and nothing can disagree with the server about which day it is.
   DateTime? get startsAt => _context?.studyStartsAt;
 
+  /// When this participant joined, for instruments anchored to them rather than to the study.
+  DateTime? get enrolledAt => _context?.enrolledAt;
+
   /// The instrument waiting to be answered, once one has been loaded.
   Instrument? get pending => _pending;
   Instrument? _pending;
@@ -71,7 +74,7 @@ class SurveyModule extends ChangeNotifier implements EmbeddedModule {
     if (startsAt == null) {
       return const ModuleStatus(ModuleState.stopped, detail: 'study has no schedule');
     }
-    if (_schedule.anythingLeft(_now(), startsAt!, _completed)) {
+    if (_schedule.anythingLeft(_now(), startsAt!, enrolledAt, _completed)) {
       return const ModuleStatus(ModuleState.sensing);
     }
     return const ModuleStatus(ModuleState.stopped, detail: 'every instrument is done');
@@ -83,7 +86,7 @@ class SurveyModule extends ChangeNotifier implements EmbeddedModule {
     final start = startsAt;
     if (context == null || start == null) return;
 
-    final due = _schedule.dueAt(_now(), start, _completed);
+    final due = _schedule.dueAt(_now(), start, context.enrolledAt, _completed);
     if (due.isEmpty) {
       _set(pending: null, entry: null, problem: null);
       return;

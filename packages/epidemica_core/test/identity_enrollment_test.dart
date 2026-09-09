@@ -50,6 +50,7 @@ void main() {
     String? bundleBody,
     int bundleStatus = 200,
     String? protocolHash,
+    bool sendEnrolledAt = true,
   }) {
     final body = bundleBody ?? _bundleJson();
     return MockClient((request) async {
@@ -69,6 +70,7 @@ void main() {
           'expires_in': 3600,
           'refresh_token': 'refresh-1',
           'server_time': '2026-09-02T12:00:00Z',
+          if (sendEnrolledAt) 'enrolled_at': '2026-09-02T11:59:58.500000Z',
         }),
         201,
       );
@@ -161,6 +163,29 @@ void main() {
       expect(restored.bundle.configFor('proximity'), isNotEmpty);
     });
 
+    test('the moment of joining is kept, to the sub-second', () async {
+      final enrollment = await serviceWith(clientFor()).enroll('JOIN-1234');
+
+      expect(enrollment.enrolledAt, DateTime.utc(2026, 9, 2, 11, 59, 58, 500));
+      expect(
+        serviceWith(clientFor()).current()!.enrolledAt,
+        DateTime.utc(2026, 9, 2, 11, 59, 58, 500),
+        reason: 'it survives a restart like the rest of the enrollment',
+      );
+    });
+
+    test('an enrollment made before the app recorded joining is still an enrollment', () async {
+      // The upgrade path. Requiring the field would turn installing a new build into a silent
+      // un-enrolment for everyone already in a study, losing their place mid-collection.
+      await serviceWith(clientFor(sendEnrolledAt: false)).enroll('JOIN-1234');
+
+      final restored = serviceWith(clientFor()).current();
+
+      expect(restored, isNotNull);
+      expect(restored!.studyId, '11111111-2222-4333-8444-555555555555');
+      expect(restored.enrolledAt, isNull, reason: 'unknown, not invented');
+    });
+
     test('there is no enrollment before one is made', () {
       expect(serviceWith(clientFor()).current(), isNull);
     });
@@ -194,9 +219,7 @@ void main() {
 
   group('bundle satisfiability', () {
     test('a study needing a module this build lacks fails loudly', () async {
-      final client = clientFor(
-        bundleBody: _bundleJson(modules: ['proximity', 'biosensing']),
-      );
+      final client = clientFor(bundleBody: _bundleJson(modules: ['proximity', 'biosensing']));
 
       await expectLater(
         serviceWith(client, modules: {'proximity'}).enroll('JOIN-1234'),
@@ -323,9 +346,7 @@ void main() {
         now: () => now,
         httpClient: MockClient((_) async => http.Response('{}', 401)),
       );
-      await store.save(
-        StudyTokens(accessToken: 'a1', expiresAt: now, refreshToken: 'r1'),
-      );
+      await store.save(StudyTokens(accessToken: 'a1', expiresAt: now, refreshToken: 'r1'));
 
       await expectLater(store.refresh(), throwsA(isA<ReEnrollmentRequired>()));
       expect(await store.read(), isNull, reason: 'a dead token would only produce a retry loop');

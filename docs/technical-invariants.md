@@ -889,6 +889,19 @@ predecessor wrote. This is the *only* thing serialising ticks, and it is per-nod
 with a `nil` study id wipes every study's projection. It is rebuildable, so recoverable, but there is
 no confirmation and no study scoping by default.
 
+**F23 — Nothing checks a server response against `contracts/api/ingest/v1.yaml` at run time.** The
+spec's `EnrollmentResponse` is `additionalProperties: false`, and `analysis/tests/test_openapi.py`
+checks the document's shape, not the server's replies. So a field the server sends but the spec does
+not declare, or a field the device reads but the server stopped sending, is caught only by whichever
+test happens to assert on it. `Enrollment.enrolledAt` reads leniently for this reason: absent means
+unknown, and anything measuring from it declines to run rather than inventing a moment.
+
+**F24 — `enrolled_at` is a server instant interpreted against the device clock.** The device
+compares it to its own `now()` to decide whether an enrollment-anchored instrument is due. A device
+whose clock is badly wrong will therefore ask early or late. The same exposure the rest of the
+device-side scheduling has, and bounded by `window_seconds`, but it now affects a per-participant
+schedule rather than only a shared one.
+
 ---
 
 ## §6 Discrepancies between docs and code

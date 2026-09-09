@@ -43,6 +43,10 @@ defmodule EpidemicaServer.Enrollment do
             subject: participant.subject,
             study_id: join_code.study_id,
             arm: participant.arm,
+            # Anything a study times from joining rather than from its own start is measured against
+            # this. Set on first enrolment and returned unchanged afterwards, so a question about the
+            # participant does not reopen because they reinstalled.
+            enrolled_at: participant.enrolled_at,
             protocol_hash: join_code.study.protocol_hash,
             protocol_url: protocol_url(join_code.study_id),
             access_token: access,

@@ -40,6 +40,7 @@ class ModuleContext {
     required this.record,
     required this.store,
     this.studyStartsAt,
+    this.enrolledAt,
     this.requestSync = _ignoreSyncRequest,
   });
 
@@ -57,6 +58,13 @@ class ModuleContext {
   /// module times has to be timed against the same instant the server uses, or the two will
   /// disagree about when something was due.
   final DateTime? studyStartsAt;
+
+  /// When this participant joined, or null if that is not known.
+  ///
+  /// The other clock a module may time against. Which one is right depends on what is being timed:
+  /// something about the *study* belongs to [studyStartsAt] and a late joiner missed it, while
+  /// something about the *participant* belongs here and is owed to them whenever they arrived.
+  final DateTime? enrolledAt;
 
   /// Appends an observation to the outbox. Returns its sequence number.
   final ObservationRecorder record;

@@ -358,7 +358,7 @@ components:
 
     EnrollmentResponse:
       type: object
-      required: [subject, study_id, protocol_hash, protocol_url, access_token, token_type, expires_in, server_time]
+      required: [subject, study_id, protocol_hash, protocol_url, access_token, token_type, expires_in, enrolled_at, server_time]
       additionalProperties: false
       properties:
         subject: { type: string }
@@ -384,6 +384,18 @@ components:
           minimum: 1
           description: Access-token lifetime in seconds.
         refresh_token: { type: string }
+        enrolled_at:
+          allOf: [{ $ref: "#/components/schemas/UtcTimestamp" }]
+          description: |
+            When this participant joined, by the server's clock. Anything a study schedules from
+            joining rather than from the study's own start is measured against this: an instrument
+            about the *participant* — demographics, baseline beliefs — is owed to a late joiner
+            whenever they arrive, while one about the study belongs to the calendar and a late
+            joiner was never there for it.
+
+            Set once, on first enrolment. Re-enrolling after a reinstall returns the original
+            instant rather than a new one, so a baseline question does not reopen because a phone
+            was replaced.
         server_time: { $ref: "#/components/schemas/UtcTimestamp" }
 
     TokenRequest:

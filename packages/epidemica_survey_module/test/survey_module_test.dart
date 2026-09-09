@@ -77,9 +77,11 @@ void main() {
       List<Map<String, Object?>> entries,
       List<Map<String, Object?>> out, {
       DateTime? start,
+      DateTime? enrolledAt,
     }) => ModuleContext(
       config: {'instruments': entries},
       studyStartsAt: start ?? startsAt,
+      enrolledAt: enrolledAt,
       studyId: 'c0badf00-1111-4222-8333-444455556666',
       subject: 'alice-0001',
       store: store,
@@ -140,6 +142,35 @@ void main() {
       // Every offset is measured from the study's start. Without one there is nothing to measure
       // against, and guessing would ask a question at a moment nobody chose.
       expect((await module.status()).isSensing, isFalse);
+      expect(module.pending, isNull);
+    });
+
+    test('an instrument anchored to the participant is timed from when they joined', () async {
+      // The module's only job here is to pass the context's instant through. If it does not, a
+      // late joiner is asked nothing, and the study cannot tell that apart from a refusal.
+      final joined = startsAt.add(const Duration(days: 10));
+      final entry = {...entryJson(offset: 900), 'anchor': 'enrollment'};
+      final module = SurveyModule(
+        source: source,
+        now: () => joined.add(const Duration(minutes: 20)),
+      );
+      await module.start(contextFor([entry], [], enrolledAt: joined));
+
+      expect((await module.status()).isSensing, isTrue);
+      await module.refresh();
+      expect(module.pending?.id, 'knowledge');
+    });
+
+    test('a device that does not know when it joined is not asked', () async {
+      final entry = {...entryJson(offset: 900), 'anchor': 'enrollment'};
+      final module = SurveyModule(
+        source: source,
+        now: () => startsAt.add(const Duration(days: 10)),
+      );
+      await module.start(contextFor([entry], []));
+
+      expect((await module.status()).isSensing, isFalse);
+      await module.refresh();
       expect(module.pending, isNull);
     });
   });

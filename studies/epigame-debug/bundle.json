@@ -24,10 +24,19 @@
     "survey": {
       "instruments": [
         {
+          "instrument_id": "about_you",
+          "version": "1.0.0",
+          "sha256": "sha256:d942a777116dfd3bcf559d8c6236acd2988090414e45090072b6c77ee4353e68",
+          "anchor": "enrollment",
+          "offset_seconds": 0,
+          "window_seconds": 1800
+        },
+        {
           "instrument_id": "checkin",
           "version": "1.0.0",
           "sha256": "sha256:d6e00a3032e14a45b7274ef30a8dc529227fc548bbb06462998bdcf77b429946",
-          "offset_seconds": 60,
+          "anchor": "study",
+          "offset_seconds": 360,
           "window_seconds": 1800
         }
       ]

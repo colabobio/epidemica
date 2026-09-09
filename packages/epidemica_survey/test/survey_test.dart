@@ -130,18 +130,21 @@ void main() {
 
     test('nothing is due before its offset has passed', () {
       // Asking early puts a question about a period that has not happened yet.
-      expect(schedule.dueAt(startsAt, startsAt, {}), isEmpty);
-      expect(schedule.dueAt(startsAt.add(const Duration(minutes: 14)), startsAt, {}), isEmpty);
+      expect(schedule.dueAt(startsAt, startsAt, null, {}), isEmpty);
+      expect(
+        schedule.dueAt(startsAt.add(const Duration(minutes: 14)), startsAt, null, {}),
+        isEmpty,
+      );
     });
 
     test('minute-level offsets are honoured', () {
-      final due = schedule.dueAt(startsAt.add(const Duration(minutes: 15)), startsAt, {});
+      final due = schedule.dueAt(startsAt.add(const Duration(minutes: 15)), startsAt, null, {});
 
       expect(due.map((e) => e.instrumentId), ['first']);
     });
 
     test('an offset of days and hours is just a longer offset', () {
-      final due = schedule.dueAt(startsAt.add(const Duration(days: 2, hours: 6)), startsAt, {
+      final due = schedule.dueAt(startsAt.add(const Duration(days: 2, hours: 6)), startsAt, null, {
         'first@1.0.0',
       });
 
@@ -153,13 +156,13 @@ void main() {
       // open invitation, and the answer stops referring to the period it asked about.
       final late = startsAt.add(const Duration(minutes: 15) + const Duration(hours: 2));
 
-      expect(schedule.dueAt(late, startsAt, {}).map((e) => e.instrumentId), isEmpty);
+      expect(schedule.dueAt(late, startsAt, null, {}).map((e) => e.instrumentId), isEmpty);
     });
 
     test('one already answered is not offered again', () {
       final now = startsAt.add(const Duration(minutes: 20));
 
-      expect(schedule.dueAt(now, startsAt, {'first@1.0.0'}), isEmpty);
+      expect(schedule.dueAt(now, startsAt, null, {'first@1.0.0'}), isEmpty);
     });
 
     test('a revised instrument is a different question', () {
@@ -170,14 +173,16 @@ void main() {
       });
       final now = startsAt.add(const Duration(minutes: 20));
 
-      expect(revised.dueAt(now, startsAt, {'first@1.0.0'}).map((e) => e.key), ['first@1.1.0']);
+      expect(revised.dueAt(now, startsAt, null, {'first@1.0.0'}).map((e) => e.key), [
+        'first@1.1.0',
+      ]);
     });
 
     test('the earliest due comes first when several are waiting', () {
       final now = startsAt.add(const Duration(days: 3));
 
       expect(
-        schedule.dueAt(now, startsAt, {}).map((e) => e.instrumentId),
+        schedule.dueAt(now, startsAt, null, {}).map((e) => e.instrumentId),
         ['second'],
         reason: 'the first has expired; only the second is still open',
       );
@@ -195,4 +200,81 @@ void main() {
     });
   });
 
+  group('anchored to the study or to the participant', () {
+    final startsAt = DateTime.utc(2026, 3, 1, 9);
+    final joinedLate = startsAt.add(const Duration(days: 10));
+
+    Map<String, Object?> anchored(String id, String anchor) => {
+      ...entryJson(id: id, offset: 3600, window: 86400),
+      'anchor': anchor,
+    };
+
+    final schedule = SurveySchedule.fromModuleConfig({
+      'instruments': [anchored('outbreak_so_far', 'study'), anchored('about_you', 'enrollment')],
+    });
+
+    test('an entry with no anchor is measured from the study, as it always was', () {
+      final entry = ScheduledInstrument.parse(entryJson(id: 'plain', offset: 60));
+
+      expect(entry!.anchor, ScheduleAnchor.study);
+    });
+
+    test('a late joiner is not owed a question about a week they were not there for', () {
+      // The study-anchored window closed on day two. Nothing can make that answer meaningful now.
+      final now = joinedLate.add(const Duration(hours: 2));
+      final due = schedule.dueAt(now, startsAt, joinedLate, {});
+
+      expect(due.map((e) => e.instrumentId), ['about_you']);
+    });
+
+    test('a question about the participant arrives on their own clock', () {
+      // The bug this exists to prevent: under rolling enrolment, anchoring this to the study
+      // silently asks nothing of everyone who joined after its window closed.
+      final tooEarly = joinedLate.add(const Duration(minutes: 30));
+      final due = joinedLate.add(const Duration(hours: 2));
+
+      expect(schedule.dueAt(tooEarly, startsAt, joinedLate, {}), isEmpty);
+      expect(schedule.dueAt(due, startsAt, joinedLate, {}).map((e) => e.instrumentId), [
+        'about_you',
+      ]);
+    });
+
+    test('both anchors run side by side in one bundle', () {
+      // A device that joined at the start sees the study-anchored one on the study's clock.
+      final due = schedule.dueAt(startsAt.add(const Duration(hours: 2)), startsAt, startsAt, {});
+
+      expect(due.map((e) => e.instrumentId), ['outbreak_so_far', 'about_you']);
+    });
+
+    test('a device that does not know when it joined is never asked', () {
+      // Guessing would put the question at a moment nobody chose, and the study could not tell
+      // that answer apart from one asked on time.
+      final now = startsAt.add(const Duration(hours: 2));
+
+      expect(schedule.dueAt(now, startsAt, null, {}).map((e) => e.instrumentId), [
+        'outbreak_so_far',
+      ]);
+      expect(schedule.anythingLeft(now, startsAt, null, {'outbreak_so_far@1.0.0'}), isFalse);
+    });
+
+    test('a misspelled anchor drops the entry rather than reverting to the study', () {
+      // `enrolment` is the British spelling and appears throughout this repo's prose. Defaulting
+      // it to the study would reintroduce the exact bug the anchor was added to fix, silently.
+      final schedule = SurveySchedule.fromModuleConfig({
+        'instruments': [anchored('typo', 'enrolment'), anchored('good', 'enrollment')],
+      });
+
+      expect(schedule.entries.map((e) => e.instrumentId), ['good']);
+    });
+
+    test('work remains while an enrollment-anchored window is still open', () {
+      final now = joinedLate.add(const Duration(hours: 2));
+
+      expect(schedule.anythingLeft(now, startsAt, joinedLate, {}), isTrue);
+      expect(
+        schedule.anythingLeft(joinedLate.add(const Duration(days: 3)), startsAt, joinedLate, {}),
+        isFalse,
+      );
+    });
+  });
 }

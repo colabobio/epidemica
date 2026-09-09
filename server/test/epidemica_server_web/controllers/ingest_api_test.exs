@@ -182,6 +182,25 @@ defmodule EpidemicaServerWeb.IngestApiTest do
       assert response["refresh_token"]
       assert response["token_type"] == "Bearer"
       assert response["protocol_hash"] == @protocol_hash
+
+      # Anything a study schedules from joining rather than from its own start is measured against
+      # this, so it has to arrive with the enrolment rather than be inferred from the device clock.
+      assert {:ok, _, _} = DateTime.from_iso8601(response["enrolled_at"])
+    end
+
+    test "the moment of joining does not move when a device re-enrols", %{conn: conn} do
+      body = %{
+        "join_code" => "contact-1",
+        "subject" => "a-returning-participant-x",
+        "device_id" => "44444444-4444-4444-8444-444444444444",
+        "platform" => "android"
+      }
+
+      first = conn |> post("/v1/enrollments", body) |> json_response(201)
+      again = conn |> post("/v1/enrollments", body) |> json_response(201)
+
+      # A reinstall must not reopen a question that is asked once, a fixed time after joining.
+      assert again["enrolled_at"] == first["enrolled_at"]
     end
 
     test "an unknown code is a 404 indistinguishable from a closed study", %{conn: conn} do

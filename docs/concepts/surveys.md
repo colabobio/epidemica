@@ -98,6 +98,40 @@ invitation, with answers that no longer refer to the period they asked about.
 The key that records completion is `instrument_id@version`, so **revising an instrument asks it
 again** rather than treating the old answer as covering the new wording.
 
+## Seconds after what: the study, or the participant
+
+An offset needs something to be measured from, and there are two candidates. `anchor` picks one,
+per entry:
+
+```json
+{ "instrument_id": "about_you", "version": "1.0.0", "offset_seconds": 3600, "anchor": "enrollment" }
+```
+
+`"study"` is the default and measures from `starts_at`. `"enrollment"` measures from the moment
+this participant joined.
+
+Which is right follows from what the instrument is *about*. One about the **study** — "how has the
+outbreak gone this week" — belongs to the calendar, and someone who joined after its window closed
+was never owed it: they were not there for the week it asks about. One about the **participant** —
+demographics, baseline beliefs, a consent check — belongs to them, and is owed whenever they
+arrive.
+
+Anchoring the second kind to the study is the failure this exists to prevent. Under rolling
+enrolment it does not error; it silently asks nothing of everyone who joined after the window
+closed, and the resulting hole in the data looks exactly like refusal.
+
+Two consequences worth knowing:
+
+- **A device that does not know when it joined is never asked.** That is an app installed before
+  the field existed, or a server too old to send it. Guessing a moment nobody chose would produce
+  an answer the study could not tell apart from one asked on time.
+- **An anchor this build does not recognise drops the entry**, rather than falling back to the
+  study. `"enrolment"` — the British spelling used throughout this repo's prose — is a typo the
+  bundle author will want to hear about, not one that quietly reintroduces the bug above.
+
+The joining instant comes from the server (`enrolled_at` in the enrollment response), not from the
+device clock, and it does not move if the same participant re-enrols on a new device.
+
 ## How it reaches the phone
 
 ```mermaid

@@ -53,6 +53,7 @@ class Enrollment {
     required this.protocolHash,
     required this.bundle,
     this.arm,
+    this.enrolledAt,
   });
 
   final String studyId;
@@ -64,6 +65,15 @@ class Enrollment {
 
   final ProtocolBundle bundle;
   final String? arm;
+
+  /// When the server says this participant joined, so a module can time something from their
+  /// enrolment rather than from the study's start.
+  ///
+  /// Null for an enrolment recorded before this field existed, and for a server that does not send
+  /// it. Nullable rather than required for that reason: making it mandatory would turn an app
+  /// upgrade into a silent un-enrolment for everyone already in a study, and anything measuring
+  /// from it can decline to run instead.
+  final DateTime? enrolledAt;
 }
 
 /// Joins a study.
@@ -90,6 +100,7 @@ class EnrollmentService {
   static const String protocolHashKey = 'protocol_hash';
   static const String armKey = 'study_arm';
   static const String bundleKey = 'protocol_bundle';
+  static const String enrolledAtKey = 'enrolled_at';
 
   final Uri baseUri;
   final EpidemicaDatabase _db;
@@ -159,6 +170,10 @@ class EnrollmentService {
       protocolHash: protocolHash,
       bundle: bundle,
       arm: body['arm'] as String?,
+      // Read leniently. A server that does not send it leaves anything measured from joining
+      // unable to run, which is the honest outcome; throwing here would fail an enrolment that
+      // otherwise worked, and not as an EnrollmentException the caller knows how to explain.
+      enrolledAt: _instant(body['enrolled_at']),
     );
     _persist(enrollment, bundleBytes);
     return enrollment;
@@ -178,8 +193,13 @@ class EnrollmentService {
       protocolHash: protocolHash,
       bundle: ProtocolBundle.parse(utf8.encode(bundle)),
       arm: _db.readMeta(armKey),
+      // Absent for an enrolment written before this was recorded. Not part of the test above: an
+      // upgrade must not un-enrol a participant who is mid-study.
+      enrolledAt: _instant(_db.readMeta(enrolledAtKey)),
     );
   }
+
+  static DateTime? _instant(Object? raw) => raw is String ? DateTime.tryParse(raw)?.toUtc() : null;
 
   void _persist(Enrollment enrollment, List<int> bundleBytes) {
     _db.transaction(() {
@@ -187,6 +207,9 @@ class EnrollmentService {
       _db.writeMeta(protocolHashKey, enrollment.protocolHash);
       _db.writeMeta(bundleKey, utf8.decode(bundleBytes));
       if (enrollment.arm != null) _db.writeMeta(armKey, enrollment.arm!);
+      if (enrollment.enrolledAt != null) {
+        _db.writeMeta(enrolledAtKey, enrollment.enrolledAt!.toIso8601String());
+      }
     });
   }
 
