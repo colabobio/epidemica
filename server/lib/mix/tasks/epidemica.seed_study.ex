@@ -12,10 +12,18 @@ defmodule Mix.Tasks.Epidemica.SeedStudy do
 
   Options:
 
-    --bundle  Path to the bundle JSON. Required.
-    --code    Join code participants type in. Defaults to the bundle's own `join_code`.
-    --name    Study name for operators. Defaults to the bundle's `title`.
-    --arm     Arm to assign to participants using this code.
+    --bundle      Path to the bundle JSON. Required.
+    --code        Join code participants type in. Defaults to the bundle's own `join_code`.
+    --name        Study name for operators. Defaults to the bundle's `title`.
+    --arm         Arm to assign to participants using this code.
+    --steal-code  Move the code from whichever study currently holds it. For development, where
+                  re-seeding a tweaked bundle under the same code is the point and the previous
+                  study is scrap.
+
+  A code already held by a *different* study is refused, and nothing is created. Codes are unique
+  across every study, so attaching one twice would leave the new study with no way in while devices
+  using it enrolled in the old one — which looks like a working seed and fails in a room with people
+  waiting.
   """
 
   use Mix.Task
@@ -31,7 +39,13 @@ defmodule Mix.Tasks.Epidemica.SeedStudy do
   def run(args) do
     {opts, _, _} =
       OptionParser.parse(args,
-        strict: [bundle: :string, code: :string, name: :string, arm: :string]
+        strict: [
+          bundle: :string,
+          code: :string,
+          name: :string,
+          arm: :string,
+          steal_code: :boolean
+        ]
       )
 
     path = opts[:bundle] || Mix.raise("--bundle is required")
@@ -44,9 +58,14 @@ defmodule Mix.Tasks.Epidemica.SeedStudy do
       opts[:code] || decoded["join_code"] || Mix.raise("no --code and no join_code in bundle")
 
     hash = Study.hash_of(source)
+    registered = Repo.get_by(Study, protocol_hash: hash)
+
+    # Before anything is created. A study registered and then refused a code is litter: it prints an
+    # id, keeps its instruments, and has no way in.
+    ensure_code_available(code, registered, opts)
 
     study =
-      case Repo.get_by(Study, protocol_hash: hash) do
+      case registered do
         nil ->
           case Studies.create_study_from_bundle(name, source) do
             {:ok, study} ->
@@ -62,10 +81,7 @@ defmodule Mix.Tasks.Epidemica.SeedStudy do
           existing
       end
 
-    case Studies.add_join_code(study, code, opts[:arm]) do
-      {:ok, _} -> Mix.shell().info("Join code: #{code}")
-      {:error, _} -> Mix.shell().info("Join code #{code} already exists")
-    end
+    attach_code(study, code, opts)
 
     register_instruments(study, path, decoded)
 
@@ -129,6 +145,61 @@ defmodule Mix.Tasks.Epidemica.SeedStudy do
   end
 
   defp describe(other), do: inspect(other)
+
+  # Refused here rather than after the study exists, so a rejected seed changes nothing at all.
+  defp ensure_code_available(code, registered, opts) do
+    owner = Studies.join_code_owner(code)
+
+    cond do
+      owner == nil -> :ok
+      registered != nil and owner.study_id == registered.id -> :ok
+      Keyword.get(opts, :steal_code, false) -> :ok
+      true -> Mix.raise(code_taken(code, owner))
+    end
+  end
+
+  defp attach_code(study, code, opts) do
+    previous = Studies.join_code_owner(code)
+
+    result =
+      if Keyword.get(opts, :steal_code, false),
+        do: Studies.move_join_code(study, code, opts[:arm]),
+        else: Studies.add_join_code(study, code, opts[:arm])
+
+    case result do
+      {:ok, _} ->
+        if previous != nil and previous.study_id != study.id do
+          Mix.shell().info("Join code: #{code} (moved from study #{previous.study_id})")
+          Mix.shell().info("Study #{previous.study_id} is no longer joinable.")
+        else
+          Mix.shell().info("Join code: #{code}")
+        end
+
+      {:error, {:code_taken, other}} ->
+        Mix.raise(code_taken(code, %{study_id: other}))
+
+      {:error, reason} ->
+        Mix.raise("could not attach join code #{code}: #{inspect(reason)}")
+    end
+  end
+
+  defp code_taken(code, owner) do
+    """
+    The join code #{code} already belongs to study #{owner.study_id}.
+
+    Codes are unique across every study, so this one cannot also point at the study you are
+    registering. Nothing has been created.
+
+    This is what re-seeding a bundle with a new start time looks like: the bundle's bytes changed,
+    so it is a different study, but the code still sends devices to the old one.
+
+      --code OTHER-CODE     register this study under a code of its own
+      --steal-code          move #{code} to this study, making the old one unjoinable
+
+    `--steal-code` is for development, where the previous study is scrap. In the field it silently
+    redirects everyone already holding the code.
+    """
+  end
 
   # Instrument definitions live beside the bundle rather than inside it, because a reworded
   # question must not change the protocol hash and re-register the study.

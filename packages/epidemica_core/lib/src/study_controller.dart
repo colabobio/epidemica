@@ -206,6 +206,16 @@ class StudyController extends ChangeNotifier {
       _message = null;
       notifyListeners();
       await _activate(enrollment);
+
+      // A study may publish a starting state at enrolment, and waiting for the host's next poll to
+      // discover it leaves the participant looking at a screen that says nothing is known yet.
+      // Failure is ignored rather than reported: the join worked, and the poll will retry.
+      try {
+        await _states.refresh();
+      } on Object {
+        // Deliberately empty.
+      }
+      notifyListeners();
     } on EnrollmentException catch (e) {
       _state = StudyState.refused;
       _message = _explain(e);

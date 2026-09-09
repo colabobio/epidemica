@@ -138,4 +138,67 @@ defmodule EpidemicaServer.StudyRegistrationTest do
                register(bundle(%{"twin" => twin(%{"coverage_threshold" => 1})}))
     end
   end
+
+  describe "join codes" do
+    defp study_named(title) do
+      {:ok, study} = register(bundle(%{"title" => title}))
+      study
+    end
+
+    test "a free code is attached" do
+      assert {:ok, code} = Studies.add_join_code(study_named("first"), "OPEN-1")
+      assert code.code == "OPEN-1"
+    end
+
+    test "a study re-attaching its own code is a no-op, so re-seeding stays safe" do
+      study = study_named("first")
+      {:ok, first} = Studies.add_join_code(study, "SAME-1")
+
+      assert {:ok, again} = Studies.add_join_code(study, "SAME-1")
+      assert again.id == first.id
+    end
+
+    test "a code belonging to another study is refused, and says which" do
+      owner = study_named("first")
+      {:ok, _} = Studies.add_join_code(owner, "TAKEN-1")
+
+      # The case that cost a debugging session: a bundle re-seeded with a new start time is a
+      # different study, but the code still points at the old one.
+      assert {:error, {:code_taken, study_id}} =
+               Studies.add_join_code(study_named("second"), "TAKEN-1")
+
+      assert study_id == owner.id
+    end
+
+    test "the check does not depend on how the code was capitalised" do
+      {:ok, _} = Studies.add_join_code(study_named("first"), "Taken-2")
+
+      assert {:error, {:code_taken, _}} =
+               Studies.add_join_code(study_named("second"), "taken-2")
+    end
+
+    test "the code still points at the study that holds it" do
+      owner = study_named("first")
+      {:ok, _} = Studies.add_join_code(owner, "TAKEN-3")
+      {:error, _} = Studies.add_join_code(study_named("second"), "TAKEN-3")
+
+      assert {:ok, found} = Studies.fetch_join_code("TAKEN-3")
+      assert found.study_id == owner.id
+    end
+
+    test "moving a code is possible, but has to be asked for" do
+      owner = study_named("first")
+      taker = study_named("second")
+      {:ok, _} = Studies.add_join_code(owner, "MOVE-1")
+
+      assert {:ok, _} = Studies.move_join_code(taker, "MOVE-1")
+      assert {:ok, found} = Studies.fetch_join_code("MOVE-1")
+      assert found.study_id == taker.id
+    end
+
+    test "moving a code nobody holds simply attaches it" do
+      assert {:ok, _} = Studies.move_join_code(study_named("first"), "MOVE-2")
+      assert {:ok, _} = Studies.fetch_join_code("MOVE-2")
+    end
+  end
 end

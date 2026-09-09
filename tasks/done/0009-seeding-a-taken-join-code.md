@@ -1,8 +1,37 @@
 # 0009 — Seeding a taken join code produces a study nobody can join
 
-**Status:** backlog
+**Status:** done
 **Filed:** 2026-09-04
+**Landed:** 2026-09-09
 **Touches:** `server/lib/mix/tasks/epidemica.seed_study.ex`, `server/lib/epidemica_server/studies.ex`
+
+## What was decided, and built
+
+Error by default, with `--steal-code` for development — the shape the task proposed, matching
+`--force` on `epidemica.tick` and `--clear-actions` on `epidemica.reset_study`.
+
+- `Studies.add_join_code/3` now distinguishes all three cases: a free code is attached, a code the
+  same study already holds is a no-op, and a code held by another study returns
+  `{:error, {:code_taken, study_id}}`. The lookup is case-insensitive, matching the unique index.
+- `Studies.move_join_code/3` repoints a code deliberately, and is a separate function because
+  repointing silently redirects everyone already holding it.
+- `epidemica.seed_study` checks availability **before** creating anything, so a refused seed leaves
+  no study behind. The message names both studies and offers the two ways out.
+
+Covered by `test/epidemica_server/seed_study_test.exs` and the join-code group in
+`study_registration_test.exs`. The task's suggested teeth check was run: disabling only the early
+check, so the task still raises but *after* creating the study, fails on the study count rather than
+on the exception — which is the variant that would otherwise pass.
+
+## Found in the field first
+
+This bit for real on 2026-09-09, a day before it was fixed, and cost a debugging session. The
+symptom was two layers away exactly as predicted: a phone joining `EPIGAME-DEBUG` showed no
+countdown screen, because it had enrolled in the previous day's study whose start was already past,
+while two orphaned studies from that day's re-seeds sat in the database with no code pointing at
+them.
+
+---
 
 ## The problem
 

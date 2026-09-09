@@ -101,11 +101,57 @@ defmodule EpidemicaServer.Studies do
     Ecto.Query.CastError -> {:error, :not_found}
   end
 
+  @doc """
+  Attach a join code to a study.
+
+  A code is unique across every study, not within one, so there are three outcomes and they are not
+  interchangeable. A free code is attached. A code this study already holds is a no-op, which keeps
+  re-seeding an unchanged bundle safe. A code belonging to *another* study is refused with
+  `{:error, {:code_taken, study_id}}` rather than reported as a note: the alternative is a study
+  that registers, prints an id, and has no way in, while devices using the code enrol somewhere
+  else entirely.
+  """
   def add_join_code(%Study{} = study, code, arm \\ nil) do
-    %JoinCode{}
-    |> JoinCode.changeset(%{study_id: study.id, code: code, arm: arm})
-    |> Repo.insert()
+    study_id = study.id
+
+    case join_code_owner(code) do
+      nil ->
+        %JoinCode{}
+        |> JoinCode.changeset(%{study_id: study.id, code: code, arm: arm})
+        |> Repo.insert()
+
+      %JoinCode{study_id: ^study_id} = held ->
+        {:ok, held}
+
+      %JoinCode{} = taken ->
+        {:error, {:code_taken, taken.study_id}}
+    end
   end
+
+  @doc """
+  Point an existing join code at a different study.
+
+  Deliberately separate from `add_join_code/3`, because repointing a code is not a variation on
+  attaching one: anybody holding it — a poster, a text message, a phone that has not re-enrolled —
+  is silently redirected. For development, where the previous study is scrap, and never as a
+  default.
+  """
+  def move_join_code(%Study{} = study, code, arm \\ nil) do
+    case join_code_owner(code) do
+      nil ->
+        add_join_code(study, code, arm)
+
+      %JoinCode{} = held ->
+        held |> JoinCode.changeset(%{study_id: study.id, arm: arm}) |> Repo.update()
+    end
+  end
+
+  @doc "The join code row for `code`, whichever study holds it, or nil. Case-insensitive."
+  def join_code_owner(code) when is_binary(code) do
+    Repo.one(from j in JoinCode, where: fragment("lower(?)", j.code) == ^String.downcase(code))
+  end
+
+  def join_code_owner(_), do: nil
 
   def get_study(id), do: Repo.get(Study, id)
 

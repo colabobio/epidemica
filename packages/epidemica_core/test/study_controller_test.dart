@@ -66,40 +66,49 @@ void main() {
     dir.deleteSync(recursive: true);
   });
 
-  http.Client serverServing(String bundle, {int enrollStatus = 201, List<String>? log}) =>
-      MockClient((request) async {
-        log?.add(request.url.path);
-        if (request.url.toString() == _bundleUrl) return http.Response(bundle, 200);
-        if (request.url.path.endsWith('/observations')) {
-          return http.Response(
-            jsonEncode({
-              'received': 0,
-              'accepted': 0,
-              'duplicate': 0,
-              'quarantined': 0,
-              'rejected': 0,
-              'exceptions': [],
-              'server_time': '2026-09-02T12:00:00Z',
-            }),
-            200,
-          );
-        }
-        if (enrollStatus != 201) return http.Response('{}', enrollStatus);
-        return http.Response(
-          jsonEncode({
-            'subject': Identity(db).subject,
-            'study_id': _studyId,
-            'protocol_hash': ProtocolBundle.hashOf(utf8.encode(bundle)),
-            'protocol_url': _bundleUrl,
-            'access_token': 'access-1',
-            'token_type': 'Bearer',
-            'expires_in': 3600,
-            'refresh_token': 'refresh-1',
-            'server_time': '2026-09-02T12:00:00Z',
-          }),
-          201,
-        );
-      });
+  http.Client serverServing(
+    String bundle, {
+    int enrollStatus = 201,
+    List<String>? log,
+    Map<String, Object?>? state,
+    int stateStatus = 404,
+  }) => MockClient((request) async {
+    log?.add(request.url.path);
+    if (request.url.toString() == _bundleUrl) return http.Response(bundle, 200);
+    if (request.url.path.endsWith('/participants/me/state')) {
+      if (state == null) return http.Response('{}', stateStatus);
+      return http.Response(jsonEncode(state), 200);
+    }
+    if (request.url.path.endsWith('/observations')) {
+      return http.Response(
+        jsonEncode({
+          'received': 0,
+          'accepted': 0,
+          'duplicate': 0,
+          'quarantined': 0,
+          'rejected': 0,
+          'exceptions': [],
+          'server_time': '2026-09-02T12:00:00Z',
+        }),
+        200,
+      );
+    }
+    if (enrollStatus != 201) return http.Response('{}', enrollStatus);
+    return http.Response(
+      jsonEncode({
+        'subject': Identity(db).subject,
+        'study_id': _studyId,
+        'protocol_hash': ProtocolBundle.hashOf(utf8.encode(bundle)),
+        'protocol_url': _bundleUrl,
+        'access_token': 'access-1',
+        'token_type': 'Bearer',
+        'expires_in': 3600,
+        'refresh_token': 'refresh-1',
+        'server_time': '2026-09-02T12:00:00Z',
+      }),
+      201,
+    );
+  });
 
   /// One binary. The module set is fixed here, exactly as it is fixed at build time.
   StudyController binaryWith(List<EmbeddedModule> modules, http.Client client) => StudyController(
@@ -300,6 +309,60 @@ void main() {
 
       expect(db.db.select('SELECT * FROM outbox').single['clock_offset_ms'], isNull);
       expect(controller.clockOffsetMs, isNull);
+    });
+  });
+
+  group('joining', () {
+    Map<String, Object?> stateDocument() => {
+      'state_version': '1.0',
+      'study_id': _studyId,
+      'subject': Identity(db).subject,
+      'state_uri': 'https://schemas.epidemica.info/state/epigame/1.0.0.json',
+      'revision': 1,
+      'as_of': '2026-09-09T12:00:00Z',
+      'state': {'day': 0, 'epi_state': 'susceptible', 'points': 0},
+    };
+
+    test('fetches the state the server published at enrolment', () async {
+      final bundle = bundleJson(modules: {'proximity': {}});
+      final controller = binaryWith([
+        _FakeModule('proximity'),
+      ], serverServing(bundle, state: stateDocument()));
+
+      await controller.join('JOIN-1234');
+
+      // A study may publish a starting state as part of enrolment. Leaving it until the host's next
+      // poll shows the participant a screen that says nothing is known yet, for as long as that
+      // poll interval — which is a minute in Epigames, and only visible once a study has started.
+      expect(controller.participantState, isNotNull);
+      expect(controller.participantState!.state['epi_state'], 'susceptible');
+      controller.dispose();
+    });
+
+    test('a study with nothing computed yet leaves no state and no complaint', () async {
+      final bundle = bundleJson(modules: {'proximity': {}});
+      final controller = binaryWith([_FakeModule('proximity')], serverServing(bundle));
+
+      await controller.join('JOIN-1234');
+
+      expect(controller.participantState, isNull);
+      expect(controller.state, StudyState.collecting);
+      controller.dispose();
+    });
+
+    test('a state fetch that fails does not make a successful join look failed', () async {
+      final bundle = bundleJson(modules: {'proximity': {}});
+      final controller = binaryWith([
+        _FakeModule('proximity'),
+      ], serverServing(bundle, stateStatus: 500));
+
+      await controller.join('JOIN-1234');
+
+      // The enrolment worked and collection started. Reporting the transport failure here would put
+      // an error in front of a participant about something that is retried a minute later anyway.
+      expect(controller.state, StudyState.collecting);
+      expect(controller.message, isNull);
+      controller.dispose();
     });
   });
 
