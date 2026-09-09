@@ -10,11 +10,20 @@
 #   START=2026-09-07T06:00:00Z deploy/local/epigames/up.sh
 #   TODAY=1 deploy/local/epigames/up.sh     # start at the top of the current hour
 #
+# A join code belongs to one study, and changing START changes the bundle's bytes and so registers a
+# different one. Re-seeding therefore refuses rather than leaving the code pointing at the previous
+# study, which is a phone joining a game that started yesterday. STEAL_CODE= moves it:
+#
+#   STEAL_CODE=1 START=... deploy/local/epigames/up.sh
+#
 # BUNDLE= registers a different study. The compressed one turns a seven-day game into seven
 # five-minute rounds, which is what makes manual debugging possible at all:
 #
 #   START="$(date -u -v+10M +%Y-%m-%dT%H:%M:%SZ)" \
 #     BUNDLE=studies/epigame-debug/bundle.json deploy/local/epigames/up.sh
+#
+# After the first run, add STEAL_CODE=1 to that: every new start time is a new study, and the code
+# has to be told to follow.
 
 set -euo pipefail
 

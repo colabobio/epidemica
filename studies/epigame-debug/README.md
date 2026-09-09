@@ -136,6 +136,19 @@ On GNU coreutils use `date -u -d '+10 minutes' +%Y-%m-%dT%H:%M:%SZ`.
 Do **not** use `TODAY=1` here. It anchors to the top of the current hour, and a 35-minute study
 started at the top of the hour is usually over before you have installed anything.
 
+**On every run after the first, add `STEAL_CODE=1`.** A new start time means new bundle bytes, so it
+is a different study, and `EPIGAME-DEBUG` still belongs to the previous one. Seeding refuses rather
+than leaving the code where it was:
+
+```sh
+STEAL_CODE=1 START="$(date -u -v+10M +%Y-%m-%dT%H:%M:%SZ)" \
+  BUNDLE=studies/epigame-debug/bundle.json \
+  deploy/local/epigames/up.sh
+```
+
+The phones are still enrolled in the old study, so leave the study on each before re-joining.
+Otherwise they resume the previous enrolment from their own database and never see the new one.
+
 Note the two things it prints:
 
 ```
@@ -397,13 +410,15 @@ whether the first-hour coverage gap matters in practice. Those need real days.
 | Symptom | Most likely cause |
 |---|---|
 | "That code did not match an open study" | Missing trailing slash on `EPIDEMICA_SERVER` ([0004](../../tasks/backlog/0004-distinguish-missing-route-from-refusal.md)) |
+| `The join code ... already belongs to study` | Correct, and it saved you. Re-run with `STEAL_CODE=1` |
+| No countdown screen, or the game looks already started | The phone joined an earlier study whose start has passed. Check `SELECT j.code, s.protocol->'schedule'->>'starts_at' FROM join_codes j JOIN studies s ON s.id = j.study_id;` |
 | `no study <uuid>` from the tick task | Used the bundle's `study_id` instead of the server's ([0005](../../tasks/backlog/0005-bundle-study-id-is-not-the-study-id.md)) |
 | Everyone `not_sensing` | No `module_status` yet, or `health.interval_seconds` too long for the tick |
 | `refused, that day has not finished yet` | Correct. Wait, or `--force` for a demo |
 | `edges: 0` with data in the DB | Observations arrived after the tick's `received_before` |
 | Only one subject in `contacts` | One phone is not being discovered; check Bluetooth and foreground |
 | App shows nothing after joining | No round has been ticked yet. State is never synthesised |
-| Nothing uploads while the app is backgrounded | Known: there is no background sync; only the poll timer and pull-to-refresh call `sync()` |
+| Nothing uploads with the app swiped away | Known on Android: sensing continues but no Dart runs, so nothing drains the outbox ([0006](../../tasks/backlog/0006-no-background-sync.md)) |
 
 ## See also
 

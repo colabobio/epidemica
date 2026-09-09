@@ -98,5 +98,14 @@ PY
   fi
 
   echo "==> Registering $(basename "$(dirname "$1")")"
-  mix epidemica.seed_study --bundle "$bundle"
+
+  # A code already held by another study is refused, because in the field that means devices enrol
+  # somewhere nobody intended. Re-seeding a tweaked bundle under the same code is the development
+  # loop, though, so STEAL_CODE= says the previous study is scrap. Written as two calls rather than
+  # an array because macOS ships bash 3.2, where an empty "${arr[@]}" trips `set -u`.
+  if [[ -n "${STEAL_CODE:-}" ]]; then
+    mix epidemica.seed_study --bundle "$bundle" --steal-code
+  else
+    mix epidemica.seed_study --bundle "$bundle"
+  fi
 }
