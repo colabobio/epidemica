@@ -214,6 +214,44 @@ The old version stays registered, because responses already reference it. Partic
 `1.0.0` will be asked `1.1.0`, since completion is tracked per version — which is usually what you
 want, and is worth thinking about before bumping a version for a typo.
 
+## More than one instrument in a study
+
+A study schedules as many as it needs. Each entry in `modules.survey.instruments` is independent:
+its own definition, its own version, its own offset and window. One ten minutes into the first day
+and another six hours into the second is just two entries:
+
+```json
+"modules": {
+  "survey": {
+    "instruments": [
+      {
+        "instrument_id": "checkin",
+        "version": "1.0.0",
+        "sha256": "sha256:d6e00a…",
+        "offset_seconds": 600,
+        "window_seconds": 1800
+      },
+      {
+        "instrument_id": "day_two",
+        "version": "1.0.0",
+        "sha256": "sha256:dt4eea…",
+        "offset_seconds": 108000,
+        "window_seconds": 1800
+      }
+    ]
+  }
+}
+```
+
+Each is registered, fetched and verified on its own. Each is answered once, tracked by its own
+`instrument_id@version`, and none has to finish before the next is due — the second is offered the
+moment its window opens even if the first was never answered.
+
+One constraint, already noted in the gaps: **the module offers one at a time**, the earliest due
+first, so two instruments whose windows overlap are queued rather than both waiting on screen.
+Spaced as in this example it never arises; a study that genuinely wants two instruments open at
+once is a current limitation.
+
 ## Known gaps
 
 **Nothing tells a participant a survey is waiting.** The card appears when the app is next opened.
