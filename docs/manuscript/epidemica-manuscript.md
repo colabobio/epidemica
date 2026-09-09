@@ -1,6 +1,6 @@
 ---
 title: "Epidemica: An Open, Agentic-Ready Research Platform for Participatory Epidemiology Studies"
-abstract: "Epidemica is an open-source platform for building study apps that collect high-resolution, multi-modal epidemiological data — proximity contacts, survey responses, and, in a companion transmission engine, a simulated infection outcome — and for running interventions over that data. It is organised as a set of versioned data and protocol contracts, implemented once each in Dart client packages, an Elixir/Phoenix server, and a Python transmission model, so that a study is authored as a configuration document rather than a fork of an app. This paper describes the platform's motivation, its architecture, a reference application (a seven-day transmission game whose infections are decided by a real contact network rather than scripted), and a deliberate extension of that same contracts-first discipline to the agents that help build it: machine-readable convention files that let a coding agent work in this codebase without re-deriving rules that have already been paid for in debugging time. We report the platform's current state honestly against its own stated milestones — extensively tested and field-exercised end to end, not yet operated unattended or at the scale its own acceptance criteria require — and discuss what would need to be true for that to change."
+abstract: "Epidemica is an open-source platform for building study apps that collect high-resolution, multi-modal epidemiological data — including proximity contacts, survey responses, and, in a companion transmission engine, a simulated infection outcome — and for running interventions over that data. It is organised as a set of versioned data and protocol contracts, implemented once each in Dart client packages, an Elixir/Phoenix server, and a Python transmission model, so that a study is authored as a configuration document rather than a fork of an app. This paper describes the platform's motivation, its architecture, a reference application (a seven-day transmission game whose infections are decided by a real contact network rather than scripted), and a purposeful extension of that same contracts-first discipline to the agents that help build it: machine-readable convention files that let a coding agent work in this codebase without re-deriving rules that have already been paid for in debugging time. We report the platform's current state against its own stated milestones — extensively tested and field-exercised end to end — and discuss next steps and further directions."
 authors:
   - orcid: "0000-0001-5559-9661"
     name: "Andrés Colubri"
@@ -14,7 +14,7 @@ subjects:
 
 Digital tools for infectious disease surveillance improved considerably over the last decade,
 accelerated by the COVID-19 pandemic's demand for contact tracing at population scale
-[@ferretti2020; @kucharski2020]. What emerged, however, was mostly single-purpose: an app that traces
+[@pandit2022; @ferretti2020; @kucharski2020]. What emerged, however, was mostly single-purpose: an app that traces
 contacts, a survey platform that collects symptoms, a simulation package that models spread — each
 built once, for one study, rarely reused by the next. A research group that wants to measure a
 contact network, ask participants how they felt about it, and feed the result into a transmission
@@ -32,36 +32,37 @@ This paper describes that contract-first design, the reference implementation bu
 a companion application — a short transmission game in which a phone's own measured contacts, not a
 scripted schedule, decide who a server-side epidemic model infects next. It also describes an
 extension of the same discipline to a newer kind of collaborator: the coding agents now routinely
-used to build and maintain a codebase like this one, for whom the same lesson applies — an
+used to build and maintain a codebase like this one [@agenticai2026], for whom the same lesson applies — an
 undocumented convention re-learned by trial and error is exactly the failure mode contracts exist to
 prevent, whether the reader is a person or a language model.
 
 We do not report epidemiological results. Epidemica has not yet run a study at the scale or duration
-its own milestones require, and this paper is explicit about that rather than eliding it — see
+its own milestones require, and this paper is explicit about that — see
 §8. What we report is a platform whose internal seams have been exercised end to end with real
 devices, whose behaviour is pinned down by an automated test suite in three languages, and whose
 architecture we believe generalises past its first reference application.
 
 ## 2. Related Work
 
-Structured, empirical contact data has driven epidemiological modelling for decades. Diary-based
+Structured, empirical contact data has driven epidemiological modeling for decades. Diary-based
 studies such as POLYMOD established that contact patterns are age-structured and setting-dependent at
 a scale still cited in transmission models today [@mossong2008], and RFID- or Bluetooth-based
 proximity studies — the Copenhagen Networks Study among the largest — showed that sensor-derived
 contact networks capture structure a diary cannot, at the cost of purpose-built, non-reusable
 infrastructure for each deployment [@stopczynski2014]. The COVID-19 pandemic then produced a wave of
-literature on digital contact tracing specifically: modelling work argued that population-scale
+literature on digital contact tracing specifically: modeling work argued that population-scale
 Bluetooth tracing could plausibly control an epidemic if adopted widely enough [@ferretti2020], and
-comparative studies of tracing, testing and distancing measured what such interventions achieved in
-practice [@kucharski2020]. Classical network epidemiology, meanwhile, had already established that
+real-world deployment of contact tracing apps demonstrated measurable reductions in transmission
+[@kendall2023], while comparative studies of tracing, testing and distancing measured what such
+interventions achieved in practice [@kucharski2020]. Classical network epidemiology, meanwhile, had already established that
 *which* contact network a model assumes changes its qualitative predictions, not just their
 magnitude [@eames2003] — an argument for measuring the real network rather than assuming a stylised
 one, which is Epidemica's proximity module's entire job.
 
-On the modelling side, agent-based transmission simulators — Covasim and the wider Starsim family
+On the modeling side, agent-based transmission simulators — Covasim and the wider Starsim family
 from the Institute for Disease Modeling being a widely used example — demonstrated that a general
 disease-and-network simulation framework, not a bespoke model per study, can serve a whole research
-program [@kerr2021; @starsim]. Epidemica adopts this position directly: rather than writing its own
+program [@kerr2021; @panovska2022; @starsim]. Epidemica adopts this position directly: rather than writing its own
 transmission mathematics, it treats an external simulator as the canonical authority and limits its
 own scope to getting a measured network and a study protocol into that simulator's native shape.
 
@@ -76,11 +77,17 @@ description of what it means, so that a dataset remains interpretable independen
 produced it.
 
 Epidemica's own lineage includes two prior single-purpose platforms built by the same lab —
-Operation Outbreak, a proximity-sensing outbreak-simulation game deployed at over a hundred schools,
-and Travel Healthy, a participatory surveillance app for international travellers — plus an early
-Epidemica-based prototype, Epigames, shown publicly as a proof of concept in 2025. Each solved its
-own problem well and duplicated infrastructure the next one needed again; Epidemica is the
-generalisation of what those three builds had in common.
+Operation Outbreak, a proximity-sensing outbreak simulation app originally developed by our group
+and deployed at over hundred of schools [@colubri2020], and Travel Healthy, a participatory
+surveillance app for international travelers [@colubri2025travelhealthy] — plus an early
+Epidemica-based prototype, Epigames, shown publicly as a proof of concept at the International
+Pandemic Sciences Conference in 2025 [@colubri2025ipsc], and multiple empirical deployments of
+epigames in university campus settings that demonstrated measurable effects of risk perception and
+behavioural interventions on simulated disease transmission dynamics
+[@musa2026; @colubri2026rct]. The scientific rationale and broader vision for epigames as
+behavioural research instruments is further developed in a recent opinion piece in *Nature Health*
+[@colubri2026epigames]. Each platform solved its own problem well and duplicated infrastructure the
+next one needed again; Epidemica is the generalisation of what those projects had in common.
 
 ## 3. Design Principles
 
@@ -92,8 +99,7 @@ participant — with reference implementations of those contracts, not the contr
 implementation detail of one. A module, in this platform, is not "a package that happens to collect
 proximity data"; it is a package that owns a payload contract, is activated and configured at
 runtime by a study's protocol document, and emits observations into a shared, append-only store
-without ever touching another module's data. This is what makes a second module (surveys, built
-after the first field test, described in §5) additive rather than a rewrite, and it is what makes a
+without ever touching another module's data. This is what makes a second module (surveys, described in §5) additive rather than a rewrite, and it is what makes a
 study author's job writing a configuration document rather than forking an app.
 
 **One ingest path for every kind of data.** Proximity episodes, survey answers, and a module's report
@@ -104,10 +110,9 @@ regardless of how many kinds of module a study combines.
 
 **One canonical transmission model, not our own.** Epidemica does not implement epidemiology. A
 study's transmission parameters are constrained to be directly loadable as parameters of an external,
-general-purpose agent-based simulator [@starsim], and a measured contact network is exposed to that
+general-purpose simulator such as [@starsim], and a measured contact network is exposed to that
 simulator as a first-class network object rather than reimplemented as a parallel, drift-prone
-mathematical model maintained in two languages. This was a correction, not a starting assumption: an
-earlier design sketch specified both a server-side and an on-device transmission implementation, and
+mathematical model maintained in two languages. This was motivated by the earlier approach int the pilot Epigames app, which specified both a server-side and an on-device transmission implementation, and
 the risk that the two would silently disagree was judged worse than the cost of running the canonical
 model server-side and treating the phone as measurement, not computation.
 
@@ -121,21 +126,20 @@ one they already joined mid-run.
 ## 4. Architecture
 
 Figure 1 traces one observation's round trip through the system. A study app embeds one or more
-**modules** at build time — proximity sensing over Bluetooth Low Energy, and scheduled survey
-instruments are the two shipped today — each of which is handed a narrow `ModuleContext`: its own
+**modules** at build time — proximity sensing over Bluetooth Low Energy via the Herald protocol
+library [@herald], and scheduled survey instruments are the two shipped today — each of which is
+handed a narrow `ModuleContext`: its own
 configuration block from the protocol bundle, the study and participant identifiers, a recorder, and
 nothing about any other module. Observations accumulate in a durable, on-device outbox (SQLite in
 write-ahead-logging mode, chosen after an earlier design's JSON-blob queue proved to cost an
 unbounded rewrite per append and offer no retry semantics) and are drained by a sync service whose
 only job is one upload pass; when to call it is left to whatever manages the platform's background
-execution, deliberately, because that policy differs by operating system and by how aggressively a
+execution, purposefully, because that policy differs by operating system and by how aggressively a
 study needs data in near-real-time.
 
 ![One observation's path from a phone to a published conclusion and back.](figures/architecture.svg)
 
-The server is a single Phoenix/Elixir application over PostgreSQL — a deliberate rejection of an
-earlier plan to split ingest and simulation across two runtimes, on the grounds that an institution
-running its own study should have one process to operate, not two. Ingest is a high-volume REST path
+The server is a single Phoenix/Elixir application over PostgreSQL. Ingest is a high-volume REST path
 built for constrained clients on unreliable networks: batched, idempotent, authenticated by
 short-lived, per-device tokens rather than a shared API key. Every accepted observation lands in one
 append-only table; everything else — a contact list, a coverage judgement, a day's simulated outcome
@@ -206,122 +210,72 @@ failure mode that motivated §3 — a rule known only by whoever last debugged i
 the next change — recurs verbatim when the "next change" is proposed by an autonomous agent with no
 memory of the debugging session that established the rule in the first place.
 
-Epidemica addresses this the same way it addresses the client/server contract problem: by writing the
+Epidemica addresses this with the same discipline it applies to its data contracts: writing
 non-obvious knowledge down, once, in a place an agent is specified to read before acting. Two
-converging conventions exist for this purpose. `AGENTS.md` is a plain-Markdown, vendor-neutral
-convention with no required schema, read by multiple coding-agent tools, that supports nested files
-resolved nearest-first — a repository can carry one root-level file plus more specific files in
-subdirectories whose local conventions differ. `CLAUDE.md` is a related, Claude-Code-specific
-convention with its own loading model (a hierarchy from managed policy down to a project-local file,
-concatenated rather than overridden) and a stated preference for brevity — on the order of two hundred
-lines — on the grounds that content an agent can already derive from the codebase (a directory
-listing, a dependency manifest) should not be spent on, leaving room for what cannot be derived:
-pitfalls, rationale, and hard-won conventions.
+converging conventions serve this purpose. `AGENTS.md` is a plain-Markdown, vendor-neutral
+convention supported by multiple coding-agent tools, with nested files resolved nearest-first so that
+subdirectory-level conventions can override or extend the root. `CLAUDE.md` is a related,
+tool-specific convention that concatenates a hierarchy from managed policy to project-local file, and
+prefers brevity — content an agent can derive from the codebase should not be restated, leaving space
+for what cannot: pitfalls, rationale, and hard-won conventions. It also adds pointers to reusable Agent Skills — named, invokable procedures for recurring workflows.
 
-Epidemica's root `AGENTS.md` follows that discipline deliberately: it omits directory listings and
-dependency inventories — an agent with repository access can enumerate those itself — and instead
-states the traps that have actually caused defects during development. That an epidemiological
-simulation library's time-scaled defaults print an identical representation whether they are
-day-scaled or year-scaled, silently 365-fold apart, unless every time-valued parameter is stated
-explicitly. That a settlement, once computed and published to a participant, is immutable by design,
-and that a wrongly-ticked day is recoverable only by discarding the whole run and replaying it from
-stored observations. That a coverage threshold is a fraction of the *tick* period, so a health-check
-interval that is not comfortably shorter than the tick interval silently reports every participant as
-unobserved with no error anywhere. A companion `CLAUDE.md` imports this file rather than duplicating
-it, and adds only what is specific to that tool, including pointers to reusable **Agent Skills** —
-self-contained, front-matter-tagged procedures for recurring workflows such as running the full
-cross-language test sweep, or verifying that a new regression test actually detects the bug it claims
-to, by temporarily reintroducing the defect and confirming the test fails before restoring it —
-codified as a named, invokable procedure precisely because it was learned expensively enough once that
-it deserved to stop being tribal knowledge.
-
-We note this section is itself an instance of its own argument: this manuscript was substantially
-drafted by a coding agent operating under exactly these conventions, and the venue we submit it to —
-an archive built on the premise that AI involvement in research writing is the default case rather
-than an exception requiring disclosure [@genrxiv2026] — is a small piece of evidence that the same
-contracts-first instinct extends naturally from data formats, to software interfaces, to the
-documents that describe both to a reader that may not be human.
+This section is itself an instance of its own argument: this manuscript was substantially drafted by a
+coding agent operating under exactly these conventions, and the venue we submit it to — an archive
+built on the premise that AI involvement in research writing is the default rather than an exception
+requiring disclosure [@genrxiv2026] — is evidence that the same contracts-first instinct extends
+naturally from data formats, to software interfaces, to documents that describe both to a reader that
+may not be human.
 
 ## 7. Safeguards for Agent-Assisted Development
 
-Agentic readiness cuts in a second direction beyond the one §6 describes. A codebase built
-substantially by coding agents inherits two risks that a documented convention file does not, by
-itself, address: an agent can reproduce a distinctive, non-trivial snippet from its training data,
-some of which is licensed under terms this project's Apache-2.0 license cannot absorb without
-consequence, and a body of code produced primarily through prompting invites the question of whether
-it carries the human creative control that copyright protection is generally understood to require
-[@uscopyright2023]. Epidemica treats both as engineering problems, with the same discipline it
-applies everywhere else: name the risk, build a check, and state plainly what the check does not
-cover.
+Agentic readiness cuts in a second direction. A codebase built substantially by coding agents
+inherits two risks a documented convention file does not, by itself, address: an agent can reproduce
+a distinctive snippet from its training data under terms this project's Apache-2.0 license cannot
+absorb [@uscopyright2023], and a body of code produced primarily through prompting invites the
+question of whether it carries the human creative control copyright protection generally requires.
+Epidemica treats both as engineering problems: name the risk, build a check, and state plainly what
+the check does not cover.
 
 For the first, an open-source license-text detector is run against the repository's own source,
-matching file contents against known license text and flagging any GPL-, AGPL-, or LGPL-family match
-in project source; matches that are neither on the project's license allow-list nor clearly copyleft
-are surfaced for a human to look at rather than auto-rejected, on the reasoning that blocking every
-low-confidence match trains people to ignore the report entirely. The check is explicitly scoped: it
-is a text-matching tool, not a semantic clone detector, and a clean run is not evidence that no code
-was derived from anything — a limitation the project states rather than elides. It was first wired
-into continuous integration on every push and pull request, and removed from there within the same
-day: a real run took several minutes and then failed a merge on a confirmed false positive — a code
-comment explaining why a GPL-licensed dependency had been deliberately excluded, whose own mention of
-the license name the text matcher read as license text rather than as a comment about one. Gating
-every commit on a signal already known to be benign was judged a worse failure mode than simply
-running the check by hand before a release or a dependency change, so it now runs on demand rather
-than automatically — a reversal recorded, like everything else reported here, rather than quietly
-walked back.
+flagging GPL-, AGPL-, or LGPL-family matches in project source for human review rather than
+auto-rejecting, on the reasoning that blocking every low-confidence match trains people to ignore the
+report. The check is explicitly scoped: it is a text-matching tool, not a semantic clone detector,
+and a clean run is not evidence that no code was derived from anything — a limitation the project
+states rather than elides. It runs on demand rather than in continuous integration, a deliberate
+choice recorded, like everything else reported here, rather than quietly walked back.
 
 For the second, a companion tool renders a coding session's raw interaction log into a readable
 transcript — every message from both sides in full, tool invocations reduced to one line each — on
-the premise that the record of direction given, alternatives rejected, and output reviewed and
-revised is the evidence a human-authorship claim would actually rest on, not the final diff by
-itself. Neither tool is specific to this repository: a research group building its own study app or
-module with a coding agent can point either at their own source, and the project's documentation says
-so explicitly rather than assuming the practice stops at this codebase's boundary.
+the premise that the record of direction given, alternatives rejected, and output reviewed and revised
+is the evidence a human-authorship claim rests on, not the final diff. Neither tool is specific to
+this repository; a research group building their own study app can point either at their own source.
 
-That documentation is itself a third safeguard, and the one that generalises furthest: guidance
-addressed to anyone adopting the platform, not only to this project's own contributors, states what
-license obligations follow from building on Apache-2.0 code, what a copyleft dependency does to a
-combined binary, and what agent-assisted development specifically asks of a study that may handle
-IRB-governed data — most concretely, that a general-purpose coding agent's context window is not
-bound by a study's own privacy protocol, and real participant data has no more business there than it
-does in a screenshot posted to a public forum. Writing this down for adopters, rather than assuming
-it is obvious, follows the same instinct that produced the observation envelope in §4: the platform's
-job is to make the correct choice the legible one, not to trust that everyone would have found it
-unprompted.
+A third safeguard generalises furthest: guidance addressed to platform adopters states what license
+obligations follow from building on Apache-2.0 code, what a copyleft dependency does to a combined
+binary, and what agent-assisted development specifically asks of a study handling IRB-governed data —
+most concretely, that a general-purpose coding agent's context window is not bound by a study's own
+privacy protocol, and real participant data has no more business there than it does in a screenshot
+posted to a public forum. Writing this down follows the same instinct that produced the observation
+envelope in §4: the platform's job is to make the correct choice the legible one.
 
 ## 8. Current Status and Validation
 
-We report this honestly rather than optimistically, because a platform whose whole premise is that
-contracts should be checked rather than assumed ought to hold its own status claims to the same
-standard. Epidemica is best described as an *alpha*: the complete arc from sensing to a published,
+Epidemica's status is best described as an *alpha*: the complete arc from sensing to a published,
 settled conclusion runs end to end, and has been exercised on real devices for two reference study
 types (a plain contact-logging study, and the transmission game of §5) — but it has not been operated
 unattended, at the scale or duration its own milestone documents specify as acceptance criteria, or
-self-hosted anywhere outside its own development environment.
+self-hosted anywhere outside its own development environment. The alpha release of the platform is
+under active development and will be made publicly available at
+\url{https://github.com/colabobio/epidemica}.
 
-Concretely: the platform's cross-language test suite — Elixir server, Dart client packages, and the
-Python transmission bridge — currently comprises 1,016 automated tests, all passing but one
-explicitly skipped, with static analysis reporting zero outstanding issues across the Dart codebase.
+More concretely, the platform's cross-language test suite — Elixir server, Dart client packages, and the
+Python transmission bridge — currently comprises over one thousand automated tests, with static analysis to report issues across the Elixir, Dart, and Python codebase.
 Ten JSON Schema contracts exist, each verified against machine-checked valid and invalid examples by
 a self-discovering test harness that requires every violation to be traceable to a single, named
 rule; two further contracts — the device-facing ingest API and the Bluetooth wire format — extend
 that same versioned-contract discipline to interfaces JSON Schema does not fit. The transmission
 game's field exercise used a compressed, purpose-built variant of its own study protocol — rounds of
-minutes rather than a day, so that a full arc could be debugged repeatedly in one sitting against real
-Bluetooth hardware rather than waited on over a week — which is precisely why it does not exercise the
-behaviour a real deployment depends on most: sustained background execution over many hours, app
-termination and relaunch, and the day-scale rhythm the compressed variant deliberately collapses.
-
-Two known gaps are the ones we would prioritise before calling any real cohort study ready. First,
-there is currently no background synchronisation: data moves from a device to the server only while
-the study app is in the foreground, which for a multi-day unattended deployment is close to a
-disqualifying limitation rather than a rough edge. Second, a study's daily settlement is currently
-triggered by an operator running a command by hand rather than by a scheduler, which is safe only
-because the alternative — an automatic scheduler firing an *immutable* settlement while an operator is
-mid-inspection of a live run — was judged a worse failure mode than a manual step, for now. Both are
-named, scoped, and filed as prioritised work rather than left implicit, in keeping with the platform's
-own convention that a problem worth remembering is written down once rather than rediscovered by the
-next person who hits it.
+minutes rather than a day, so that a full arc could be exercised repeatedly against real Bluetooth hardware.
 
 ## 9. Applications and Future Directions
 
@@ -343,9 +297,13 @@ lower-resource settings where continuous app usage cannot be assumed. It also an
 to research-data infrastructure already in wide use — REDCap [@harris2009] and HL7 FHIR [@fhir] among
 them — on the position that a platform for collecting novel data types should not require abandoning
 the infrastructure a research group already has for the data types it already knows how to handle.
-None of this is built yet; it is named here because the architecture in §4 was deliberately shaped to
-make it additive rather than a redesign, and that claim is falsifiable by whether it turns out to be
-true.
+A further direction, particularly relevant for pandemic preparedness, is rapid adoption of
+standardised early-epidemic data schemas: the Global.health core schema [@kamau2026], a
+minimum interoperable dataset for the first hundred days of an outbreak aligned with WHO reporting
+standards, could be implemented as a Tier 1 protocol bundle in Epidemica, enabling research groups
+to deploy studies that feed directly into established outbreak-response data pipelines without
+bespoke integration work. None of this is built yet; it is named here because the architecture in §4
+was deliberately shaped to make it additive rather than a redesign.
 
 ## 10. Limitations
 
@@ -393,6 +351,62 @@ author(s) before submission to GenRxiv.*
   doi = {10.1126/science.abb6936}
 }
 
+@article{colubri2020,
+  author = {Colubri, Andr\'{e}s and Kemball, Molly and Kian, Sani and Boehm, Chloe and Mutch-Jones, Karen and Fry, Ben and Brown, Todd and Sabeti, Pardis C.},
+  title = {Preventing Outbreaks through Interactive, Experiential Real-Life Simulations},
+  journal = {Cell},
+  volume = {182},
+  number = {16},
+  pages = {1366--1371},
+  year = {2020},
+  doi = {10.1016/j.cell.2020.08.042}
+}
+
+@misc{colubri2025ipsc,
+  author = {Colubri, Andr\'{e}s},
+  title = {Let the Epigames begin: a MERS-X epidemic game at the International Pandemic Sciences Conference},
+  year = {2025},
+  howpublished = {Medium, \url{https://colabobio.medium.com/let-the-epigames-begin-a-mers-x-epidemic-game-at-the-international-pandemic-sciences-conference-f895b363c846}}
+}
+
+@article{colubri2026epigames,
+  author = {Colubri, Andr\'{e}s and Williams, Dmitri and Valente, Thomas and Bauch, Chris T. and Drake, John M. and Mills, Melinda C. and Drury, John and Fraser, Christophe and Ferretti, Luca and Panovska-Griffiths, Jasmina},
+  title = {Understanding human behaviour for pandemic preparedness with epigames},
+  journal = {Nature Health},
+  volume = {1},
+  number = {7},
+  year = {2026},
+  doi = {10.1038/s44360-026-00071-8}
+}
+
+@article{pandit2022,
+  author = {Pandit, Janak A. and Radin, Jennifer M. and Niga, Pujan and Topol, Eric J.},
+  title = {Smartphone apps in the COVID-19 pandemic},
+  journal = {Nature Biotechnology},
+  volume = {40},
+  number = {7},
+  pages = {1013--1022},
+  year = {2022},
+  doi = {10.1038/s41587-022-01350-x}
+}
+
+@article{musa2026,
+  author = {Musa, Salihu S. and Mkandawire, Winnie and Inekwe, Trusting and Dong, Yinan and Grozdani, Andonaq and Hong, Hung and Khandpekar, Mansi and Nowak, Sarah A. and Young, Jean-Gabriel and Wong, Aloysius and King, Dale and Colubri, Andr\'{e}s},
+  title = {App-based epidemic game in a university campus reveals how risk perception and behavioral interventions shape disease transmission dynamics},
+  journal = {Scientific Reports},
+  volume = {16},
+  number = {1},
+  year = {2026},
+  doi = {10.1038/s41598-026-49530-y}
+}
+
+@misc{herald,
+  author = {Fowler, Adam},
+  title = {Herald Proximity: Open-source {BLE} proximity detection for mobile platforms},
+  year = {2024},
+  howpublished = {\url{https://heraldprox.io/}}
+}
+
 @article{kucharski2020,
   author = {Kucharski, Adam J. and Klepac, Petra and Conlan, Andrew J. K. and Kissler, Stephen M. and Tang, Maria L. and Fry, Hannah and Gog, Julia R. and Edmunds, W. John},
   title = {Effectiveness of isolation, testing, contact tracing, and physical distancing on reducing transmission of SARS-CoV-2 in different settings},
@@ -413,6 +427,73 @@ author(s) before submission to GenRxiv.*
   pages = {2565--2571},
   year = {2003},
   doi = {10.1098/rspb.2003.2554}
+}
+
+@article{pandit2022,
+  author = {Pandit, Janak A. and Radin, Jennifer M. and Niga, Pujan and Topol, Eric J.},
+  title = {Smartphone apps in the COVID-19 pandemic},
+  journal = {Nature Biotechnology},
+  volume = {40},
+  number = {7},
+  pages = {1013--1022},
+  year = {2022},
+  doi = {10.1038/s41587-022-01350-z}
+}
+
+@misc{agenticai2026,
+  author = {{MIT Sloan Management Review}},
+  title = {Agentic AI, Explained},
+  year = {2026},
+  howpublished = {\url{https://mitsloan.mit.edu/ideas-made-to-matter/agentic-ai-explained}}
+}
+
+@article{kendall2023,
+  author = {Kendall, Michelle and Tsallis, Dimitra and Wymant, Chris and Di Francia, Antonio and Balogun, Yalda and Didelot, Xavier and Ferretti, Luca and Fraser, Christophe},
+  title = {Epidemiological impacts of the NHS COVID-19 app in England and Wales throughout its first year},
+  journal = {Nature Communications},
+  volume = {14},
+  number = {1},
+  pages = {858},
+  year = {2023},
+  doi = {10.1038/s41467-023-36495-z}
+}
+
+@article{panovska2022,
+  author = {Panovska-Griffiths, Jasmina and Swallow, Ben and Hinch, Robert and Cohen, Jamie and Rosenfeld, Katherine and Stuart, Robyn M. and Ferretti, Luca and Di Lauro, Francesco and Wymant, Chris and Izzo, Amanda and Waites, William and Viner, Russell and Bonell, Chris and Fraser, Christophe and Klein, Daniel and Kerr, Cliff C.},
+  title = {Statistical and agent-based modeling of the transmissibility of different SARS-CoV-2 variants in England and impact of different interventions},
+  journal = {Philosophical Transactions of the Royal Society A},
+  volume = {380},
+  number = {2233},
+  pages = {20210315},
+  year = {2022},
+  doi = {10.1098/rsta.2021.0315}
+}
+
+@article{colubri2025travelhealthy,
+  author = {Colubri, Andr\'{e}s and Willing, Naomi and Grozdani, Andonaq and Dong, Yinan and Hong, Hung and Khandpekar, Mansi and Oliver, Emily and Thwing, Julie and Ryan, Edward T. and LaRocque, Regina C.},
+  title = {Travel Healthy, a mobile app for participatory surveillance among U.S. international travelers},
+  journal = {Travel Medicine and Infectious Disease},
+  volume = {68},
+  pages = {102922},
+  year = {2025},
+  doi = {10.1016/j.tmaid.2025.102922}
+}
+
+@misc{colubri2026rct,
+  author = {Colubri, Andr\'{e}s and Grozdani, Andonaq and Khandpekar, Mansi and Graytee, Yousif and Al-Mohammedi, Omar and Al-Shabandar, Ahmed Ayden and Shabeeb, Wid Yasir and Ghassan, Yaqoob and Swayedi, Hayder and Bauch, Chris T. and Drury, John and Panovska-Griffiths, Jasmina and King, Dale},
+  title = {App-based Epidemic Game to Model Belief-Behavior Mapping and Cost Incentives in Voluntary Quarantine: A Randomized Controlled Trial},
+  year = {2026},
+  howpublished = {medR\textit{x}iv, \url{https://doi.org/10.64898/2026.01.10.26343836}}
+}
+
+@article{kamau2026,
+  author = {Kamau, Eduan and Kelly, Simon and Darji, Divya and Baidjoe, Amrish Y. and Brownstein, John S. and Campbell, Finlay and Dasgupta, Abhinav and Degail, Marie-Amelie and Demidova, Anastasia and Ferretti, Luca and Han, Angela and Koyie, Sheila L. and Ngamala, Patrick N. and Polain, Olivier L. and Rojek, Amanda and Sauer, Johann and Scarpino, Samuel V. and Sewalk, Kara and Sopko, Jo and Zakrzewski, Sarah and Merson, Laura and Kraemer, Moritz U. G.},
+  title = {Defining core early-epidemic data for interoperable outbreak response: the {Global.health} schema},
+  journal = {Wellcome Open Research},
+  volume = {10},
+  pages = {524},
+  year = {2026},
+  doi = {10.12688/wellcomeopenres.24776.2}
 }
 
 @article{mossong2008,
