@@ -5,9 +5,18 @@ defmodule EpidemicaServer.Twin.Worker do
   Days are run in order and one at a time, because each tick starts from the state its predecessor
   wrote. A day already decided is reported as done rather than retried: the job failing forever on
   a tick that has already happened would be noise, not a signal.
+
+  Unique while a job for the same day is still live. The scheduler asks hourly and only stops asking
+  once a tick row exists, so without this a day whose tick keeps failing -- an engine that cannot
+  start is the obvious way -- would accumulate a job an hour, indefinitely. Uniqueness covers the
+  non-terminal states only: once every attempt is spent the job is discarded, and an operator who
+  has fixed the cause can enqueue it again.
   """
 
-  use Oban.Worker, queue: :twin, max_attempts: 5
+  use Oban.Worker,
+    queue: :twin,
+    max_attempts: 5,
+    unique: [period: :infinity, states: [:available, :scheduled, :executing, :retryable]]
 
   alias EpidemicaServer.Epigame
   alias EpidemicaServer.Twin

@@ -1,9 +1,58 @@
 # 0002 — Ticks do not run on their own
 
-**Status:** backlog
+**Status:** done
 **Filed:** 2026-09-02
-**Touches:** `server/config/config.exs`, `server/lib/epidemica_server/twin/worker.ex`,
-`server/lib/epidemica_server/ops.ex` (new)
+**Landed:** 2026-09-09
+**Touches:** `server/config/config.exs`, `server/lib/epidemica_server/twin/scheduler.ex` (new),
+`server/lib/epidemica_server/twin/worker.ex`, `server/lib/epidemica_server/ops.ex` (new)
+
+## What was built, and where it differs from the plan below
+
+`Twin.Scheduler`, run hourly by `Oban.Plugins.Cron`, decides which study-days are due and enqueues
+them. It is a *decision*, not an actor: `due_ticks/1` answers "what should run" and returns pairs,
+so a test can assert the answer without asserting anything about Oban, and running it twice is safe
+by construction rather than by discipline.
+
+Four things are worth recording because they are not obvious from the plan:
+
+**Which days exist is asked in one place.** `due_for/2` is built on `Studies.days_to_catch_up/2`,
+the same function `Ops.catch_up/1` and `mix epidemica.tick --catch-up` use. A scheduler with its own
+notion of "has this study started, is it over" would eventually disagree with the task that operators
+reach for when it goes wrong.
+
+**The buffer applies to a finished study's last day too.** An earlier cut special-cased an ended
+study and offered every day at once. But *over* is not *finished arriving*: day 7 ending is exactly
+when the buffer matters most, because there is no day 8 whose tick would pick up the stragglers.
+One rule, applied uniformly.
+
+**`Twin.Worker` is now unique across the live job states.** The scheduler keeps finding a day due
+until a tick row exists, so a day whose tick cannot run — an engine that will not start being the
+obvious case — would have accumulated one job an hour, indefinitely. Uniqueness covers
+`available`, `scheduled`, `executing` and `retryable` only: once every attempt is spent the job is
+discarded, and an operator who has fixed the cause can enqueue it again.
+
+**The scheduler runs in its own queue.** Sharing `twin` (limit 1) would put the hourly decision
+behind whatever ticks are already queued, so a study catching up on a week would stop noticing new
+days while it worked.
+
+**Cron is `:prod` only.** In dev it would fire immutable ticks mid-inspection, which is the opposite
+of what [`studies/epigame-debug`](../../studies/epigame-debug/README.md) exists for. Test disables
+Oban outright.
+
+## What was deliberately left undone
+
+The multi-node trap is documented, not closed. `Oban.Plugins.Cron` elects a leader, so two nodes
+would not both schedule — but the `twin` queue's limit of one is per node, so a job enqueued outside
+the scheduler could still tick the same study twice. The unique index on `twin_ticks (study_id, day)`
+makes that harmless rather than corrupting, and the loser fails silently in its own logs. Until a
+deployment runs more than one node this stays a documented constraint.
+
+`Twin.Worker` still burns all five attempts on a premature day rather than snoozing until
+`period_end`. The scheduler's buffer means it never hands one over, so this is now only reachable
+by a manual enqueue — noted in [epigame.md](../../docs/concepts/epigame.md), still worth fixing.
+
+The interaction with [`0001`](../backlog/0001-configurable-tick-interval.md) is noted, not resolved:
+both tasks are really about when a day's data has finished arriving.
 
 ## The problem
 
@@ -47,7 +96,7 @@ outside the repository where nobody will find it.
    every 15 minutes. Ticking at the instant a day ends settles it before the last uploads land.
    Half an hour is a reasonable default; it should be derived from `sync.min_interval_seconds`
    rather than guessed, and it interacts with
-   [`0001`](0001-configurable-tick-interval.md) — both are really the same constraint about data
+   [`0001`](../backlog/0001-configurable-tick-interval.md) — both are really the same constraint about data
    arrival.
 
 4. **`EpidemicaServer.Ops`**, a small module of operator entry points callable from

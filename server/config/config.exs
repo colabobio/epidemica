@@ -53,11 +53,28 @@ config :logger, :console,
 config :phoenix, :json_library, Jason
 
 # The twin queue runs one job at a time: a tick reads the state its predecessor wrote, so two of
-# them for the same study must never overlap.
+# them for the same study must never overlap. The scheduler gets a queue of its own so the hourly
+# decision is never stuck behind a study catching up on a week of days.
+#
+# Cron owns the decision to look at all; `Twin.Scheduler` decides which days are actually due from
+# that moment, so an hour of downtime delays a tick rather than losing it.
+#
+# Prod only. A scheduler that fires on its own is the opposite of what debugging needs:
+# `studies/epigame-debug` exists so a day can be ticked by hand, inspected, and ticked again, and a
+# job firing mid-inspection is interference, not a safety net. Test disables Oban outright
+# (`config/test.exs`); dev gets the queues without the cron.
+oban_plugins =
+  [{Oban.Plugins.Pruner, max_age: 60 * 60 * 24 * 7}] ++
+    if config_env() == :prod do
+      [{Oban.Plugins.Cron, crontab: [{"@hourly", EpidemicaServer.Twin.Scheduler}]}]
+    else
+      []
+    end
+
 config :epidemica_server, Oban,
   repo: EpidemicaServer.Repo,
-  queues: [twin: 1],
-  plugins: [{Oban.Plugins.Pruner, max_age: 60 * 60 * 24 * 7}]
+  queues: [twin: 1, scheduler: 1],
+  plugins: oban_plugins
 
 # Where the Starsim bridge lives. Set explicitly so a release fails loudly rather than guessing a
 # path and silently running nothing.

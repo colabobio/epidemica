@@ -243,9 +243,9 @@ Re-run it every few minutes, or leave it running:
 watch -n 60 "mix epidemica.tick --study $STUDY --catch-up"
 ```
 
-This is deliberately manual. An automatic scheduler
-([task 0002](../../tasks/backlog/0002-scheduled-ticks.md)) would fire immutable ticks while you are
-mid-inspection, which is the opposite of what debugging needs.
+This is deliberately manual, and stays manual. `Oban.Plugins.Cron` is configured for `:prod` only
+([task 0002](../../tasks/done/0002-scheduled-ticks.md)), because a scheduler firing immutable ticks
+while you are mid-inspection is the opposite of what debugging needs.
 
 ## 5. Check what the round decided
 

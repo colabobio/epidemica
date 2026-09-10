@@ -9,6 +9,7 @@ it serves**.
 | [`docker/`](docker) | The server image. Used by both a self-hosted deployment and the AWS one. |
 | [`aws/`](aws) | Running that image on EC2, for studies that need a hosted server. |
 | [`app-release/`](app-release) | Signed app builds pointed at a deployed server. |
+| [`epigames7-live-test.md`](epigames7-live-test.md) | The seven-day study, end to end, in the order you actually do it. |
 
 [`common.sh`](common.sh) holds what the local recipes share: starting PostgreSQL, migrating,
 working out this machine's LAN address, and registering a bundle.
@@ -32,8 +33,11 @@ isolation will not work.
 
 ## Known gaps
 
-- **Ticks are not scheduled.** A deployed study collects data and never advances until something
-  drives the days. See [`tasks/backlog/0002`](../tasks/backlog/0002-scheduled-ticks.md); the AWS
-  page has an interim cron entry.
 - **Nothing here has been run end to end.** The image builds are written against the code but
   untested, and the five device-level criteria from M1 are still outstanding.
+- **Multi-node is not supported.** `Oban.Plugins.Cron` elects a leader, so scheduling is safe, but
+  the `twin` queue's limit of one job is per node rather than per cluster. Keep any deployment to a
+  single server — see [`aws/README.md`](aws/README.md).
+
+Ticks are no longer a gap: they are scheduled by `Twin.Scheduler` under `Oban.Plugins.Cron`, in
+prod only. See [`tasks/done/0002`](../tasks/done/0002-scheduled-ticks.md).
