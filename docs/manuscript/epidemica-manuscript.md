@@ -429,17 +429,6 @@ author(s) before submission to GenRxiv.*
   doi = {10.1098/rspb.2003.2554}
 }
 
-@article{pandit2022,
-  author = {Pandit, Janak A. and Radin, Jennifer M. and Niga, Pujan and Topol, Eric J.},
-  title = {Smartphone apps in the COVID-19 pandemic},
-  journal = {Nature Biotechnology},
-  volume = {40},
-  number = {7},
-  pages = {1013--1022},
-  year = {2022},
-  doi = {10.1038/s41587-022-01350-z}
-}
-
 @misc{agenticai2026,
   author = {{MIT Sloan Management Review}},
   title = {Agentic AI, Explained},
