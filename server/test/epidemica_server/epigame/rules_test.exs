@@ -107,4 +107,82 @@ defmodule EpidemicaServer.Epigame.RulesTest do
       assert Rules.pars(nil)["protection_cost"] == 1
     end
   end
+
+  describe "arms" do
+    defp armed do
+      %{
+        "pars" => %{"protection_cost" => 1, "contact_points" => 5},
+        "arms" => [
+          %{"name" => "low", "weight" => 1, "pars" => %{}},
+          %{"name" => "high", "weight" => 3, "pars" => %{"protection_cost" => 2}}
+        ]
+      }
+    end
+
+    test "an arm overlays the shared pars" do
+      assert Rules.pars_for(armed(), "high")["protection_cost"] == 2
+
+      # Anything the arm does not name stays shared, or naming one constant would zero the rest.
+      assert Rules.pars_for(armed(), "high")["contact_points"] == 5
+      assert Rules.pars_for(armed(), "low")["protection_cost"] == 1
+    end
+
+    test "no arm, and an unknown one, is the shared pars" do
+      # A participant who joined before the study randomised still has to be priced.
+      assert Rules.pars_for(armed(), nil) == Rules.pars(armed())
+      assert Rules.pars_for(armed(), "nobody") == Rules.pars(armed())
+    end
+
+    test "a study that declares no arms is one group and is unaffected" do
+      assert Rules.arms(%{"pars" => %{}}) == nil
+      assert Rules.assign_arm(%{"pars" => %{}}, "s", "subj") == nil
+
+      # Every bundle written before arms existed keeps meaning what it meant.
+      assert Rules.pars_for(%{"pars" => %{"protection_cost" => 9}}, "anything") ==
+               Rules.pars(%{"pars" => %{"protection_cost" => 9}})
+    end
+
+    test "the draw follows the weights" do
+      rules = %{
+        "arms" => [
+          %{"name" => "low", "weight" => 1, "pars" => %{}},
+          %{"name" => "high", "weight" => 3, "pars" => %{}}
+        ]
+      }
+
+      share =
+        1..4000
+        |> Enum.count(&(Rules.assign_arm(rules, "study", "subject-#{&1}") == "high"))
+        |> Kernel./(4000)
+
+      # 3:1, so the truth is 0.75. Bounds rather than an exact figure: this is a draw, and a test
+      # tight enough to pin it would fail on a fair one.
+      assert share > 0.70
+      assert share < 0.80
+    end
+
+    test "the same participant is always drawn the same way" do
+      # An audit has to be able to re-derive the split from the record, and nothing may move a
+      # participant between conditions after the fact.
+      assert Rules.assign_arm(armed(), "s1", "subj") == Rules.assign_arm(armed(), "s1", "subj")
+    end
+
+    test "every draw lands in an arm that exists" do
+      for n <- 1..500 do
+        assert Rules.assign_arm(armed(), "s", "s#{n}") in ["low", "high"]
+      end
+    end
+
+    test "an arm leaves the constants that decide what a contact is alone" do
+      # The restriction lives in the bundle schema, in one place, so an arm carrying
+      # `contact_min_seconds` never registers. This overlay is a plain merge and does not re-check
+      # it -- two lists of permitted keys would eventually disagree, and the schema is the one an
+      # author actually meets. What is asserted here is the consequence: an arm that names only
+      # prices leaves every pair-level duration at the study's value.
+      assert Rules.pars_for(armed(), "high")["contact_min_seconds"] == 600
+      assert Rules.pars_for(armed(), "high")["contact_cooldown_days"] == 1
+      assert Rules.pars_for(armed(), "high")["protection_window_seconds"] == 86_400
+      assert Rules.pars_for(armed(), "high")["carry_over_days"] == 3
+    end
+  end
 end

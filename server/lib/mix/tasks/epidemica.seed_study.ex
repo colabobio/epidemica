@@ -136,6 +136,16 @@ defmodule Mix.Tasks.Epidemica.SeedStudy do
     """
   end
 
+  defp explain(path, {:arms_share_a_name, repeated}) do
+    """
+    #{path} declares more than one arm called #{Enum.map_join(repeated, ", ", &inspect/1)}.
+
+    An arm's name is the label analysis splits by, so two arms sharing one merges the conditions
+    into a single group -- exactly the comparison the study exists to make -- and the merge leaves
+    no trace afterwards.
+    """
+  end
+
   defp explain(path, reason), do: "#{path} could not be registered: #{inspect(reason)}"
 
   defp describe(error) when is_list(error) do
@@ -177,6 +187,15 @@ defmodule Mix.Tasks.Epidemica.SeedStudy do
 
       {:error, {:code_taken, other}} ->
         Mix.raise(code_taken(code, %{study_id: other}))
+
+      {:error, :study_randomises_arms} ->
+        Mix.raise("""
+        #{code} was given --arm, but this study declares `rules.arms` and randomises instead.
+
+        Both decide a participant's arm and only one can win. Stamping the arm on a code is
+        stratification by who you handed which code to; `rules.arms` is a draw at enrolment. Pick
+        the one the protocol means and drop the other.
+        """)
 
       {:error, reason} ->
         Mix.raise("could not attach join code #{code}: #{inspect(reason)}")

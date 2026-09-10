@@ -255,5 +255,105 @@
         "population": 50
       }
     }
+  },
+  {
+    "case": "a study that randomises the price of protection across two arms",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "77777777-8888-4999-8aaa-bbbbbbbbbbbb",
+      "title": "Epigame seven-day",
+      "modules": {
+        "proximity": {}
+      },
+      "twin": {
+        "engine": "starsim",
+        "state_uri": "https://schemas.epidemica.info/state/epigame/1.0.0.json",
+        "population": 50
+      },
+      "rules": {
+        "engine": "epigame",
+        "pars": {
+          "healthy_points": 2,
+          "protection_cost": 1,
+          "contact_points": 5
+        },
+        "arms": [
+          {
+            "name": "low_cost",
+            "weight": 1,
+            "pars": {}
+          },
+          {
+            "name": "high_cost",
+            "weight": 2,
+            "pars": {
+              "protection_cost": 2
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "case": "an arm that names nothing, which is how a control arm is written",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "77777777-8888-4999-8aaa-bbbbbbbbbbbb",
+      "title": "Epigame seven-day",
+      "modules": {
+        "proximity": {}
+      },
+      "twin": {
+        "engine": "starsim",
+        "state_uri": "https://schemas.epidemica.info/state/epigame/1.0.0.json",
+        "population": 50
+      },
+      "rules": {
+        "engine": "epigame",
+        "pars": {
+          "protection_cost": 3
+        },
+        "arms": [
+          {
+            "name": "control",
+            "weight": 1,
+            "pars": {}
+          }
+        ]
+      }
+    }
+  },
+  {
+    "case": "every price an arm is allowed to vary",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "77777777-8888-4999-8aaa-bbbbbbbbbbbb",
+      "title": "Epigame seven-day",
+      "modules": {
+        "proximity": {}
+      },
+      "twin": {
+        "engine": "starsim",
+        "state_uri": "https://schemas.epidemica.info/state/epigame/1.0.0.json",
+        "population": 50
+      },
+      "rules": {
+        "engine": "epigame",
+        "pars": {},
+        "arms": [
+          {
+            "name": "generous",
+            "weight": 1,
+            "pars": {
+              "healthy_points": 3,
+              "infected_points": 1,
+              "protection_cost": 0,
+              "contact_points": 8,
+              "contact_points_while_infected": true
+            }
+          }
+        ]
+      }
+    }
   }
 ]

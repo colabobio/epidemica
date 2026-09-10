@@ -314,5 +314,144 @@
         "population": 50
       }
     }
+  },
+  {
+    "case": "an arm that changes what counts as a contact",
+    "why": "`contact_min_seconds` decides whether an encounter happened at all, and an encounter joins two people. Two participants in different arms would disagree about whether the same contact took place, and neither answer is fair to both. Prices may vary; the definition of a contact may not.",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "77777777-8888-4999-8aaa-bbbbbbbbbbbb",
+      "title": "Epigame seven-day",
+      "modules": {
+        "proximity": {}
+      },
+      "twin": {
+        "engine": "starsim",
+        "state_uri": "https://schemas.epidemica.info/state/epigame/1.0.0.json",
+        "population": 50
+      },
+      "rules": {
+        "engine": "epigame",
+        "pars": {
+          "protection_cost": 1
+        },
+        "arms": [
+          {
+            "name": "lenient",
+            "weight": 1,
+            "pars": {
+              "contact_min_seconds": 60
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "case": "an arm that changes how long protection lasts",
+    "why": "Protection removes a participant from a pair's award, so its duration is a pair-level rule. One arm holding protection longer would silently deny the other side contacts it was promised.",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "77777777-8888-4999-8aaa-bbbbbbbbbbbb",
+      "title": "Epigame seven-day",
+      "modules": {
+        "proximity": {}
+      },
+      "twin": {
+        "engine": "starsim",
+        "state_uri": "https://schemas.epidemica.info/state/epigame/1.0.0.json",
+        "population": 50
+      },
+      "rules": {
+        "engine": "epigame",
+        "pars": {},
+        "arms": [
+          {
+            "name": "long",
+            "weight": 1,
+            "pars": {
+              "protection_window_seconds": 172800
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "case": "an arm with zero weight",
+    "why": "A zero-weight arm can never be drawn, so it would sit in the protocol describing a group no participant is ever in.",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "77777777-8888-4999-8aaa-bbbbbbbbbbbb",
+      "title": "Epigame seven-day",
+      "modules": {
+        "proximity": {}
+      },
+      "twin": {
+        "engine": "starsim",
+        "state_uri": "https://schemas.epidemica.info/state/epigame/1.0.0.json",
+        "population": 50
+      },
+      "rules": {
+        "engine": "epigame",
+        "pars": {},
+        "arms": [
+          {
+            "name": "low",
+            "weight": 0,
+            "pars": {}
+          }
+        ]
+      }
+    }
+  },
+  {
+    "case": "an arm with no pars at all",
+    "why": "An arm that overrides nothing is written `\"pars\": {}`. Omitting the key entirely is more likely a half-written arm than a deliberate control, and the difference matters too much to guess.",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "77777777-8888-4999-8aaa-bbbbbbbbbbbb",
+      "title": "Epigame seven-day",
+      "modules": {
+        "proximity": {}
+      },
+      "twin": {
+        "engine": "starsim",
+        "state_uri": "https://schemas.epidemica.info/state/epigame/1.0.0.json",
+        "population": 50
+      },
+      "rules": {
+        "engine": "epigame",
+        "pars": {},
+        "arms": [
+          {
+            "name": "low",
+            "weight": 1
+          }
+        ]
+      }
+    }
+  },
+  {
+    "case": "an empty arms array",
+    "why": "Declaring arms asks for a draw at enrolment; an empty array asks for a draw with nothing to draw. A study with one group leaves `arms` out.",
+    "instance": {
+      "bundle_version": "1.0",
+      "study_id": "77777777-8888-4999-8aaa-bbbbbbbbbbbb",
+      "title": "Epigame seven-day",
+      "modules": {
+        "proximity": {}
+      },
+      "twin": {
+        "engine": "starsim",
+        "state_uri": "https://schemas.epidemica.info/state/epigame/1.0.0.json",
+        "population": 50
+      },
+      "rules": {
+        "engine": "epigame",
+        "pars": {},
+        "arms": []
+      }
+    }
   }
 ]

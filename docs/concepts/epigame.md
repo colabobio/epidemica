@@ -6,7 +6,8 @@ journey.
 This is the Tier 2 reference: one study app, one server-side twin, one scoring engine. It assumes
 [modules](modules.md), [the observation envelope](observation-envelope.md),
 [proximity](proximity.md) and [the state channel](state-channel.md), and joins them up.
-Scheduled instruments have their own reference in [surveys](surveys.md).
+Scheduled instruments have their own reference in [surveys](surveys.md), and a study that
+randomises its prices across participants is covered in [arms](arms.md).
 
 ## The pieces
 

@@ -902,6 +902,15 @@ whose clock is badly wrong will therefore ask early or late. The same exposure t
 device-side scheduling has, and bounded by `window_seconds`, but it now affects a per-participant
 schedule rather than only a shared one.
 
+**F25 — An arm may vary prices but not the four shared durations.** `contact_min_seconds`,
+`contact_cooldown_days`, `protection_window_seconds` and `carry_over_days` decide something about a
+*pair*, so two participants in different arms would disagree about whether the same encounter
+happened. The bundle schema refuses an arm naming one; `Rules.pars_for/2` is a plain merge and does
+not re-check, deliberately — a second list of permitted keys would drift from the first. If that
+restriction is relaxed, reconciliation stops being single-valued and `award_contacts` needs an
+answer it does not currently have. Settlement is the only place that takes per-participant pars;
+everything deciding *whether* a contact counts stays on `Rules.pars/1`.
+
 ---
 
 ## §6 Discrepancies between docs and code

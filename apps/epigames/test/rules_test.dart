@@ -103,4 +103,48 @@ void main() {
       });
     }
   });
+
+  group('arms', () {
+    const rules = {
+      'pars': {'protection_cost': 1, 'contact_points': 5},
+      'arms': [
+        {'name': 'low', 'weight': 1, 'pars': <String, Object?>{}},
+        {
+          'name': 'high',
+          'weight': 1,
+          'pars': {'protection_cost': 2},
+        },
+      ],
+    };
+
+    test('an arm overlays the shared pars', () {
+      expect(RulePars.forArm(rules, 'high').integer('protection_cost'), 2);
+      // Anything the arm does not name stays shared, or naming one constant would zero the rest.
+      expect(RulePars.forArm(rules, 'high').integer('contact_points'), 5);
+      expect(RulePars.forArm(rules, 'low').integer('protection_cost'), 1);
+    });
+
+    test('no arm, and an unknown one, is the shared pars', () {
+      expect(RulePars.forArm(rules, null).integer('protection_cost'), 1);
+      expect(RulePars.forArm(rules, 'nobody').integer('protection_cost'), 1);
+    });
+
+    test('a bundle that declares no arms is unaffected', () {
+      // Every study written before arms existed has to keep meaning what it meant.
+      const plain = {
+        'pars': {'protection_cost': 4},
+      };
+
+      expect(RulePars.forArm(plain, 'high').integer('protection_cost'), 4);
+      expect(RulePars.fromBundle(plain).integer('protection_cost'), 4);
+    });
+
+    test('an arm leaves the constants that decide what a contact is alone', () {
+      // The bundle schema is what forbids an arm from naming these, so one never reaches a device.
+      // What holds here is the consequence: an arm naming only prices leaves every pair-level
+      // duration at the study's value, on both sides of the wire.
+      expect(RulePars.forArm(rules, 'high').integer('contact_min_seconds'), 600);
+      expect(RulePars.forArm(rules, 'high').integer('carry_over_days'), 3);
+    });
+  });
 }

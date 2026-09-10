@@ -308,5 +308,7 @@ answers so scoring can be recomputed if the algorithm is later corrected. Nothin
 - [modules](modules.md) — what a module is, and what the server needs from a new one
 - [the observation envelope](observation-envelope.md) — what wraps a response on its way up
 - [epigames](epigame.md) — the study this was first built for
+- [arms](arms.md) — a study that randomises its prices across participants, which an instrument is
+  then how you measure what changed
 - [`tasks/backlog/0008`](../../tasks/backlog/0008-survey-module.md) — the task this came from,
   including the decisions taken and why

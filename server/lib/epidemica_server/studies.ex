@@ -50,7 +50,8 @@ defmodule EpidemicaServer.Studies do
   indistinguishable from a disease that failed to spread.
   """
   def validate_bundle(decoded) when is_map(decoded) do
-    with :ok <- schema(decoded) do
+    with :ok <- schema(decoded),
+         :ok <- arms_distinct(decoded) do
       coverage_reportable(decoded)
     end
   end
@@ -59,6 +60,22 @@ defmodule EpidemicaServer.Studies do
     case Contracts.validate_bundle(decoded) do
       :ok -> :ok
       {:error, error} -> {:error, {:invalid_bundle, error}}
+    end
+  end
+
+  # JSON Schema can require a name pattern but not that the names differ. Two arms sharing one merges
+  # the two conditions into a single label, which is precisely the split the study exists to make,
+  # and the merge is invisible afterwards: the column says `low` for both groups.
+  defp arms_distinct(decoded) do
+    names =
+      decoded
+      |> get_in(["rules", "arms"])
+      |> List.wrap()
+      |> Enum.map(fn arm -> is_map(arm) && arm["name"] end)
+
+    case names -- Enum.uniq(names) do
+      [] -> :ok
+      repeated -> {:error, {:arms_share_a_name, Enum.uniq(repeated)}}
     end
   end
 
@@ -110,23 +127,41 @@ defmodule EpidemicaServer.Studies do
   `{:error, {:code_taken, study_id}}` rather than reported as a note: the alternative is a study
   that registers, prints an id, and has no way in, while devices using the code enrol somewhere
   else entirely.
+
+  An `arm` on the code is refused when the protocol declares `rules.arms`. They are two different
+  experiments — one stratifies by who you handed which code to, the other randomises — and only one
+  can decide a participant's arm. Accepting both would let the design a researcher wrote down be
+  overruled without a word.
   """
   def add_join_code(%Study{} = study, code, arm \\ nil) do
     study_id = study.id
 
-    case join_code_owner(code) do
-      nil ->
-        %JoinCode{}
-        |> JoinCode.changeset(%{study_id: study.id, code: code, arm: arm})
-        |> Repo.insert()
+    with :ok <- code_arm_allowed(study, arm) do
+      case join_code_owner(code) do
+        nil ->
+          %JoinCode{}
+          |> JoinCode.changeset(%{study_id: study.id, code: code, arm: arm})
+          |> Repo.insert()
 
-      %JoinCode{study_id: ^study_id} = held ->
-        {:ok, held}
+        %JoinCode{study_id: ^study_id} = held ->
+          {:ok, held}
 
-      %JoinCode{} = taken ->
-        {:error, {:code_taken, taken.study_id}}
+        %JoinCode{} = taken ->
+          {:error, {:code_taken, taken.study_id}}
+      end
     end
   end
+
+  defp code_arm_allowed(_study, nil), do: :ok
+
+  defp code_arm_allowed(%Study{protocol: protocol}, _arm) when is_map(protocol) do
+    case get_in(protocol, ["rules", "arms"]) do
+      list when is_list(list) -> {:error, :study_randomises_arms}
+      _ -> :ok
+    end
+  end
+
+  defp code_arm_allowed(_study, _arm), do: :ok
 
   @doc """
   Point an existing join code at a different study.
@@ -137,12 +172,14 @@ defmodule EpidemicaServer.Studies do
   default.
   """
   def move_join_code(%Study{} = study, code, arm \\ nil) do
-    case join_code_owner(code) do
-      nil ->
-        add_join_code(study, code, arm)
+    with :ok <- code_arm_allowed(study, arm) do
+      case join_code_owner(code) do
+        nil ->
+          add_join_code(study, code, arm)
 
-      %JoinCode{} = held ->
-        held |> JoinCode.changeset(%{study_id: study.id, arm: arm}) |> Repo.update()
+        %JoinCode{} = held ->
+          held |> JoinCode.changeset(%{study_id: study.id, arm: arm}) |> Repo.update()
+      end
     end
   end
 

@@ -162,6 +162,60 @@
         "pars": {
           "type": "object",
           "description": "Every constant the rules use, so a second game with different economics needs no rebuild. Interpreted only by the named rule engine, and carried to the app unchanged so both sides score from one source."
+        },
+        "arms": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Randomised arms, when participants are assigned different economics. A study that declares arms draws one at enrolment, by weight, and it stays with the participant. Absent, everyone plays by the same `pars`, and a bundle written before arms existed keeps its meaning and its hash. Shared by every arm: the disease, the population, the schedule.",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "weight",
+              "pars"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]{1,31}$",
+                "description": "A label carried on the participant, so analysis can split by it."
+              },
+              "weight": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Relative share of new enrolments. Two arms of weight 1 split evenly; 2 against 1 gives the first two-thirds. No zero: an arm nobody can be drawn into would sit in the protocol describing a group that does not exist."
+              },
+              "pars": {
+                "type": "object",
+                "additionalProperties": false,
+                "description": "What this arm pays, overlaid on `pars`. Prices only. The durations that decide whether a contact counts at all -- `contact_min_seconds`, `contact_cooldown_days`, `protection_window_seconds`, `carry_over_days` -- are deliberately absent, because they are properties of a pair or of reconciliation rather than of a person: two participants in different arms would disagree about whether the same encounter happened, and there is no answer to that question that is fair to both. Vary what an encounter is worth, never what counts as one. An arm naming nothing inherits the whole default, which is how a control arm is written.",
+                "properties": {
+                  "healthy_points": {
+                    "type": "integer",
+                    "description": "What a day ending healthy is worth in this arm."
+                  },
+                  "infected_points": {
+                    "type": "integer",
+                    "description": "What a day ending infected is worth in this arm."
+                  },
+                  "protection_cost": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "What protection costs in this arm. The usual thing an epigame randomises: the price of protecting yourself, inside one shared outbreak."
+                  },
+                  "contact_points": {
+                    "type": "integer",
+                    "description": "What one qualifying contact earns in this arm. Each side of a pair is credited at their own rate, so an encounter across two arms pays each participant what they were promised."
+                  },
+                  "contact_points_while_infected": {
+                    "type": "boolean",
+                    "description": "Whether contacts still earn once infected, in this arm. A price rather than a duration: it reads the participant's own state and changes only what their own day is worth."
+                  }
+                }
+              }
+            }
+          }
         }
       }
     },

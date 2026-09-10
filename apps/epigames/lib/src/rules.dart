@@ -12,9 +12,30 @@ library;
 class RulePars {
   const RulePars(this._values);
 
-  factory RulePars.fromBundle(Map<String, Object?>? rules) {
-    final pars = (rules?['pars'] as Map?)?.cast<String, Object?>() ?? const {};
-    return RulePars({...defaults, ...pars});
+  factory RulePars.fromBundle(Map<String, Object?>? rules) => RulePars.forArm(rules, null);
+
+  /// What one participant is paid by: the bundle's constants, overlaid with their arm's.
+  ///
+  /// The same overlay `Rules.pars_for/2` applies on the server, so the number on the screen and the
+  /// number in the ledger stay one answer — which is what the shared vectors exist to hold. An arm
+  /// this build does not recognise falls back to the shared constants rather than refusing: the
+  /// ledger is authoritative either way, and a participant seeing a stale price is a smaller
+  /// failure than one seeing no score at all.
+  factory RulePars.forArm(Map<String, Object?>? rules, String? arm) {
+    final shared = (rules?['pars'] as Map?)?.cast<String, Object?>() ?? const {};
+    return RulePars({...defaults, ...shared, ..._armPars(rules, arm)});
+  }
+
+  static Map<String, Object?> _armPars(Map<String, Object?>? rules, String? arm) {
+    if (arm == null) return const {};
+
+    for (final entry in (rules?['arms'] as List?) ?? const []) {
+      if (entry is Map && entry['name'] == arm) {
+        return (entry['pars'] as Map?)?.cast<String, Object?>() ?? const {};
+      }
+    }
+
+    return const {};
   }
 
   static const Map<String, Object?> defaults = {

@@ -76,6 +76,7 @@ defmodule EpidemicaServer.Epigame do
       now = Keyword.get(opts, :now, DateTime.utc_now())
 
       subjects = participants_in(tick)
+      arms = arms_by_subject(study_id)
       shown = states_shown_during(study_id, day, subjects)
       observed = observed_subjects(study, tick, subjects)
       chosen = chosen_protection(study_id, tick.period_start, tick.period_end)
@@ -95,7 +96,9 @@ defmodule EpidemicaServer.Epigame do
             carried_over: Map.get(carried, subject, 0)
           }
 
-          {subject, Rules.settle(pars, facts)}
+          # Which contacts qualified is settled above, at shared rates, because an encounter joins
+          # two people. What each of them is paid for it is theirs alone.
+          {subject, Rules.settle(Rules.pars_for(rules, Map.get(arms, subject)), facts)}
         end)
 
       write(study_id, day, settlements, tick, study, shown, chosen, observed, now)
@@ -371,6 +374,18 @@ defmodule EpidemicaServer.Epigame do
 
   defp rules_block(%{protocol: %{"rules" => rules}}) when is_map(rules), do: {:ok, rules}
   defp rules_block(_), do: {:error, :not_a_scored_study}
+
+  # Every participant's arm in one query. Includes the withdrawn: they may still appear in a tick
+  # they were present for, and scoring that day at the shared rate would price it as though they had
+  # never been randomised.
+  defp arms_by_subject(study_id) do
+    Repo.all(
+      from p in Participant,
+        where: p.study_id == type(^study_id, :binary_id) and not is_nil(p.arm),
+        select: {p.subject, p.arm}
+    )
+    |> Map.new()
+  end
 
   defp fetch_tick(study_id, day) do
     case Repo.get_by(Tick, study_id: study_id, day: day) do

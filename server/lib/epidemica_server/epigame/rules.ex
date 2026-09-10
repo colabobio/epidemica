@@ -31,6 +31,76 @@ defmodule EpidemicaServer.Epigame.Rules do
   def pars(_), do: @defaults
 
   @doc """
+  What one participant is paid by: defaults, then the study's `pars`, then their arm's.
+
+  The single place any caller asks "what are the rules for this person", so the number in the ledger
+  and the number the app shows come from one overlay. An arm that is nil, or names something this
+  study does not declare, is the shared rules — a participant who joined before arms existed still
+  has to be priced.
+  """
+  def pars_for(rules_block, arm) when is_map(rules_block) do
+    Map.merge(pars(rules_block), arm_pars(rules_block, arm))
+  end
+
+  def pars_for(_rules_block, _arm), do: @defaults
+
+  defp arm_pars(_rules_block, nil), do: %{}
+
+  defp arm_pars(rules_block, name) when is_binary(name) do
+    rules_block
+    |> Map.get("arms", [])
+    |> Enum.find_value(%{}, fn arm -> if arm["name"] == name, do: arm["pars"] || %{} end)
+  end
+
+  defp arm_pars(_rules_block, _arm), do: %{}
+
+  @doc """
+  The arms a study declares, as `[{name, weight}]`, or nil for one that does not.
+
+  Nil rather than `[]` so "one group" and "a draw with nothing to draw" stay distinguishable. The
+  schema refuses the second; this keeps the distinction readable in code that has already been
+  handed a protocol.
+  """
+  def arms(rules_block) when is_map(rules_block) do
+    case Map.get(rules_block, "arms") do
+      list when is_list(list) ->
+        Enum.map(list, fn arm -> {arm["name"], arm["weight"]} end)
+
+      _ ->
+        nil
+    end
+  end
+
+  def arms(_), do: nil
+
+  @doc """
+  Which arm a new enrolment lands in, drawn by weight.
+
+  Weighted rather than blocked. Blocking balances small groups but makes the assignment depend on
+  join order, which two phones joining at once cannot agree on without coordination; a weighted draw
+  is independent per participant, and imbalance at small numbers is the price. Say so in the
+  protocol: this is a draw, not a guarantee of equal groups.
+
+  Derived from `{study_id, subject}` rather than sampled, so the split can be re-derived from the
+  record during an audit, and so a redraw is impossible even if this were called twice.
+  """
+  def assign_arm(rules_block, study_id, subject) do
+    case arms(rules_block) do
+      choices when is_list(choices) and choices != [] ->
+        total = Enum.sum(Enum.map(choices, fn {_name, weight} -> weight end))
+        draw = :erlang.phash2({study_id, subject}, total)
+
+        choices
+        |> Enum.reduce_while(0, fn {name, weight}, acc ->
+          if draw < acc + weight, do: {:halt, name}, else: {:cont, acc + weight}
+        end)
+
+      _ ->
+        nil
+    end
+  end
+
+  @doc """
   Settle one participant-day.
 
   `facts` carries only what the participant could have known: the state they were shown, whether
