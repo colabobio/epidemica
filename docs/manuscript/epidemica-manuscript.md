@@ -112,7 +112,7 @@ regardless of how many kinds of module a study combines.
 study's transmission parameters are constrained to be directly loadable as parameters of an external,
 general-purpose simulator such as [@starsim], and a measured contact network is exposed to that
 simulator as a first-class network object rather than reimplemented as a parallel, drift-prone
-mathematical model maintained in two languages. This was motivated by the earlier approach int the pilot Epigames app, which specified both a server-side and an on-device transmission implementation, and
+mathematical model maintained in two languages. This was motivated by the earlier approach in the pilot Epigames app, which specified both a server-side and an on-device transmission implementation, and
 the risk that the two would silently disagree was judged worse than the cost of running the canonical
 model server-side and treating the phone as measurement, not computation.
 
@@ -184,23 +184,18 @@ to sustain transmission on its own — never to an unexplained default. Second, 
 both sides of every encounter server-side, which is strictly more information than either phone has
 alone and is why the earlier on-device transmission design (§3) was set aside for this application.
 Third, a settled day's score never changes retroactively except by an explicit, audited carry-over
-rule that recomputes what was actually true on each earlier day it revisits — a rule whose absence,
-during development, produced a real bug: crediting a participant today for a contact made while they
-were protected days ago, using today's protection state rather than the one that held at the time.
+rule that recomputes what was actually true on each earlier day it revisit.
 
 Two extensions built on the same reference application illustrate how a study author varies a
 platform-provided mechanism without touching platform code. **Arms** let a study randomise its
-economics — different point values, cooldowns, or protection costs — across participants drawn by a
+economics — different point values or protection costs — across participants drawn by a
 weighted, deterministic assignment at enrollment, with every rule resolved through one function that
 folds a study's defaults, its declared parameters, and a participant's arm into the parameters that
 actually govern their day; no scoring path is allowed a second, competing notion of what a
-participant's rules are. **Scheduled surveys**, added as the platform's second module after the first
-field test, close a gap sensing alone cannot: the sensors measure what happened, not what a
-participant knew, believed, or felt about it, which for a study whose research question is about
-understanding transmission is often the actual outcome of interest. Survey items are restricted to
-closed responses by construction — no free-text field exists in the instrument contract — which turns
-"the store should be pseudonymous" from a policy statement into a structural guarantee the schema
-itself enforces.
+participant's rules are. **Scheduled surveys** close a gap sensing alone cannot: the sensors measure what happened, not what a participant knew, believed, or felt about it, which for a study whose research 
+question is about understanding transmission is often the actual outcome of interest. Survey items are restricted to closed responses by construction — no free-text field exists in the instrument contract — 
+which turns "the store should be pseudonymous" from a policy statement into a structural guarantee the 
+schema itself enforces.
 
 ## 6. Agentic Readiness
 
