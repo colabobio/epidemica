@@ -3,6 +3,7 @@ analyzer:
     Pub:
       options:
         flutterVersion: "3.44.9-stable"
+        pubDependenciesOnly: "true"
 
 includes:
   paths:
