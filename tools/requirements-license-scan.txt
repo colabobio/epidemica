@@ -1,1 +1,2 @@
 scancode-toolkit==32.5.0
+scanoss[fast_winnowing]==1.54.2cd
