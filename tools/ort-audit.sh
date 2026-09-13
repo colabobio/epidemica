@@ -97,6 +97,9 @@ docker run --rm \
   -i /project \
   -o /out/pub/analyzer
 
+cleanup_pub_analysis_files
+trap - EXIT
+
 echo
 echo "=== ORT: analyzing Mix dependency graph ==="
 
