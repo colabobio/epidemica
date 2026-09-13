@@ -7,6 +7,7 @@ server/_build/
 server/deps/
 server/priv/static/assets/
 *.ez
+.ort.yml
 
 # Lockfiles are committed in every language. A published dataset has to stay re-derivable
 # years later, and estimator_version only pins our own code.

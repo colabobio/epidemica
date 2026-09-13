@@ -1,0 +1,49 @@
+analyzer:
+  package_managers:
+    Pub:
+      options:
+        flutterVersion: "3.44.9-stable"
+
+includes:
+  paths:
+    - pattern: "server/mix.exs"
+      reason: "SOURCE_OF"
+      comment: "Epidemica server."
+
+    - pattern: "packages/*/pubspec.yaml"
+      reason: "SOURCE_OF"
+      comment: "Epidemica Dart packages."
+
+    - pattern: "apps/*/pubspec.yaml"
+      reason: "SOURCE_OF"
+      comment: "Epidemica Flutter applications."
+
+    - pattern: "models/pyproject.toml"
+      reason: "SOURCE_OF"
+      comment: "Epidemica models."
+
+    - pattern: "analysis/pyproject.toml"
+      reason: "SOURCE_OF"
+      comment: "Epidemica analysis."
+
+excludes:
+  paths:
+    - pattern: "server/deps/**"
+      reason: "BUILD_TOOL_OF"
+      comment: "Dependencies downloaded by Mix."
+
+    - pattern: "server/_build/**"
+      reason: "BUILD_TOOL_OF"
+      comment: "Generated Mix build output."
+
+    - pattern: "**/.dart_tool/**"
+      reason: "BUILD_TOOL_OF"
+      comment: "Generated Dart package-manager state."
+
+    - pattern: "**/build/**"
+      reason: "BUILD_TOOL_OF"
+      comment: "Generated build output."
+
+    - pattern: ".venv*/**"
+      reason: "BUILD_TOOL_OF"
+      comment: "Local Python virtual environments."
