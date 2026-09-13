@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import sys
+import re
 from pathlib import Path
 
 # Paths where naming a license in prose is the entire point (an ADR comparing options,
@@ -46,7 +47,11 @@ ALLOW = {
     "isc",
     "cc-by-4.0",  # ADR-0009: docs/schemas are CC-BY-4.0, some fixtures may carry that text
 }
-REJECT_PREFIXES = ("gpl-", "agpl-", "lgpl-")
+
+COPYLEFT_RE = re.compile(
+    r"(?<![a-z0-9])(?:agpl|lgpl|gpl)-",
+    re.IGNORECASE,
+)
 
 # Below this ScanCode match score (0-100), a "detection" is usually a stray keyword
 # (a comment saying "no GPL code here" matches "gpl") rather than actual license text.
@@ -59,18 +64,21 @@ def excluded(path: str) -> bool:
 
 def classify(expression: str) -> str:
     key = expression.lower()
+
+    if COPYLEFT_RE.search(key):
+        return "reject"
+
     if key in ALLOW:
         return "allow"
-    if any(key.startswith(p) or f"({p}" in key for p in REJECT_PREFIXES):
-        return "reject"
-    return "review"
 
+    return "review"
 
 def iter_detections(file_entry: dict):
     """ScanCode's per-file license schema has changed across major versions; read both shapes."""
     for det in file_entry.get("license_detections", []):
         expr = det.get("license_expression") or det.get("license_expression_spdx")
-        score = det.get("matches", [{}])[0].get("score", 100.0) if det.get("matches") else 100.0
+        matches = det.get("matches", [])
+        score = max((m.get("score", 100.0) for m in matches), default=100.0)
         if expr:
             yield expr, score
     for lic in file_entry.get("licenses", []):  # older ScanCode releases
