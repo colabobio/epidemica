@@ -22,6 +22,19 @@ mkdir -p "$tmp"
 
 audit_failed=0
 
+generate_report() {
+  echo
+  echo "=== Generating Markdown report ==="
+
+  python3 tools/generate-provenance-report.py \
+    "$tmp" \
+    "$tmp/provenance-report.md" || true
+
+  echo "Report:"
+  echo "  $tmp/provenance-report.md"
+}
+
+trap generate_report EXIT
 
 # ---------------------------------------------------------------------------
 # 1. ScanCode
