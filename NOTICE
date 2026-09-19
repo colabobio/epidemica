@@ -1,0 +1,23 @@
+Epidemica
+Copyright 2026 University of Massachusetts Chan Medical School
+and the Epidemica Project Contributors
+
+This product includes software developed by the Colubri Lab at the University of
+Massachusetts Chan Medical School.
+
+Portions of this software are derived from earlier projects by the same team:
+  - Travel Healthy (TH)
+  - Epigames (EG)
+
+This product depends on, or incorporates interfaces to, third-party software
+distributed under its own terms, including:
+
+  - Herald (https://heraldprox.io)
+    Copyright 2020-2023 Herald Project Contributors
+    Licensed under the Apache License, Version 2.0
+
+  - Starsim (https://starsim.org)
+    Licensed under the MIT License
+
+  - Flutter, Phoenix, Ecto and other dependencies; see the dependency manifests
+    in each package for their respective notices.
