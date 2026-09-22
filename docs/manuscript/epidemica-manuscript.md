@@ -1,6 +1,6 @@
 ---
 title: "Epidemica: An Open, Agentic-Ready Research Platform for Participatory Epidemiology Studies"
-abstract: "Epidemica is an open-source platform for building study apps that collect high-resolution, multi-modal epidemiological data — including proximity contacts, survey responses, and, in a companion transmission engine, a simulated infection outcome — and for running interventions over that data. It is organised as a set of versioned data and protocol contracts, implemented once each in Dart client packages, an Elixir/Phoenix server, and a Python transmission model, so that a study is authored as a configuration document rather than a fork of an app. This paper describes the platform's motivation, its architecture, a reference application (a seven-day transmission game whose infections are decided by a real contact network rather than scripted), and a purposeful extension of that same contracts-first discipline to the agents that help build it: machine-readable convention files that let a coding agent work in this codebase without re-deriving rules that have already been paid for in debugging time. We report the platform's current state against its own stated milestones — extensively tested and field-exercised end to end — and discuss next steps and further directions."
+abstract: "Epidemica is an open-source platform for building study apps that collect high-resolution, multi-modal epidemiological data — including proximity contacts, survey responses, and, in a companion transmission engine, a simulated infection outcome — and for running interventions over that data. It is organised as a set of versioned data and protocol contracts, implemented once each in Dart client packages, an Elixir/Phoenix server, and a Python transmission model, so that a study is authored as a configuration document rather than a fork of an app. This paper describes the platform's motivation, its architecture, a reference application (a seven-day transmission game whose infections are decided by a real contact network rather than scripted), and a purposeful extension of that same contracts-first discipline to the agents that help build it: machine-readable convention files that let a coding agent work in this codebase without re-deriving rules that have already been paid for in debugging time. We report the platform's current state and discuss next steps and further directions. Epidemica is available under the Apache-2.0 license at: https://github.com/colabobio/epidemica"
 authors:
   - orcid: "0000-0001-5559-9661"
     name: "Andrés Colubri"
@@ -259,9 +259,7 @@ Epidemica's status is best described as an *alpha*: the complete arc from sensin
 settled conclusion runs end to end, and has been exercised on real devices for two reference study
 types (a plain contact-logging study, and the transmission game of §5) — but it has not been operated
 unattended, at the scale or duration its own milestone documents specify as acceptance criteria, or
-self-hosted anywhere outside its own development environment. The alpha release of the platform is
-under active development and will be made publicly available at
-\url{https://github.com/colabobio/epidemica}.
+self-hosted anywhere outside its own development environment. The platform is under active development and publicly available at \url{https://github.com/colabobio/epidemica}.
 
 More concretely, the platform's cross-language test suite — Elixir server, Dart client packages, and the
 Python transmission bridge — currently comprises over one thousand automated tests, with static analysis to report issues across the Elixir, Dart, and Python codebase.
