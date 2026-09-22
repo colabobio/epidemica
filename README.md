@@ -2,9 +2,7 @@
   <img src="assets/epidemica-wordmark.png" alt="Project Logo" width="200"/>
 </p>
 
-# Epidemica
-
-Modular infrastructure for building mobile apps that collect high-resolution, multi-modal
+Epidemica is a modular infrastructure for building mobile apps that collect high-resolution, multi-modal
 epidemiological data and deliver interventions.
 
 For an introduction presentation to Epidemica in pdf format, follow [this link](docs/presentations/Epidemica-Platform-Intro-Sep-22-2026.pdf). A preprint is also 
