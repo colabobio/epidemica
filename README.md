@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/epidemica-wordmark.png" alt="Project Logo" width="200"/>
+</p>
+
 # Epidemica
 
 Modular infrastructure for building mobile apps that collect high-resolution, multi-modal
