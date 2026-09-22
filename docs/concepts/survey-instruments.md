@@ -1,4 +1,4 @@
-# Surveys
+# Survey instruments
 
 How an instrument gets from a file in a repository to an answer in the observation store, and how to
 add one to a study.

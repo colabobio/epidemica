@@ -1,4 +1,4 @@
-# Modules
+# Epidemica modules
 
 A module is the unit of measurement in Epidemica. Proximity is one. Instruments, location and
 biosensing will be others. This is what a module is, how one is put together, and how modules get

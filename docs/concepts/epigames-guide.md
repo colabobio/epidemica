@@ -1,4 +1,4 @@
-# Epigames end to end
+# Epigames end-to-end guide
 
 How a phone seeing another phone becomes a number on a screen, and every clock that governs the
 journey.

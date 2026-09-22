@@ -1,8 +1,8 @@
 # Building a study
 
-How the pieces fit together, from the point of view of someone who wants to run one.
+This document explains how the different pieces offered by Epidemica fit together, from the point of view of someone who wants to run a study.
 
-## Three ways to build
+## Three ways to build a study
 
 Not every study needs the same amount of work, and the platform is arranged so that most need very
 little. [ADR-0001](../adr/0001-monorepo-and-package-boundaries.md) calls these tiers.
@@ -18,16 +18,13 @@ signs nothing** — which means no app store review, no build infrastructure, an
 That is the difference between a study taking a week and taking a quarter.
 
 The constraint is that Tier 1 only reaches as far as the module set already compiled into the binary
-you are using. A study needing a module that binary lacks is refused at enrolment, deliberately and
-loudly.
+you are using. A study needing a module that binary lacks is refused at enrollment.
 
 ## Tier 1, end to end
 
 ### 1. Author the bundle
 
-A bundle names the modules the study uses and configures each one. Declaring and configuring are the
-same act, so a bundle cannot name a module it forgot to configure, or configure one it never
-declared.
+A bundle must name the modules the study uses and configure each one. A bundle cannot name a module it without configuration, or specify configuraton arguments outside a module.
 
 ```json
 {
@@ -46,18 +43,14 @@ declared.
 }
 ```
 
-[`studies/contactlog/`](../../studies/contactlog) is the worked example. It is one JSON file and a
-README — there is no code in it, and a test asserts there never will be.
+[`studies/contactlog/`](../../studies/contactlog) is a basic worked example. It is one JSON file and a
+README — there is no code in it.
 
 The bundle is validated against [`contracts/bundle/1.0.0.json`](../../contracts/bundle/1.0.0.json),
-which is closed at the top level: a typo'd key is a loud failure rather than a setting that silently
-stays at its default. That is the specific way a misconfigured study otherwise collects the wrong
-thing for a month before anyone notices.
+which is closed at the top level: a typo'd key results in a failure rather than a setting that silently
+stays at its default. This avoids having a misconfigured study collecting the wrong data.
 
-**The settings are the study design.** `include_rssi: false` means you cannot recalibrate the
-distance estimator afterwards. `min_duration_seconds: 60` means brief contacts are never recorded,
-not merely filtered later. These are irreversible choices about what the dataset can answer, and
-they belong in the protocol discussion, not in the deployment.
+**The settings are the study design.** For example, in the case of the cotactlog, `include_rssi: false` means you cannot recalibrate the distance estimator afterwards. `min_duration_seconds: 60` means brief contacts are never recorded, not merely filtered later. These are choices about what the dataset that need to be made during protocol discussion, as they cannot be changed once deployed.
 
 ### 2. Register it
 
@@ -71,8 +64,7 @@ exactly what will be served. That hash is stamped on every observation the study
 dataset always says which configuration produced it — and changing the bundle changes the hash,
 which makes a mid-study configuration change visible in the data rather than silent.
 
-For a local run, [`deploy/local/contactlog/up.sh`](../../deploy/local/contactlog/up.sh) does the database, the migration,
-the registration and the server in one command.
+For a local run, [`deploy/local/contactlog/up.sh`](../../deploy/local/contactlog/up.sh) executes the database, the migration, the registration and the server in one command.
 
 ### 3. Participants join
 
@@ -91,18 +83,15 @@ sequenceDiagram
   A->>A: start the modules the bundle names
 ```
 
-If the binary lacks a module the bundle names, enrolment is refused with *"This study needs a newer
-version of the app"* — and the participant is never left enrolled in a study that collects nothing.
+If the binary lacks a module the bundle names, enrollment is refused with *"This study needs a newer
+version of the app"* — and the participant is never left enrolled in a study that collects no data.
 
 ### 4. Collection runs
 
 Modules record observations into a local outbox. The outbox is SQLite in WAL mode, writable from a
-background isolate, and its guarantee is narrow but firm: a recorded observation is delivered exactly
-once, or is visibly parked, but is never quietly lost. Twenty-four hours offline loses nothing.
+background isolate, and it offers the following specific guarantee: a recorded observation is delivered exactly once, or is visibly parked, but is never quietly lost. A device being temporarily offline does not result in data loses.
 
-The participant can see what the app is doing — recording, waiting to send, last sent — and can
-leave at any time, which stops collection and destroys everything held on the device including
-observations not yet uploaded.
+The participant can leave a study at any time, which stops collection and destroys everything held on the device including observations not yet uploaded.
 
 ### 5. Get the data out
 

@@ -1,4 +1,4 @@
-# Arms
+# Study Arms
 
 How to run an epigame as a randomised experiment: one outbreak, played at different prices.
 

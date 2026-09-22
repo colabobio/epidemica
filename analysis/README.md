@@ -78,3 +78,10 @@ and that enrollment agrees with the envelope on what a pseudonym is.
 
 A spec can validate cleanly while having quietly lost its semantics, so structural validation alone
 would not be worth much.
+
+## Netviz
+
+A D3.js-based web visulization of a run of the epigames app. The data should first be exported and then
+have random mixing added to it, refer to the instructions of the epigame-debug study in 
+[`studies/epigame-debug/README.md`](../studies/epigame-debug/README.md) for a step-by-step guide on how 
+to use netviz.

@@ -1,6 +1,6 @@
 # The study server
 
-One Phoenix application and one PostgreSQL database. It enrols devices, accepts observations,
+One Phoenix application and one PostgreSQL database. It enrolls devices, accepts observations,
 stores them, and derives query-friendly projections from them. This is what it does and why it does
 it that way.
 
